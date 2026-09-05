@@ -1,0 +1,16 @@
+{
+  "id": "bad-1",
+  "name": "Bad Project",
+  "units": "furlongs",
+  "createdAt": "not a date",
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "revision": -1,
+  "photos": "not an array",
+  "room": {
+    "polygon": [[0, 0], [1, 0]],
+    "walls": [],
+    "openings": []
+  },
+  "items": "not an array",
+  "history": []
+}
