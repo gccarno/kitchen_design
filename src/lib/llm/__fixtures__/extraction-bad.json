@@ -1,0 +1,7 @@
+{
+  "confidence": 1.5,
+  "polygonMm": [[0, 0], [1, 0]],
+  "walls": [],
+  "openings": [],
+  "notes": "intentionally bad: confidence > 1, polygon < 3 points"
+}
