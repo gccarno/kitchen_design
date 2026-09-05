@@ -1,0 +1,32 @@
+{
+  "confidence": 0.78,
+  "polygonMm": [
+    [0, 0],
+    [4200, 0],
+    [4200, 3200],
+    [0, 3200]
+  ],
+  "walls": [
+    { "fromIdx": 0, "toIdx": 1, "thicknessMm": 120 },
+    { "fromIdx": 1, "toIdx": 2, "thicknessMm": 120 },
+    { "fromIdx": 2, "toIdx": 3, "thicknessMm": 120 },
+    { "fromIdx": 3, "toIdx": 0, "thicknessMm": 120 }
+  ],
+  "openings": [
+    {
+      "wallIdx": 0,
+      "kind": "door",
+      "positionMm": 1800,
+      "widthMm": 900,
+      "heightMm": 2100
+    },
+    {
+      "wallIdx": 2,
+      "kind": "window",
+      "positionMm": 600,
+      "widthMm": 1500,
+      "heightMm": 1200
+    }
+  ],
+  "notes": "Single rectangular room, door on the north wall, window on the south wall. Reference: credit card at the bottom of the first photo."
+}
