@@ -5,8 +5,10 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    include: ['tests/unit/**/*.{test,spec}.{ts,tsx}', 'src/**/*.{test,spec}.{ts,tsx}'],
+    include: ['tests/unit/**/*.{test,spec}.{ts,tsx}', 'tests/integration/**/*.{test,spec}.{ts,tsx}', 'src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['tests/e2e/**', 'node_modules/**'],
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
   },
   resolve: {
     alias: {
