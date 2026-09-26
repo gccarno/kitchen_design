@@ -21,7 +21,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 10.5 — Hardening + data model migration (manual phone check waits until Task 13 mounts `PhotoCapture` on a page)
 - [x] Task 10.6 — Measured walls + manual room sketch (`RoomSketch` mounts on a page in Task 13)
 - [x] Task 11 — Vision extraction endpoint (REST; tRPC dropped)
-- [ ] **Next: Task 12 — Diff preview component**
+- [x] Task 12 — Diff preview component
+- [ ] **Next: Task 13 — Project page shell**
 
 ## Decisions (locked in with user)
 
@@ -37,7 +38,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–11 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–12 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -486,6 +487,8 @@ Steps:
 2. List openings/walls as a table of changes; for LLM proposals show `confidence` and `notes` prominently.
 3. "Apply" posts the patch to `POST /api/projects/[id]/revisions` with `baseRevision` (409 → "plan changed, re-run"); "Discard" drops it.
 4. Commit: `feat: diff preview component`.
+
+> ✅ Done. The change list comes from `src/lib/plan/changes.ts` (`describePlanChanges`, compares whole plans, so wording is about walls and items, not JSON paths; a full room replacement reads as one "All walls replaced" line). Both thumbnails share one scale via the shared `PlanThumbnail` component, which `RoomSketch` now uses too.
 
 ### Task 13: Project page shell + routing
 

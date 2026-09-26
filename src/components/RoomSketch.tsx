@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { newId } from '@/lib/id';
-import { polygonBounds, polygonSelfIntersects, signedPolygonArea, snapToGrid, type Point } from '@/lib/plan/geometry';
+import PlanThumbnail from './PlanThumbnail';
+import { polygonSelfIntersects, signedPolygonArea, snapToGrid, type Point } from '@/lib/plan/geometry';
 import { rescaleRoomToMeasurements, SCALE_DISAGREEMENT_WARN } from '@/lib/plan/scale';
 import type { Measurement, Room } from '@/lib/plan/schemas';
 import { wallLengthMm } from '@/lib/plan/validate';
@@ -65,7 +66,7 @@ export default function RoomSketch({ onSave }: RoomSketchProps) {
     const room = result.room;
     return (
       <section className="flex flex-col gap-3">
-        <RoomPreview polygon={room.polygon} />
+        <PlanThumbnail room={room} label="Room outline preview" className="max-h-72 w-full max-w-md border bg-white" />
         <ol className="flex flex-col gap-2 text-sm">
           {room.walls.map((w, i) => (
             <li key={w.id} className="flex flex-wrap items-center gap-2">
@@ -238,35 +239,4 @@ function Grid() {
     lines.push(<line key={`h${v}`} x1={0} y1={v} x2={CANVAS_MM} y2={v} stroke="#e5e7eb" strokeWidth={10} />);
   }
   return <g>{lines}</g>;
-}
-
-function RoomPreview({ polygon }: { polygon: Point[] }) {
-  const b = polygonBounds(polygon);
-  const pad = Math.max(b.maxX - b.minX, b.maxY - b.minY) * 0.08;
-  const stroke = Math.max(b.maxX - b.minX, b.maxY - b.minY) / 100;
-  return (
-    <svg
-      viewBox={`${b.minX - pad} ${b.minY - pad} ${b.maxX - b.minX + 2 * pad} ${b.maxY - b.minY + 2 * pad}`}
-      className="max-h-72 w-full max-w-md border bg-white"
-      role="img"
-      aria-label="Room outline preview"
-    >
-      <polygon points={polygon.map((p) => p.join(',')).join(' ')} fill="#f3f4f6" stroke="black" strokeWidth={stroke} />
-      {polygon.map((p, i) => {
-        const q = polygon[(i + 1) % polygon.length];
-        return (
-          <text
-            key={i}
-            x={(p[0] + q[0]) / 2}
-            y={(p[1] + q[1]) / 2}
-            fontSize={stroke * 4}
-            textAnchor="middle"
-            dominantBaseline="middle"
-          >
-            {i + 1}
-          </text>
-        );
-      })}
-    </svg>
-  );
 }
