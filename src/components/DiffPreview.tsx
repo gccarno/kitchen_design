@@ -5,20 +5,10 @@ import PlanThumbnail from './PlanThumbnail';
 import { describePlanChanges } from '@/lib/plan/changes';
 import { validatePatchOnProject } from '@/lib/plan/diff';
 import { polygonBounds, type Bounds, type Point } from '@/lib/plan/geometry';
-import type { JsonPatchOp, Project } from '@/lib/plan/schemas';
+import type { Project } from '@/lib/plan/schemas';
+import type { Proposal } from '@/lib/plan/proposal';
 
-/** A proposed edit awaiting the user's confirmation. */
-export interface Proposal {
-  patch: JsonPatchOp[];
-  /** Revision the patch was computed against; the server rejects it if the plan has moved on. */
-  baseRevision: number;
-  summary: string;
-  source: 'user' | 'llm';
-  /** LLM proposals only. */
-  confidence?: number;
-  notes?: string;
-  warnings?: string[];
-}
+export type { Proposal };
 
 interface DiffPreviewProps {
   projectId: string;

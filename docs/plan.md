@@ -22,7 +22,9 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 10.6 — Measured walls + manual room sketch (`RoomSketch` mounts on a page in Task 13)
 - [x] Task 11 — Vision extraction endpoint (REST; tRPC dropped)
 - [x] Task 12 — Diff preview component
-- [ ] **Next: Task 13 — Project page shell**
+- [x] Task 13 — Project page shell — **milestone 1 reached** (photos + measurements → proposed room, or a hand sketch → review → saved)
+- [ ] Manual phone check of Tasks 10–13 (now possible: `next dev -H 0.0.0.0`, open `http://<laptop-ip>:3000` on the phone)
+- [ ] **Next: Task 14 — Konva canvas + viewport**
 
 ## Decisions (locked in with user)
 
@@ -38,7 +40,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–12 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–13 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -498,6 +500,8 @@ Steps:
 - Create: `src/app/project/[id]/page.tsx`, `src/app/layout.tsx` (extend), `src/store/editor.ts` (Zustand store).
 
 Commit: `feat: project page shell`.
+
+> ✅ Done. `/project/[id]` (server page, 404 for malformed/unknown ids) renders `ProjectEditor`: current room, photos with reference marking, "Room from photos" (`ExtractPanel`), "Or sketch it by hand" (`RoomSketch`), and `DiffPreview` for every change. `src/store/editor.ts` holds the saved project and at most one pending proposal (`src/lib/plan/proposal.ts`). `/` got a minimal project list and create form (Task 25 adds thumbnails, rename, delete). Playwright e2e now runs on its own port with a throwaway `DATA_DIR` and covers creating a project, sketch → review → apply → reload, and dragging a reference box with a real pointer (checked in natural pixels).
 
 ---
 
