@@ -24,7 +24,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 12 — Diff preview component
 - [x] Task 13 — Project page shell — **milestone 1 reached** (photos + measurements → proposed room, or a hand sketch → review → saved)
 - [ ] Manual phone check of Tasks 10–13 (now possible: `next dev -H 0.0.0.0`, open `http://<laptop-ip>:3000` on the phone)
-- [ ] **Next: Task 14 — Konva canvas + viewport**
+- [x] Task 14 — Konva canvas + viewport
+- [ ] **Next: Task 15 — Drag-to-edit walls and polygon vertices**
 
 ## Decisions (locked in with user)
 
@@ -40,7 +41,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–13 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–14 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -517,6 +518,8 @@ Commit: `feat: project page shell`.
 Use `react-konva`. Initial: render polygon + walls only. Snap-to-grid on. Mobile: pinch zoom, two-finger pan.
 
 Commit: `feat: floor plan canvas`.
+
+> ✅ Done. Viewport math is pure and unit-tested in `src/lib/plan/viewport.ts` (fit, zoom-at-point, pan, pinch, ruler ticks in m/mm or ft/in, adaptive grid step, `formatLength`). `FloorPlanCanvas` owns gestures on the wrapper with pointer events (one pointer pans, two pinch; wheel zooms at the cursor without scrolling the page) and draws HTML rulers; `FloorPlanStage` is the Konva drawing (walls at real thickness, openings, items, wall labels inside the room), loaded client-only. `next.config.ts` aliases Konva's optional `canvas` dependency away (it broke every route's compile). Snapping lands with vertex dragging in Task 15; the grid it will snap to is drawn now. Canvas behaviour is covered by Playwright (pixel checks, wheel, drag, buttons, a real CDP two-finger pinch).
 
 ### Task 15: Drag-to-edit walls and polygon vertices
 

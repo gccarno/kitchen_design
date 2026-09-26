@@ -5,7 +5,7 @@ import Link from 'next/link';
 import DiffPreview from './DiffPreview';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
-import PlanThumbnail from './PlanThumbnail';
+import FloorPlanCanvas from './FloorPlanCanvas';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForRoom } from '@/lib/plan/proposal';
@@ -52,7 +52,7 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
 
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Current room</h2>
-        <PlanThumbnail room={project.room} items={project.items} label="Current room" className="max-h-80 w-full border bg-white" />
+        <FloorPlanCanvas room={project.room} items={project.items} units={project.units} label="Current room" />
         <p className="text-sm text-gray-600">
           {Math.round(bounds.maxX - bounds.minX)} × {Math.round(bounds.maxY - bounds.minY)} mm, {areaM2.toFixed(1)} m²
         </p>
