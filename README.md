@@ -7,7 +7,7 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
 ## Status
 
 **Phase 1 — Foundations:** complete (Tasks 1–8).
-**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–12 done; Task 13 (project page) is next.
+**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–13 done — milestone 1: photos + measurements (or a hand sketch) → reviewed, saved room. Task 14 (Konva canvas) is next.
 
 ## Stack
 
@@ -24,7 +24,8 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
 ```bash
 npm install
 npm run dev
-npm test
+npm test          # unit + integration (Vitest)
+npm run e2e       # browser tests (Playwright; own port and temp data dir)
 ```
 
 ## Configuration
