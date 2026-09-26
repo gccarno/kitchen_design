@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { createProject, projectDir } from '@/lib/storage/projects';
+import { createProject, loadProject, projectDir } from '@/lib/storage/projects';
 
 let server: ChildProcess | null = null;
 let dataDir: string;
@@ -105,7 +105,7 @@ describe('dev server end-to-end', () => {
     expect(await pollHome()).toBe(true);
   });
 
-  it('accepts a real photo upload and saves bytes to disk', async () => {
+  it('uploads a photo, registers it, serves it back, and stores a reference', async () => {
     const p = createProject(dataDir, { name: 'Integration' });
 
     const jpeg = await sharp({
@@ -117,7 +117,6 @@ describe('dev server end-to-end', () => {
     const form = new FormData();
     form.append('projectId', p.id);
     form.append('file', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'room.jpg');
-    form.append('referenceKind', 'credit_card');
 
     const res = await fetch(BASE + '/api/upload', { method: 'POST', body: form });
     expect(res.status).toBe(201);
@@ -135,10 +134,36 @@ describe('dev server end-to-end', () => {
     expect(dims.width).toBe(640);
     expect(dims.height).toBe(480);
 
-    // Sidecar reference metadata.
-    const sidecar = join(projectDir(dataDir, p.id), 'photos', `${body.photo.id}.ref.json`);
-    expect(existsSync(sidecar)).toBe(true);
-    const meta = JSON.parse(readFileSync(sidecar, 'utf-8'));
-    expect(meta).toEqual({ kind: 'credit_card', knownSizeMm: 85.6 });
+    // Registered on the project document.
+    expect(loadProject(dataDir, p.id).photos.map((ph) => ph.id)).toEqual([body.photo.id]);
+
+    // Served back through the photo route.
+    const photoUrl = `${BASE}/api/projects/${p.id}/photos/${body.photo.id}`;
+    const img = await fetch(photoUrl);
+    expect(img.status).toBe(200);
+    expect(img.headers.get('content-type')).toBe('image/jpeg');
+    expect((await sharp(Buffer.from(await img.arrayBuffer())).metadata()).width).toBe(640);
+
+    // Reference stored with the server-resolved size.
+    const put = await fetch(`${photoUrl}/reference`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'credit_card', side: 'long', pixelBox: [100, 100, 271, 208] }),
+    });
+    expect(put.status).toBe(200);
+    expect(loadProject(dataDir, p.id).photos[0].referenceObject).toEqual({
+      kind: 'credit_card',
+      side: 'long',
+      knownSizeMm: 85.6,
+      pixelBox: [100, 100, 271, 208],
+    });
+  });
+
+  it('rejects a path-traversal project id', async () => {
+    const form = new FormData();
+    form.append('projectId', '../../outside');
+    form.append('file', new Blob([new Uint8Array(4)], { type: 'image/jpeg' }), 'x.jpg');
+    const res = await fetch(BASE + '/api/upload', { method: 'POST', body: form });
+    expect(res.status).toBe(400);
   });
 });

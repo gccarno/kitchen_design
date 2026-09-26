@@ -12,6 +12,10 @@ import {
   segmentLength,
   pointToSegmentDistance,
   polygonCentroid,
+  segmentsIntersect,
+  polygonSelfIntersects,
+  rotatedRectFootprint,
+  convexPolygonsOverlap,
   type Point,
   type Rect,
 } from './geometry';
@@ -244,5 +248,78 @@ describe('polygonCentroid', () => {
     ]);
     expect(c[0]).toBeCloseTo(1000);
     expect(c[1]).toBeCloseTo(2000);
+  });
+});
+
+describe('segmentsIntersect', () => {
+  it('detects a proper crossing', () => {
+    expect(segmentsIntersect([0, 0], [10, 10], [0, 10], [10, 0])).toBe(true);
+  });
+
+  it('returns false for parallel segments', () => {
+    expect(segmentsIntersect([0, 0], [10, 0], [0, 5], [10, 5])).toBe(false);
+  });
+
+  it('returns false for segments that only touch at an endpoint', () => {
+    expect(segmentsIntersect([0, 0], [10, 0], [10, 0], [10, 10])).toBe(false);
+  });
+});
+
+describe('polygonSelfIntersects', () => {
+  it('returns false for a rectangle', () => {
+    expect(polygonSelfIntersects([[0, 0], [3000, 0], [3000, 4000], [0, 4000]])).toBe(false);
+  });
+
+  it('returns true for a bow-tie', () => {
+    expect(polygonSelfIntersects([[0, 0], [4000, 4000], [4000, 0], [0, 4000]])).toBe(true);
+  });
+
+  it('returns false for a concave L-shape', () => {
+    expect(
+      polygonSelfIntersects([[0, 0], [4000, 0], [4000, 2000], [2000, 2000], [2000, 4000], [0, 4000]])
+    ).toBe(false);
+  });
+});
+
+describe('rotatedRectFootprint', () => {
+  it('returns an axis-aligned rect centred on the point at 0 degrees', () => {
+    const f = rotatedRectFootprint([1000, 1000], 600, 400, 0);
+    expect(f).toEqual([
+      [700, 800],
+      [1300, 800],
+      [1300, 1200],
+      [700, 1200],
+    ]);
+  });
+
+  it('swaps extents at 90 degrees', () => {
+    const f = rotatedRectFootprint([0, 0], 600, 400, 90);
+    const xs = f.map((p) => p[0]);
+    const ys = f.map((p) => p[1]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(400);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(600);
+  });
+});
+
+describe('convexPolygonsOverlap', () => {
+  const sq = (x: number, y: number, s: number): Point[] => [[x, y], [x + s, y], [x + s, y + s], [x, y + s]];
+
+  it('detects overlapping squares', () => {
+    expect(convexPolygonsOverlap(sq(0, 0, 100), sq(50, 50, 100))).toBe(true);
+  });
+
+  it('returns false for separated squares', () => {
+    expect(convexPolygonsOverlap(sq(0, 0, 100), sq(200, 0, 100))).toBe(false);
+  });
+
+  it('returns false for squares that only share an edge', () => {
+    expect(convexPolygonsOverlap(sq(0, 0, 100), sq(100, 0, 100))).toBe(false);
+  });
+
+  it('separates a 45-degree rotated square whose bounding boxes overlap', () => {
+    // Diamond centred at (0,0) with half-diagonal ~70.7 vs a square in the
+    // corner region: AABBs overlap but the shapes do not.
+    const diamond = rotatedRectFootprint([0, 0], 100, 100, 45);
+    expect(convexPolygonsOverlap(diamond, sq(40, 40, 50))).toBe(false);
   });
 });

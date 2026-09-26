@@ -7,10 +7,10 @@
     [0, 3200]
   ],
   "walls": [
-    { "fromIdx": 0, "toIdx": 1, "thicknessMm": 120 },
-    { "fromIdx": 1, "toIdx": 2, "thicknessMm": 120 },
-    { "fromIdx": 2, "toIdx": 3, "thicknessMm": 120 },
-    { "fromIdx": 3, "toIdx": 0, "thicknessMm": 120 }
+    { "thicknessMm": 120 },
+    { "thicknessMm": 120 },
+    { "thicknessMm": 120 },
+    { "thicknessMm": 120 }
   ],
   "openings": [
     {

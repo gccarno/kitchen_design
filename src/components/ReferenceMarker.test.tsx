@@ -1,64 +1,135 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi } from 'vitest';
-import ReferenceMarker from './ReferenceMarker';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
+import ReferenceMarker from './ReferenceMarker';
+
+const imageUrl = '/api/projects/p/photos/ph';
+
+/**
+ * The image is displayed at 200×150 CSS px but is 400×300 natural px, so
+ * every display coordinate should be doubled in the emitted pixelBox.
+ */
+function setup(props: Partial<React.ComponentProps<typeof ReferenceMarker>> = {}) {
+  const onChange = vi.fn();
+  render(<ReferenceMarker imageUrl={imageUrl} onChange={onChange} {...props} />);
+  const img = screen.getByRole('img') as HTMLImageElement;
+  Object.defineProperty(img, 'naturalWidth', { value: 400, configurable: true });
+  Object.defineProperty(img, 'naturalHeight', { value: 300, configurable: true });
+  img.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, width: 200, height: 150, right: 200, bottom: 150, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+  fireEvent.load(img);
+  const surface = screen.getByTestId('reference-surface');
+  return { onChange, img, surface };
+}
+
+function drag(surface: HTMLElement, from: [number, number], to: [number, number]) {
+  fireEvent.pointerDown(surface, { pointerId: 1, clientX: from[0], clientY: from[1] });
+  fireEvent.pointerMove(surface, { pointerId: 1, clientX: to[0], clientY: to[1] });
+  fireEvent.pointerUp(surface, { pointerId: 1, clientX: to[0], clientY: to[1] });
+}
 
 describe('ReferenceMarker', () => {
-  const imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='; // 1x1 transparent pixel
-
-  it('renders an image and a dropdown', () => {
-    const onChange = vi.fn();
-    render(<ReferenceMarker imageUrl={imageUrl} onChange={onChange} />);
-    expect(screen.getByRole('img')).not.toBeNull();
-    expect(screen.getByRole('combobox')).not.toBeNull();
+  it('renders the photo plus object and side pickers', () => {
+    setup();
+    expect(screen.getByRole('img').getAttribute('src')).toBe(imageUrl);
+    expect(screen.getByLabelText(/reference object/i)).not.toBeNull();
+    expect(screen.getByLabelText(/edge/i)).not.toBeNull();
   });
 
-  it('calls onChange with null when cleared', () => {
-    const onChange = vi.fn();
-    render(<ReferenceMarker imageUrl={imageUrl} onChange={onChange} />);
-    // We'll implement a clear button later. For now, skip.
-    expect(true).toBe(true);
+  it('emits the box in natural image pixels, not CSS pixels', () => {
+    const { onChange, surface } = setup();
+    drag(surface, [10, 10], [110, 60]);
+    expect(onChange).toHaveBeenLastCalledWith({
+      kind: 'credit_card',
+      side: 'long',
+      pixelBox: [20, 20, 220, 120],
+    });
   });
 
-  it('calls onChange when user draws a rectangle', async () => {
-    const onChange = vi.fn();
-    const { container } = render(<ReferenceMarker imageUrl={imageUrl} onChange={onChange} />);
-    const img = screen.getByRole('img');
-    // Wait for the image to load (we'll mock naturalWidth and naturalHeight to be 100)
-    // We'll use waitFor to ensure the image is rendered (though it's immediate)
-    await waitFor(() => {
-      // We'll just check that the img has a src attribute
-      expect(img.getAttribute('src')).toBe(imageUrl);
+  it('normalizes a box dragged up and to the left', () => {
+    const { onChange, surface } = setup();
+    drag(surface, [110, 60], [10, 10]);
+    expect(onChange.mock.lastCall?.[0].pixelBox).toEqual([20, 20, 220, 120]);
+  });
+
+  it('clamps the box to the image bounds', () => {
+    const { onChange, surface } = setup();
+    drag(surface, [150, 100], [260, 190]);
+    expect(onChange.mock.lastCall?.[0].pixelBox).toEqual([300, 200, 400, 300]);
+  });
+
+  it('ignores a tap that does not drag', () => {
+    const { onChange, surface } = setup();
+    drag(surface, [50, 50], [50, 50]);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps an existing box when the user taps (or a wobbly tap moves a pixel)', () => {
+    const { onChange, surface } = setup();
+    drag(surface, [10, 10], [110, 60]);
+    onChange.mockClear();
+    drag(surface, [150, 100], [150.5, 100.5]);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId('reference-box').style.left).toBe('5%');
+    expect(screen.getByTestId('reference-box').style.width).toBe('50%');
+  });
+
+  it('restores the previous box when the pointer is cancelled mid-drag', () => {
+    const { surface } = setup();
+    drag(surface, [10, 10], [110, 60]);
+    fireEvent.pointerDown(surface, { pointerId: 2, clientX: 150, clientY: 100 });
+    fireEvent.pointerMove(surface, { pointerId: 2, clientX: 190, clientY: 140 });
+    fireEvent.pointerCancel(surface, { pointerId: 2 });
+    expect(screen.getByTestId('reference-box').style.left).toBe('5%');
+  });
+
+  it('shows a live preview rectangle while dragging', () => {
+    const { surface } = setup();
+    fireEvent.pointerDown(surface, { pointerId: 1, clientX: 20, clientY: 15 });
+    fireEvent.pointerMove(surface, { pointerId: 1, clientX: 120, clientY: 90 });
+    const box = screen.getByTestId('reference-box');
+    // Positioned as a percentage of the image, so it tracks resizes.
+    expect(box.style.left).toBe('10%');
+    expect(box.style.top).toBe('10%');
+    expect(box.style.width).toBe('50%');
+    expect(box.style.height).toBe('50%');
+  });
+
+  it('re-emits when the object kind or edge changes after drawing', () => {
+    const { onChange, surface } = setup();
+    drag(surface, [10, 10], [110, 60]);
+    fireEvent.change(screen.getByLabelText(/reference object/i), { target: { value: 'a4_paper' } });
+    expect(onChange.mock.lastCall?.[0]).toMatchObject({ kind: 'a4_paper', side: 'long' });
+    fireEvent.change(screen.getByLabelText(/edge/i), { target: { value: 'short' } });
+    expect(onChange.mock.lastCall?.[0]).toMatchObject({ kind: 'a4_paper', side: 'short' });
+  });
+
+  it('asks for a size for a custom object and only emits once it is valid', () => {
+    const { onChange, surface } = setup();
+    fireEvent.change(screen.getByLabelText(/reference object/i), { target: { value: 'custom' } });
+    drag(surface, [10, 10], [110, 60]);
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/size \(mm\)/i), { target: { value: '600' } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      kind: 'custom',
+      side: 'long',
+      customSizeMm: 600,
+      pixelBox: [20, 20, 220, 120],
     });
-    // Mock the naturalWidth and naturalHeight to be 100 so we can compute scale if needed.
-    Object.defineProperty(img, 'naturalWidth', { value: 100, configurable: true });
-    Object.defineProperty(img, 'naturalHeight', { value: 100, configurable: true });
-    const rect = img.getBoundingClientRect();
-    // We'll simulate a drag from (10,10) to (90,90) relative to the image's top-left.
-    const startX = rect.left + 10;
-    const startY = rect.top + 10;
-    const endX = rect.left + 90;
-    const endY = rect.top + 90;
-    // Simulate mousedown at start
-    fireEvent.mouseDown(img, { clientX: startX, clientY: startY });
-    // Simulate mousemove to end
-    fireEvent.mouseMove(img, { clientX: endX, clientY: endY });
-    // Simulate mouseup
-    fireEvent.mouseUp(img, { clientX: endX, clientY: endY });
-    // Wait for onChange to be called
-    await waitFor(() => {
-      expect(onChange).toHaveBeenCalled();
-    });
-    const call = onChange.mock.calls[0][0];
-    expect(call).toHaveProperty('kind');
-    expect(call.kind).toBe('credit_card');
-    expect(call).toHaveProperty('pixelBox');
-    expect(Array.isArray(call.pixelBox)).toBe(true);
-    expect(call.pixelBox).toHaveLength(4);
-    expect(call.pixelBox.every(Number.isFinite)).toBe(true);
-    expect(call).toHaveProperty('lengthMM');
-    expect(typeof call.lengthMM).toBe('number');
-    // Since we selected credit-card by default, lengthMM should be the width of the credit-card (85.60)
-    expect(call.lengthMM).toBeCloseTo(85.60, 2);
+  });
+
+  it('clears the box and emits null', () => {
+    const { onChange, surface } = setup();
+    drag(surface, [10, 10], [110, 60]);
+    fireEvent.click(screen.getByRole('button', { name: /clear/i }));
+    expect(onChange).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByTestId('reference-box')).toBeNull();
+  });
+
+  it('starts from an existing value', () => {
+    setup({ value: { kind: 'us_letter', side: 'short', pixelBox: [40, 30, 240, 180] } });
+    expect((screen.getByLabelText(/reference object/i) as HTMLSelectElement).value).toBe('us_letter');
+    expect((screen.getByLabelText(/edge/i) as HTMLSelectElement).value).toBe('short');
+    expect(screen.getByTestId('reference-box').style.left).toBe('10%');
   });
 });

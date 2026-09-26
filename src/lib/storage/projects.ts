@@ -19,8 +19,27 @@ export function resolveDataDir(): string {
   return process.env.DATA_DIR || join(process.cwd(), 'data');
 }
 
-/** `<dataDir>/projects/<id>` — where a project's files live. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Thrown for any project id that is not a UUID — the path-traversal guard. */
+export class InvalidProjectIdError extends Error {
+  constructor(id: string) {
+    super(`invalid project id: ${JSON.stringify(id)}`);
+    this.name = 'InvalidProjectIdError';
+  }
+}
+
+export function isValidProjectId(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
+/**
+ * `<dataDir>/projects/<id>` — where a project's files live. Every path into
+ * project storage goes through here, so `id` (often from a request) is
+ * validated as a UUID before it can reach the filesystem.
+ */
 export function projectDir(dataDir: string, id: string): string {
+  if (!isValidProjectId(id)) throw new InvalidProjectIdError(id);
   return join(dataDir, 'projects', id);
 }
 
@@ -44,6 +63,7 @@ export function createProject(
 ): Project {
   const now = new Date().toISOString();
   const id = overrides.id ?? randomUUID();
+  const dir = projectDir(dataDir, id);
   const project: Project = ProjectSchema.parse({
     id,
     name: overrides.name,
@@ -53,23 +73,21 @@ export function createProject(
     revision: 0,
     photos: [],
     room: {
-      // Default empty rectangle so the editor has something to draw on.
-      // The user replaces this once photos are extracted.
+      // Default 3m × 4m rectangle so the editor has something to draw on.
+      // The user replaces this once photos are extracted or the room is sketched.
       polygon: [
         [0, 0],
         [3000, 0],
         [3000, 4000],
         [0, 4000],
       ],
-      walls: [],
+      walls: Array.from({ length: 4 }, () => ({ id: randomUUID(), thicknessMm: 100 })),
       openings: [],
     },
     items: [],
     history: [],
   });
 
-  const dir = projectDir(dataDir, id);
-  mkdirSync(dir, { recursive: true });
   mkdirSync(join(dir, 'photos'), { recursive: true });
   atomicWriteJson(join(dir, 'project.json'), project);
   return project;
@@ -93,6 +111,41 @@ export function saveProject(dataDir: string, project: Project): void {
   mkdirSync(dir, { recursive: true });
   mkdirSync(join(dir, 'photos'), { recursive: true });
   atomicWriteJson(join(dir, 'project.json'), validated);
+}
+
+// Per-project write queue. Kept on globalThis so every Next.js route bundle
+// in this process shares one queue per project.
+const LOCKS_KEY = Symbol.for('kitchen-design.projectLocks');
+function projectLocks(): Map<string, Promise<unknown>> {
+  const g = globalThis as typeof globalThis & { [LOCKS_KEY]?: Map<string, Promise<unknown>> };
+  return (g[LOCKS_KEY] ??= new Map());
+}
+
+/**
+ * Load → update → save under a per-project lock, so concurrent writers
+ * (e.g. parallel photo uploads) can't overwrite each other's changes.
+ * If `update` throws, nothing is saved and the error propagates.
+ * In-process only — fine for the single-user local app.
+ */
+export async function updateProject(
+  dataDir: string,
+  id: string,
+  update: (current: Project) => Project | Promise<Project>
+): Promise<Project> {
+  const key = projectDir(dataDir, id);
+  const locks = projectLocks();
+  const run = (locks.get(key) ?? Promise.resolve()).then(async () => {
+    const next = await update(loadProject(dataDir, id));
+    saveProject(dataDir, next);
+    return next;
+  });
+  const tail = run.catch(() => undefined);
+  locks.set(key, tail);
+  try {
+    return await run;
+  } finally {
+    if (locks.get(key) === tail) locks.delete(key);
+  }
 }
 
 /** Minimal summary used by the project list page. */

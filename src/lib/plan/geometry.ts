@@ -228,7 +228,85 @@ export function polygonCentroid(poly: ReadonlyArray<Point>): Point {
   return [cx * k, cy * k];
 }
 
+/**
+ * True if segments ab and cd cross at a single interior point. Segments
+ * that only touch at an endpoint, or are collinear, do not count — that
+ * is what polygon self-intersection needs (adjacent edges share vertices).
+ */
+export function segmentsIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
+  const d1 = cross(c, d, a);
+  const d2 = cross(c, d, b);
+  const d3 = cross(a, b, c);
+  const d4 = cross(a, b, d);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+}
+
+/** True if any pair of non-adjacent polygon edges intersect. */
+export function polygonSelfIntersects(poly: ReadonlyArray<Point>): boolean {
+  const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 2; j < n; j++) {
+      // The last edge is adjacent to the first (they share vertex 0).
+      if (i === 0 && j === n - 1) continue;
+      if (segmentsIntersect(poly[i], poly[(i + 1) % n], poly[j], poly[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Corners of a `w` × `d` rectangle centred on `center`, rotated `deg`
+ * degrees CCW. Order: the unrotated corners go (-x,-y), (+x,-y), (+x,+y), (-x,+y).
+ */
+export function rotatedRectFootprint(center: Point, w: number, d: number, deg: number): Point[] {
+  const hw = w / 2;
+  const hd = d / 2;
+  const corners: Point[] = [
+    [center[0] - hw, center[1] - hd],
+    [center[0] + hw, center[1] - hd],
+    [center[0] + hw, center[1] + hd],
+    [center[0] - hw, center[1] + hd],
+  ];
+  return deg === 0 ? corners : corners.map((p) => rotateAround(p, center, deg));
+}
+
+/**
+ * Separating-axis test for two convex polygons. Returns true only when
+ * the intersection has non-zero area — polygons that merely share an
+ * edge or a vertex do not overlap.
+ */
+export function convexPolygonsOverlap(a: ReadonlyArray<Point>, b: ReadonlyArray<Point>): boolean {
+  const EPS = 1e-9;
+  for (const poly of [a, b]) {
+    for (let i = 0; i < poly.length; i++) {
+      const p1 = poly[i];
+      const p2 = poly[(i + 1) % poly.length];
+      const axis: Point = [p1[1] - p2[1], p2[0] - p1[0]];
+      const [minA, maxA] = project(a, axis);
+      const [minB, maxB] = project(b, axis);
+      if (maxA <= minB + EPS || maxB <= minA + EPS) return false;
+    }
+  }
+  return true;
+}
+
 // --- internals ---
+
+/** Orientation of `p` relative to the directed line o→a: >0 left, <0 right, 0 collinear. */
+function cross(o: Point, a: Point, p: Point): number {
+  return (a[0] - o[0]) * (p[1] - o[1]) - (a[1] - o[1]) * (p[0] - o[0]);
+}
+
+function project(poly: ReadonlyArray<Point>, axis: Point): [number, number] {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const p of poly) {
+    const v = p[0] * axis[0] + p[1] * axis[1];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return [min, max];
+}
 
 function lineLineIntersection(
   p1: Point,

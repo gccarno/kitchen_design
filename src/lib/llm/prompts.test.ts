@@ -11,12 +11,7 @@ describe('refineExtractedRoom', () => {
       [4000, 3000],
       [0, 3000],
     ],
-    walls: [
-      { fromIdx: 0, toIdx: 1, thicknessMm: 100 },
-      { fromIdx: 1, toIdx: 2, thicknessMm: 100 },
-      { fromIdx: 2, toIdx: 3, thicknessMm: 100 },
-      { fromIdx: 3, toIdx: 0, thicknessMm: 100 },
-    ],
+    walls: [{ thicknessMm: 100 }, { thicknessMm: 100 }, { thicknessMm: 100 }, { thicknessMm: 100 }],
     openings: [],
     notes: '',
   });
@@ -29,15 +24,25 @@ describe('refineExtractedRoom', () => {
     }
   });
 
-  it('flags a wall referencing an out-of-range vertex', () => {
+  it('flags a wall count that does not match the polygon edge count', () => {
+    const broken = { ...baseValid, walls: [{ thicknessMm: 100 }] };
+    const r = refineExtractedRoom(broken);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.issues.join(' ')).toMatch(/1 walls.*4 edges/);
+    }
+  });
+
+  it('flags an opening that runs past the end of its wall', () => {
+    // Wall 1 is the 3000mm edge (4000,0)→(4000,3000).
     const broken = {
       ...baseValid,
-      walls: [{ fromIdx: 0, toIdx: 99, thicknessMm: 100 }],
+      openings: [{ wallIdx: 1, kind: 'window' as const, positionMm: 2500, widthMm: 1000, heightMm: 1200 }],
     };
     const r = refineExtractedRoom(broken);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.issues.join(' ')).toMatch(/out.of.range/i);
+      expect(r.issues.join(' ')).toMatch(/past the end/);
     }
   });
 
@@ -124,6 +129,12 @@ describe('buildExtractRoomPrompt', () => {
     const p = buildExtractRoomPrompt({ units: 'mm', photoCount: 3 });
     expect(p.system).not.toMatch(/Use that to compute the millimetre-per-pixel scale/);
     expect(p.user).toMatch(/3 photos?/i);
+  });
+
+  it('describes walls as one entry per polygon edge', () => {
+    const p = buildExtractRoomPrompt({ units: 'mm', photoCount: 1 });
+    expect(p.system).toMatch(/walls\[i\].*edge/i);
+    expect(p.system).not.toMatch(/fromIdx/);
   });
 
   it('returns a prompt that requests a JSON object (response_format compatible)', () => {
