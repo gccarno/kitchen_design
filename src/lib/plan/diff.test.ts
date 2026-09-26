@@ -4,6 +4,9 @@ import {
   applyJsonPatch,
   summarizePatch,
   validatePatchOnProject,
+  commitRevision,
+  StaleRevisionError,
+  HISTORY_LIMIT,
 } from './diff';
 import { ProjectSchema, type Project } from './schemas';
 
@@ -25,7 +28,10 @@ function newProject(): Project {
         [0, 4000],
       ],
       walls: [
-        { id: 'w0', from: [0, 0], to: [3000, 0], thicknessMm: 100 },
+        { id: 'w0', thicknessMm: 100 },
+        { id: 'w1', thicknessMm: 100 },
+        { id: 'w2', thicknessMm: 100 },
+        { id: 'w3', thicknessMm: 100 },
       ],
       openings: [],
     },
@@ -56,6 +62,7 @@ describe('planToJsonPatch', () => {
         {
           id: 'i1',
           catalogId: 'base-cabinet-600',
+          sizeMm: { w: 600, d: 560, h: 720 },
           position: { x: 100, y: 200 },
           rotationDeg: 0,
         },
@@ -76,6 +83,7 @@ describe('planToJsonPatch', () => {
         {
           id: 'i1',
           catalogId: 'base-cabinet-600',
+          sizeMm: { w: 600, d: 560, h: 720 },
           position: { x: 0, y: 0 },
           rotationDeg: 0,
         },
@@ -141,6 +149,7 @@ describe('applyJsonPatch', () => {
         {
           id: 'i1',
           catalogId: 'base-cabinet-600',
+          sizeMm: { w: 600, d: 560, h: 720 },
           position: { x: 100, y: 200 },
           rotationDeg: 0,
         },
@@ -180,11 +189,11 @@ describe('validatePatchOnProject', () => {
 
   it('rejects a patch whose result is not a valid project', () => {
     const p = newProject();
-    const patch = [{ op: 'replace' as const, path: '/units', value: 'parsecs' }];
+    const patch = [{ op: 'replace' as const, path: '/room/walls/0/thicknessMm', value: -5 }];
     const r = validatePatchOnProject(p, patch);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.issues.join(' ')).toMatch(/units|invalid/i);
+      expect(r.issues.join(' ')).toMatch(/thicknessMm|invalid|number/i);
     }
   });
 
@@ -193,5 +202,93 @@ describe('validatePatchOnProject', () => {
     const patch = [{ op: 'remove' as const, path: '/items/0' }];
     const r = validatePatchOnProject(p, patch);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('patch-path allowlist', () => {
+  it.each([
+    ['/id', 'x'],
+    ['/revision', 99],
+    ['/history', []],
+    ['/photos', []],
+    ['/units', 'in'],
+    ['/updatedAt', 'x'],
+    ['/names', 'x'],
+  ])('rejects ops targeting %s', (path, value) => {
+    expect(() => applyJsonPatch(newProject(), [{ op: 'replace', path, value }])).toThrow(/non-editable path/);
+  });
+
+  it('rejects move/copy whose source is outside the allowlist', () => {
+    expect(() => applyJsonPatch(newProject(), [{ op: 'copy', from: '/id', path: '/name' }])).toThrow(
+      /non-editable path/
+    );
+  });
+
+  it('allows /name, /room/** and /items/**', () => {
+    const p = applyJsonPatch(newProject(), [
+      { op: 'replace', path: '/name', value: 'N' },
+      { op: 'replace', path: '/room/walls/0/thicknessMm', value: 150 },
+      {
+        op: 'add',
+        path: '/items/-',
+        value: { id: 'i1', catalogId: 'c', sizeMm: { w: 600, d: 560, h: 720 }, position: { x: 1, y: 1 }, rotationDeg: 0 },
+      },
+    ]);
+    expect(p.name).toBe('N');
+    expect(p.items).toHaveLength(1);
+  });
+});
+
+describe('commitRevision', () => {
+  const at = '2026-02-02T00:00:00.000Z';
+  const rename = [{ op: 'replace' as const, path: '/name', value: 'Renamed' }];
+
+  it('applies the patch, bumps revision and updatedAt, and records history', () => {
+    const before = newProject();
+    const after = commitRevision(before, rename, { baseRevision: 0, source: 'user', summary: 'rename', at });
+    expect(after.name).toBe('Renamed');
+    expect(after.revision).toBe(1);
+    expect(after.updatedAt).toBe(at);
+    expect(after.history).toHaveLength(1);
+    expect(after.history[0]).toMatchObject({ revision: 1, patch: rename, source: 'user', summary: 'rename', at });
+  });
+
+  it('records an inverse that restores the previous plan', () => {
+    const before = newProject();
+    const movedVertex = [{ op: 'replace' as const, path: '/room/polygon/2', value: [3500, 4500] }];
+    const after = commitRevision(before, movedVertex, { baseRevision: 0, source: 'llm', summary: 's', at });
+    const undone = applyJsonPatch(after, after.history[0].inverse);
+    expect(undone.room).toEqual(before.room);
+    expect(undone.name).toEqual(before.name);
+  });
+
+  it('rejects a stale baseRevision', () => {
+    const p = { ...newProject(), revision: 3 };
+    expect(() => commitRevision(p, rename, { baseRevision: 2, source: 'llm', summary: 's', at })).toThrow(
+      StaleRevisionError
+    );
+  });
+
+  it('rejects a patch that leaves the plan semantically invalid', () => {
+    const p = newProject();
+    const dropWall = [{ op: 'remove' as const, path: '/room/walls/3' }];
+    expect(() => commitRevision(p, dropWall, { baseRevision: 0, source: 'user', summary: 's', at })).toThrow(
+      /3 walls/
+    );
+  });
+
+  it(`caps history at ${HISTORY_LIMIT} entries, dropping the oldest`, () => {
+    let p = newProject();
+    for (let i = 0; i < HISTORY_LIMIT + 5; i++) {
+      p = commitRevision(p, [{ op: 'replace', path: '/name', value: `n${i}` }], {
+        baseRevision: p.revision,
+        source: 'user',
+        summary: String(i),
+        at,
+      });
+    }
+    expect(p.history).toHaveLength(HISTORY_LIMIT);
+    expect(p.history[0].summary).toBe('5');
+    expect(p.revision).toBe(HISTORY_LIMIT + 5);
   });
 });

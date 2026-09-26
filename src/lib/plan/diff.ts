@@ -8,10 +8,15 @@
  * before/after objects). `planToJsonPatch` walks the structure and emits
  * the minimum set of ops to transform before into after.
  *
- * `applyJsonPatch` is strict: it deep-clones the input, applies the ops
+ * `applyJsonPatch` is strict: it only accepts ops on editable paths
+ * (`/name`, `/room/**`, `/items/**`), deep-clones the input, applies the ops
  * via `fast-json-patch`, then re-validates against `ProjectSchema`. A
  * patch that produces an invalid project throws — the caller is expected
  * to surface this as a "could not apply" error, never silently corrupt state.
+ *
+ * `commitRevision` is the one way an edit becomes a new revision: it checks
+ * `baseRevision`, applies, runs `validatePlan`, and appends a history entry
+ * carrying the inverse patch for undo.
  */
 
 import {
@@ -19,14 +24,31 @@ import {
   compare as fjpCompare,
   type Operation as FjpOp,
 } from 'fast-json-patch';
-import { ProjectSchema, type JsonPatchOp, type Project } from './schemas';
+import type { CheckResult } from '../result';
+import { ProjectSchema, type JsonPatchOp, type PlanRevision, type Project } from './schemas';
+import { validatePlan } from './validate';
 
 export type { JsonPatchOp } from './schemas';
 
-export interface RefineResult<T> {
-  ok: boolean;
-  value?: T;
-  issues: string[];
+/** Maximum history entries kept on a project; the oldest are dropped. */
+export const HISTORY_LIMIT = 200;
+
+/** Top-level fields a patch may touch. Everything else is server-managed. */
+const EDITABLE_ROOTS = ['/name', '/room', '/items'];
+
+function isEditablePath(path: string): boolean {
+  return EDITABLE_ROOTS.some((root) => path === root || path.startsWith(`${root}/`));
+}
+
+/** Thrown when a proposal was made against an older revision of the project. */
+export class StaleRevisionError extends Error {
+  constructor(
+    readonly baseRevision: number,
+    readonly currentRevision: number
+  ) {
+    super(`plan changed since this edit was proposed (base revision ${baseRevision}, now ${currentRevision})`);
+    this.name = 'StaleRevisionError';
+  }
 }
 
 /**
@@ -61,10 +83,18 @@ function fjpToOur(op: FjpOp): JsonPatchOp | null {
 /**
  * Apply a patch to a project. Returns a new project; the input is not
  * mutated. Throws on:
+ *   - an op whose `path` or `from` is outside the editable allowlist
  *   - patch application error (bad path, type mismatch, etc.)
  *   - post-application schema validation failure
  */
 export function applyJsonPatch(before: Project, patch: JsonPatchOp[]): Project {
+  for (const op of patch) {
+    for (const p of [op.path, op.from]) {
+      if (p !== undefined && !isEditablePath(p)) {
+        throw new Error(`patch op "${op.op}" targets non-editable path "${p}"`);
+      }
+    }
+  }
   const cloned = structuredClone(before);
   const raw: FjpOp[] = patch.map(oursToFjp);
   const result = fjpApply(cloned as unknown as object, raw, /*validate*/ true, /*mutate*/ false);
@@ -87,21 +117,55 @@ function oursToFjp(op: JsonPatchOp): FjpOp {
 /**
  * Validate a patch against a project WITHOUT mutating the project. The
  * patch is applied to a deep clone, then the result is checked against
- * `ProjectSchema`. Returns a `RefineResult` so callers can show issues
+ * `ProjectSchema`. Returns a `CheckResult` so callers can show issues
  * to the user before they confirm.
  */
-export function validatePatchOnProject(
-  before: Project,
-  patch: JsonPatchOp[]
-): RefineResult<Project> {
-  const issues: string[] = [];
+export function validatePatchOnProject(before: Project, patch: JsonPatchOp[]): CheckResult<Project> {
   try {
-    const result = applyJsonPatch(before, patch);
-    return { ok: true, value: result, issues: [] };
+    return { ok: true, value: applyJsonPatch(before, patch) };
   } catch (err) {
-    issues.push((err as Error).message);
-    return { ok: false, issues };
+    return { ok: false, issues: [(err as Error).message] };
   }
+}
+
+export interface CommitOptions {
+  /** Revision the patch was proposed against. */
+  baseRevision: number;
+  source: PlanRevision['source'];
+  summary: string;
+  /** ISO timestamp; defaults to now. */
+  at?: string;
+}
+
+/**
+ * Apply `patch` as a new revision. Throws `StaleRevisionError` if the
+ * project has moved past `baseRevision`, and an Error listing the problems
+ * if the result fails `validatePlan`. Returns the new project; the input
+ * is not mutated.
+ */
+export function commitRevision(before: Project, patch: JsonPatchOp[], opts: CommitOptions): Project {
+  if (before.revision !== opts.baseRevision) {
+    throw new StaleRevisionError(opts.baseRevision, before.revision);
+  }
+  const applied = applyJsonPatch(before, patch);
+  const check = validatePlan(applied);
+  if (!check.valid) {
+    throw new Error(`edit would leave the plan invalid: ${check.errors.join('; ')}`);
+  }
+
+  // `applied` differs from `before` only on editable paths, so the reverse
+  // diff is a valid (allowlisted) undo patch.
+  const inverse = planToJsonPatch(applied, before);
+  const at = opts.at ?? new Date().toISOString();
+  const revision = before.revision + 1;
+  const entry: PlanRevision = { revision, patch, inverse, at, source: opts.source, summary: opts.summary };
+
+  return ProjectSchema.parse({
+    ...applied,
+    revision,
+    updatedAt: at,
+    history: [...before.history, entry].slice(-HISTORY_LIMIT),
+  });
 }
 
 /**

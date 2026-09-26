@@ -6,7 +6,7 @@
 
 import type { ReferenceObjectKind } from '../plan/schemas';
 
-export const PROMPT_VERSION = '1.0.0';
+export const PROMPT_VERSION = '1.1.0';
 
 export interface ExtractPromptInput {
   units: 'mm' | 'in';
@@ -52,7 +52,7 @@ export function buildExtractRoomPrompt(input: ExtractPromptInput): {
     '{',
     '  "confidence": <number 0..1, how sure you are>,',
     '  "polygonMm": [[x0,y0], [x1,y1], ...],   // >= 3 vertices, counter-clockwise',
-    '  "walls": [{"fromIdx": i, "toIdx": j, "thicknessMm": 120}, ...],',
+    '  "walls": [{"thicknessMm": 120}, ...],   // exactly one per polygon edge',
     '  "openings": [{"wallIdx": k, "kind": "door"|"window"|"pass_through", "positionMm": <mm along wall>, "widthMm": <mm>, "heightMm": <mm>}, ...],',
     '  "notes": "<free-form caveats, e.g. assumed ceiling height, occluded corner>"',
     '}',
@@ -60,9 +60,9 @@ export function buildExtractRoomPrompt(input: ExtractPromptInput): {
     'Rules:',
     '- All distances are in MILLIMETRES. Do not return inches.',
     '- polygonMm is a closed polygon. The first vertex need not equal the last; close it implicitly.',
-    '- walls[].fromIdx and walls[].toIdx reference polygonMm vertex indices (0..N-1). Every wall must have both endpoints in the polygon.',
-    '- openings[].wallIdx references a wall index (0..W-1), not a polygon vertex.',
-    '- Estimate generously but flag uncertainty. If you cannot see a wall clearly, return fewer walls and lower confidence.',
+    '- walls[i] is the edge from polygonMm[i] to polygonMm[i+1] (the last wall closes back to vertex 0). Return exactly N walls for N vertices.',
+    '- openings[].wallIdx references a wall index (0..N-1). positionMm is measured along the wall from its start vertex; positionMm + widthMm must not exceed the wall length.',
+    '- Estimate generously but flag uncertainty. If you cannot see a wall clearly, give your best guess, lower confidence, and say so in notes.',
     '- Return ONLY the JSON object. No prose, no markdown fences.',
   ].join('\n');
 

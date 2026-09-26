@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { POST } from './route';
+import { createProject, loadProject, projectDir } from '@/lib/storage/projects';
 
 function makeJpeg(width: number, height: number): Promise<Buffer> {
   return sharp({
@@ -26,6 +28,14 @@ async function readJson(res: Response): Promise<UploadResult> {
   return (await res.json()) as UploadResult;
 }
 
+function post(fields: Record<string, string | Blob>): Promise<Response> {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  return POST(new Request('http://localhost/api/upload', { method: 'POST', body: form }));
+}
+
+const jpegBlob = async (w = 100, h = 100) => new Blob([new Uint8Array(await makeJpeg(w, h))], { type: 'image/jpeg' });
+
 describe('POST /api/upload', () => {
   let dataDir: string;
   beforeEach(() => {
@@ -38,85 +48,64 @@ describe('POST /api/upload', () => {
   });
 
   it('rejects requests without projectId', async () => {
-    const form = new FormData();
-    form.append('file', new Blob([new Uint8Array(10)], { type: 'image/jpeg' }), 'x.jpg');
-    const req = new Request('http://localhost/api/upload', { method: 'POST', body: form });
-    const res = await POST(req);
+    const res = await post({ file: await jpegBlob() });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-UUID projectId without touching the filesystem', async () => {
+    const res = await post({ projectId: '../../escape', file: await jpegBlob() });
+    expect(res.status).toBe(400);
+    expect(existsSync(join(dataDir, 'escape'))).toBe(false);
+    expect(existsSync(join(dataDir, 'projects'))).toBe(false);
+  });
+
+  it('returns 404 for a well-formed id with no project', async () => {
+    const res = await post({ projectId: randomUUID(), file: await jpegBlob() });
+    expect(res.status).toBe(404);
+    expect(existsSync(join(dataDir, 'projects'))).toBe(false);
   });
 
   it('rejects requests without a file', async () => {
-    const form = new FormData();
-    form.append('projectId', 'p1');
-    const req = new Request('http://localhost/api/upload', { method: 'POST', body: form });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('rejects an invalid referenceKind', async () => {
-    const jpeg = await makeJpeg(100, 100);
-    const form = new FormData();
-    form.append('projectId', 'p1');
-    form.append('file', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'x.jpg');
-    form.append('referenceKind', 'banana');
-    const req = new Request('http://localhost/api/upload', { method: 'POST', body: form });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('rejects custom reference with missing size', async () => {
-    const jpeg = await makeJpeg(100, 100);
-    const form = new FormData();
-    form.append('projectId', 'p1');
-    form.append('file', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'x.jpg');
-    form.append('referenceKind', 'custom');
-    const req = new Request('http://localhost/api/upload', { method: 'POST', body: form });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('saves a photo to the project directory and returns metadata', async () => {
-    // Pre-create the project dir by writing a project.json there.
-    const { projectDir, createProject, loadProject } = await import('@/lib/storage/projects');
     const p = createProject(dataDir, { name: 'Test' });
+    const res = await post({ projectId: p.id });
+    expect(res.status).toBe(400);
+  });
 
-    const jpeg = await makeJpeg(640, 480);
-    const form = new FormData();
-    form.append('projectId', p.id);
-    form.append('file', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'kitchen.jpg');
-    const req = new Request('http://localhost/api/upload', { method: 'POST', body: form });
-    const res = await POST(req);
+  it('rejects bytes that are not an image', async () => {
+    const p = createProject(dataDir, { name: 'Test' });
+    const res = await post({ projectId: p.id, file: new Blob(['not an image'], { type: 'image/jpeg' }) });
+    expect(res.status).toBe(400);
+    expect(loadProject(dataDir, p.id).photos).toEqual([]);
+  });
+
+  it('saves the photo, registers it on the project, and returns metadata', async () => {
+    const p = createProject(dataDir, { name: 'Test' });
+    const res = await post({ projectId: p.id, file: await jpegBlob(640, 480) });
     expect(res.status).toBe(201);
     const body = await readJson(res);
-    expect(body.photo.id).toMatch(/[0-9a-f-]{36}/);
-    expect(body.photo.path).toMatch(/^photos\/.+\.jpg$/);
+    expect(body.photo.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(body.photo.path).toBe(`photos/${body.photo.id}.jpg`);
     expect(body.photo.width).toBe(640);
     expect(body.photo.height).toBe(480);
 
     const filePath = join(projectDir(dataDir, p.id), body.photo.path);
-    expect(existsSync(filePath)).toBe(true);
-    // Confirm the saved bytes are a valid JPEG of the right size.
-    const saved = readFileSync(filePath);
-    const dims = await sharp(saved).metadata();
+    const dims = await sharp(readFileSync(filePath)).metadata();
     expect(dims.width).toBe(640);
     expect(dims.height).toBe(480);
+
+    const saved = loadProject(dataDir, p.id);
+    expect(saved.photos).toEqual([body.photo]);
+    expect(saved.updatedAt >= p.updatedAt).toBe(true);
+    // No sidecar files any more — the project document is the only record.
+    expect(readdirSync(join(projectDir(dataDir, p.id), 'photos'))).toEqual([`${body.photo.id}.jpg`]);
   });
 
-  it('writes a sidecar reference metadata file when reference is provided', async () => {
-    const { createProject, projectDir } = await import('@/lib/storage/projects');
+  it('keeps every photo when uploads run concurrently', async () => {
     const p = createProject(dataDir, { name: 'Test' });
-    const jpeg = await makeJpeg(100, 100);
-    const form = new FormData();
-    form.append('projectId', p.id);
-    form.append('file', new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }), 'x.jpg');
-    form.append('referenceKind', 'credit_card');
-    const req = new Request('http://localhost/api/upload', { method: 'POST', body: form });
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-    const body = await readJson(res);
-    const sidecar = join(projectDir(dataDir, p.id), 'photos', `${body.photo.id}.ref.json`);
-    expect(existsSync(sidecar)).toBe(true);
-    const meta = JSON.parse(readFileSync(sidecar, 'utf-8'));
-    expect(meta).toEqual({ kind: 'credit_card', knownSizeMm: 85.6 });
+    const results = await Promise.all(
+      Array.from({ length: 5 }, async () => post({ projectId: p.id, file: await jpegBlob() }))
+    );
+    expect(results.every((r) => r.status === 201)).toBe(true);
+    expect(loadProject(dataDir, p.id).photos).toHaveLength(5);
   });
 });

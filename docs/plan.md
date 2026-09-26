@@ -17,8 +17,9 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 7 — JSON Patch diff/apply
 - [x] Task 8 — Plan validation
 - [x] Task 9 — Photo upload + EXIF
-- [~] Task 10 — Reference-marker UI (partial: `PhotoCapture.tsx` missing, mouse-only, coordinate bug — finished in Task 10.5)
-- [ ] **Next: Task 10.5 — Hardening** (review findings), then Task 10.6
+- [x] Task 10 — Reference-marker UI (completed in Task 10.5)
+- [x] Task 10.5 — Hardening + data model migration (manual phone check waits until Task 13 mounts `PhotoCapture` on a page)
+- [ ] **Next: Task 10.6 — Measured walls + manual room sketch**
 
 ## Decisions (locked in with user)
 
@@ -33,7 +34,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–10 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–10.5 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -83,7 +84,7 @@ Data flow:
 
 ## Data Model (the contract)
 
-> Zod schemas in `src/lib/plan/schemas.ts` are the source of truth; `types.ts` re-exports inferred types. The shape below is the **target** model — the migration from the Tasks 1–10 shape happens in Task 10.5.
+> Zod schemas in `src/lib/plan/schemas.ts` are the source of truth; `types.ts` re-exports inferred types. The code matches this model as of Task 10.5.
 
 ```ts
 // Plan document — single source of truth, versioned. All lengths in mm.

@@ -14,4 +14,7 @@ export type {
   PlanRevision,
   JsonPatchOp,
   ReferenceObjectKind,
+  ReferenceObject,
+  ReferenceSide,
+  Measurement,
 } from './schemas';

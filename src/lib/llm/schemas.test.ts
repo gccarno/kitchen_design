@@ -37,22 +37,17 @@ describe('ExtractedRoomSchema', () => {
     expect(() => ExtractedRoomSchema.parse(data)).toThrow();
   });
 
-  it('rejects a wall that references an out-of-range vertex index', () => {
-    // polygonMm has 4 entries, so valid fromIdx/toIdx are 0..3
-    const data = {
-      ...ok,
-      walls: [{ fromIdx: 0, toIdx: 99, thicknessMm: 100 }],
-    };
-    // Note: the schema accepts the raw index here; cross-field validation
-    // happens in refineExtractedRoom. So this fixture should actually parse.
-    // The purpose of this test is to pin the contract: raw schema allows it.
+  it('accepts a wall count that differs from the edge count (checked in refineExtractedRoom)', () => {
+    // Pins the contract: the raw schema is per-field only; cross-field
+    // consistency is refineExtractedRoom's job.
+    const data = { ...ok, walls: [{ thicknessMm: 100 }] };
     expect(() => ExtractedRoomSchema.parse(data)).not.toThrow();
   });
 
   it('rejects a non-positive wall thickness', () => {
     const data = {
       ...ok,
-      walls: [{ fromIdx: 0, toIdx: 1, thicknessMm: 0 }],
+      walls: [{ thicknessMm: 0 }],
     };
     expect(() => ExtractedRoomSchema.parse(data)).toThrow();
   });

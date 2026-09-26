@@ -10,17 +10,31 @@ export const ReferenceObjectKind = z.enum([
   'credit_card',
   'a4_paper',
   'us_letter',
-  'tape_measure',
   'coin_us_quarter',
   'custom',
 ]);
 export type ReferenceObjectKind = z.infer<typeof ReferenceObjectKind>;
 
-// A wall is a directed segment along the room polygon perimeter, with a thickness.
+// Which edge of the reference object the user's box measures.
+export const ReferenceSide = z.enum(['long', 'short']);
+export type ReferenceSide = z.infer<typeof ReferenceSide>;
+
+// A resolved reference: `knownSizeMm` comes from `reference-objects.ts` (or
+// the user's custom value) and `pixelBox` is [x1, y1, x2, y2] in NATURAL
+// image pixels (not CSS pixels), with x1 < x2 and y1 < y2.
+export const ReferenceObjectSchema = z.object({
+  kind: ReferenceObjectKind,
+  side: ReferenceSide,
+  knownSizeMm: z.number().positive(),
+  pixelBox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+});
+export type ReferenceObject = z.infer<typeof ReferenceObjectSchema>;
+
+// Wall i is the polygon edge polygon[i] → polygon[(i + 1) % n]. Its geometry is
+// derived from the polygon, never stored, so editing a vertex can't desync
+// walls from the outline. `validatePlan` enforces walls.length === polygon.length.
 const WallSchema = z.object({
   id: z.string().min(1),
-  from: Point,
-  to: Point,
   thicknessMm: z.number().positive(),
 });
 
@@ -34,11 +48,19 @@ const OpeningSchema = z.object({
   heightMm: z.number().positive(),
 });
 
+// A user-measured wall length — the scale source of truth for extraction.
+const MeasurementSchema = z.object({
+  wallId: z.string().min(1),
+  lengthMm: z.number().positive(),
+  source: z.literal('user'),
+});
+
 // The room is a polygon (in mm, plan coords) with walls and openings.
 const RoomSchema = z.object({
   polygon: z.array(Point).min(3),
   walls: z.array(WallSchema),
   openings: z.array(OpeningSchema),
+  measurements: z.array(MeasurementSchema).optional(),
 });
 
 // A photo with optional reference object for scale and optional wall hint.
@@ -47,19 +69,12 @@ const PhotoSchema = z.object({
   path: z.string().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-  referenceObject: z
-    .object({
-      kind: ReferenceObjectKind,
-      knownSizeMm: z.number().positive(),
-      customSizeMm: z.number().positive().optional(),
-      pixelBox: z.tuple([z.number(), z.number(), z.number(), z.number()]),
-    })
-    .optional(),
+  referenceObject: ReferenceObjectSchema.optional(),
   wallHint: z.enum(['north', 'east', 'south', 'west', 'unknown']).optional(),
 });
 
 // A single JSON-Patch op (RFC 6902) — produced by the LLM and applied on user confirm.
-const JsonPatchOpSchema = z.object({
+export const JsonPatchOpSchema = z.object({
   op: z.enum(['add', 'remove', 'replace', 'move', 'copy', 'test']),
   path: z.string(),
   value: z.unknown().optional(),
@@ -71,6 +86,10 @@ export type JsonPatchOp = z.infer<typeof JsonPatchOpSchema>;
 const PlacedItemSchema = z.object({
   id: z.string().min(1),
   catalogId: z.string().min(1),
+  // Snapshot of the catalog item's size at placement, so validation never
+  // needs the catalog and plans survive catalog changes.
+  sizeMm: z.object({ w: z.number().positive(), d: z.number().positive(), h: z.number().positive() }),
+  // Item centre, mm.
   position: z.object({ x: z.number(), y: z.number() }),
   rotationDeg: z.number(),
   tag: z.string().optional(),
@@ -80,6 +99,8 @@ const PlacedItemSchema = z.object({
 const PlanRevisionSchema = z.object({
   revision: z.number().int().nonnegative(),
   patch: z.array(JsonPatchOpSchema),
+  // Patch that undoes `patch`; applied on undo.
+  inverse: z.array(JsonPatchOpSchema),
   at: z.string().min(1),
   source: z.enum(['user', 'llm']),
   summary: z.string(),
@@ -105,3 +126,4 @@ export type Opening = z.infer<typeof OpeningSchema>;
 export type PlacedItem = z.infer<typeof PlacedItemSchema>;
 export type Photo = z.infer<typeof PhotoSchema>;
 export type PlanRevision = z.infer<typeof PlanRevisionSchema>;
+export type Measurement = z.infer<typeof MeasurementSchema>;

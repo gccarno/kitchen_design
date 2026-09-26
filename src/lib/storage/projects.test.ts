@@ -10,7 +10,12 @@ import {
   listProjects,
   projectDir,
   atomicWriteJson,
+  updateProject,
+  InvalidProjectIdError,
 } from './projects';
+import { validatePlan } from '../plan/validate';
+
+const SOME_UUID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
 
 // Minimal but valid project; tests can mutate freely.
 function newProject(overrides: Partial<Project> = {}): Project {
@@ -67,8 +72,15 @@ describe('project storage', () => {
 
   describe('projectDir', () => {
     it('returns dataDir/projects/<id>', () => {
-      expect(projectDir(dataDir, 'abc')).toBe(join(dataDir, 'projects', 'abc'));
+      expect(projectDir(dataDir, SOME_UUID)).toBe(join(dataDir, 'projects', SOME_UUID));
     });
+
+    it.each(['abc', '../../etc', '..', `${SOME_UUID}/../x`, '', 'C:\Windows'])(
+      'rejects non-UUID id %j (path traversal guard)',
+      (id) => {
+        expect(() => projectDir(dataDir, id)).toThrow(InvalidProjectIdError);
+      }
+    );
   });
 
   describe('createProject', () => {
@@ -77,6 +89,16 @@ describe('project storage', () => {
       const dir = projectDir(dataDir, p.id);
       expect(existsSync(join(dir, 'project.json'))).toBe(true);
       expect(existsSync(join(dir, 'photos'))).toBe(true);
+    });
+
+    it('starts with a room that passes validatePlan (one wall per edge)', () => {
+      const p = createProject(dataDir, { name: 'Valid room' });
+      expect(p.room.walls).toHaveLength(p.room.polygon.length);
+      expect(validatePlan(p).valid).toBe(true);
+    });
+
+    it('rejects a non-UUID id override', () => {
+      expect(() => createProject(dataDir, { id: '../escape', name: 'X' })).toThrow(InvalidProjectIdError);
     });
 
     it('returns a project with a unique id and zero revision', () => {
@@ -97,7 +119,7 @@ describe('project storage', () => {
     });
 
     it('throws when the project does not exist', () => {
-      expect(() => loadProject(dataDir, 'missing')).toThrow();
+      expect(() => loadProject(dataDir, SOME_UUID)).toThrow(/not found/);
     });
 
     it('throws when the stored JSON fails schema validation', () => {
@@ -115,6 +137,44 @@ describe('project storage', () => {
       const loaded = loadProject(dataDir, p.id);
       expect(loaded.name).toBe('Renamed');
       expect(loaded.revision).toBe(1);
+    });
+  });
+
+  describe('updateProject', () => {
+    it('loads, applies the updater, and saves', async () => {
+      const p = createProject(dataDir, { name: 'Before' });
+      const out = await updateProject(dataDir, p.id, (cur) => ({ ...cur, name: 'After' }));
+      expect(out.name).toBe('After');
+      expect(loadProject(dataDir, p.id).name).toBe('After');
+    });
+
+    it('serializes concurrent updates so none are lost', async () => {
+      const p = createProject(dataDir, { name: 'Concurrent' });
+      await Promise.all(
+        Array.from({ length: 20 }, (_, i) =>
+          updateProject(dataDir, p.id, async (cur) => {
+            // Yield so updates would interleave without the lock.
+            await new Promise((r) => setTimeout(r, 1));
+            return {
+              ...cur,
+              photos: [...cur.photos, { id: `ph${i}`, path: `photos/ph${i}.jpg`, width: 10, height: 10 }],
+            };
+          })
+        )
+      );
+      expect(loadProject(dataDir, p.id).photos).toHaveLength(20);
+    });
+
+    it('does not save and releases the lock when the updater throws', async () => {
+      const p = createProject(dataDir, { name: 'Keep' });
+      await expect(
+        updateProject(dataDir, p.id, () => {
+          throw new Error('boom');
+        })
+      ).rejects.toThrow('boom');
+      expect(loadProject(dataDir, p.id).name).toBe('Keep');
+      const out = await updateProject(dataDir, p.id, (cur) => ({ ...cur, name: 'Next' }));
+      expect(out.name).toBe('Next');
     });
   });
 
