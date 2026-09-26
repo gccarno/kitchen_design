@@ -3,4 +3,5 @@
  * from this module — never from a vendor SDK or specific implementation.
  */
 export type { LLMProvider, ProviderConfig, TextRequest, ImageAttachment, VisionRequest } from './provider';
-export { OpenAICompatibleProvider, providerFromEnv } from './openai-compatible';
+export { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, LLMNotConfiguredError, providerFromEnv } from './openai-compatible';
+export { extractRoom, ExtractionError, type ExtractRoomResult, type MeasurementInput } from './extract';

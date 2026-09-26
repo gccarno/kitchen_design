@@ -7,12 +7,12 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
 ## Status
 
 **Phase 1 — Foundations:** complete (Tasks 1–8).
-**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–10.6 done; Task 11 (vision extraction endpoint) is next.
+**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–11 done; Task 12 (diff preview) is next.
 
 ## Stack
 
 - Next.js 15 (App Router) + React 19 + TypeScript + Tailwind
-- tRPC for typed RPC
+- Next.js route handlers (JSON over fetch), Zod-validated
 - Zustand for client state
 - react-konva for the 2D editor
 - OpenAI-compatible LLM provider (works with OpenAI, OpenRouter, Together, Groq, local llama.cpp server)

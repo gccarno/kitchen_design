@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { OpenAICompatibleProvider } from './openai-compatible';
+import { OpenAICompatibleProvider, LLMResponseError, LLMRequestError } from './openai-compatible';
 import type { LLMProvider, ProviderConfig } from './provider';
 
 // Capture every fetch call and let each test decide the response.
@@ -142,6 +142,66 @@ describe('OpenAICompatibleProvider', () => {
       const imagePart = content.find((c) => c.type === 'image_url');
       expect(imagePart?.image_url?.url).toBe('data:image/jpeg;base64,AAAA');
     });
+  });
+});
+
+describe('failure modes', () => {
+  const schema = z.object({ a: z.number() });
+
+  it('raises LLMResponseError (retryable) for non-JSON content, with the raw text', async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ choices: [{ message: { content: 'sorry, no' } }] }));
+    const err = await new OpenAICompatibleProvider(cfg)
+      .completeJSON({ system: 's', user: 'u', schema })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LLMResponseError);
+    expect((err as LLMResponseError).raw).toBe('sorry, no');
+  });
+
+  it('raises LLMResponseError for a schema mismatch', async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ choices: [{ message: { content: '{"a":"x"}' } }] }));
+    const err = await new OpenAICompatibleProvider(cfg)
+      .completeJSON({ system: 's', user: 'u', schema })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LLMResponseError);
+    expect((err as Error).message).toMatch(/schema/);
+  });
+
+  it('raises LLMRequestError (not retryable) for an HTTP failure', async () => {
+    fetchMock.mockResolvedValueOnce(errJson(500, { error: 'down' }));
+    const err = await new OpenAICompatibleProvider(cfg)
+      .completeJSON({ system: 's', user: 'u', schema })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LLMRequestError);
+    expect(err).not.toBeInstanceOf(LLMResponseError);
+  });
+
+  it('raises LLMRequestError for a network failure', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'));
+    await expect(new OpenAICompatibleProvider(cfg).completeText({ system: 's', user: 'u' })).rejects.toBeInstanceOf(
+      LLMRequestError
+    );
+  });
+
+  it('passes an abort signal so requests time out', async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ choices: [{ message: { content: 'x' } }] }));
+    await new OpenAICompatibleProvider({ ...cfg, timeoutMs: 1234 }).completeText({ system: 's', user: 'u' });
+    const init = (fetchMock.mock.calls[0] as [string, RequestInit])[1];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('reports a timeout clearly', async () => {
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        })
+    );
+    await expect(
+      new OpenAICompatibleProvider({ ...cfg, timeoutMs: 20 }).completeText({ system: 's', user: 'u' })
+    ).rejects.toThrow(LLMRequestError);
+    await expect(
+      new OpenAICompatibleProvider({ ...cfg, timeoutMs: 20 }).completeText({ system: 's', user: 'u' })
+    ).rejects.toThrow(/timed out after 20 ms/);
   });
 });
 
