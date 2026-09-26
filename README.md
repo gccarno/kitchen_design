@@ -7,7 +7,7 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
 ## Status
 
 **Phase 1 — Foundations:** complete (Tasks 1–8).
-**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–11 done; Task 12 (diff preview) is next.
+**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–12 done; Task 13 (project page) is next.
 
 ## Stack
 
