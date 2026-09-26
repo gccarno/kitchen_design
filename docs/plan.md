@@ -19,7 +19,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 9 — Photo upload + EXIF
 - [x] Task 10 — Reference-marker UI (completed in Task 10.5)
 - [x] Task 10.5 — Hardening + data model migration (manual phone check waits until Task 13 mounts `PhotoCapture` on a page)
-- [ ] **Next: Task 10.6 — Measured walls + manual room sketch**
+- [x] Task 10.6 — Measured walls + manual room sketch (`RoomSketch` mounts on a page in Task 13)
+- [ ] **Next: Task 11 — Vision extraction endpoint**
 
 ## Decisions (locked in with user)
 
@@ -34,7 +35,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–10.5 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–10.6 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -448,6 +449,8 @@ Commit: `fix: post-review hardening + data model migration`.
 **Verify:** A user with no API key can create a project, sketch a 3000 × 4000 room, and see it persisted.
 
 Commit: `feat: measured walls + manual room sketch`.
+
+> ✅ Done. Also added the write path the sketch needs: `POST /api/projects` (create) and `POST /api/projects/[id]/revisions` (the single plan-edit endpoint: `commitRevision` under the project lock; 400 invalid edit, 409 stale `baseRevision`). `src/lib/id.ts` provides UUIDs over plain HTTP, where `crypto.randomUUID` is unavailable. Verified over HTTP against the dev server with no `LLM_API_KEY`.
 
 ### Task 11: Vision extraction endpoint
 

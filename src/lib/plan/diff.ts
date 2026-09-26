@@ -81,6 +81,18 @@ function fjpToOur(op: FjpOp): JsonPatchOp | null {
 }
 
 /**
+ * Thrown by `commitRevision` when the edit itself is bad (non-editable path,
+ * patch doesn't apply, result fails schema or `validatePlan`) — as opposed
+ * to a storage or programming error. Routes map it to 400.
+ */
+export class InvalidPatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidPatchError';
+  }
+}
+
+/**
  * Apply a patch to a project. Returns a new project; the input is not
  * mutated. Throws on:
  *   - an op whose `path` or `from` is outside the editable allowlist
@@ -139,18 +151,23 @@ export interface CommitOptions {
 
 /**
  * Apply `patch` as a new revision. Throws `StaleRevisionError` if the
- * project has moved past `baseRevision`, and an Error listing the problems
- * if the result fails `validatePlan`. Returns the new project; the input
- * is not mutated.
+ * project has moved past `baseRevision`, and `InvalidPatchError` if the patch
+ * can't be applied or the result fails `validatePlan`. Returns the new
+ * project; the input is not mutated.
  */
 export function commitRevision(before: Project, patch: JsonPatchOp[], opts: CommitOptions): Project {
   if (before.revision !== opts.baseRevision) {
     throw new StaleRevisionError(opts.baseRevision, before.revision);
   }
-  const applied = applyJsonPatch(before, patch);
+  let applied: Project;
+  try {
+    applied = applyJsonPatch(before, patch);
+  } catch (err) {
+    throw new InvalidPatchError((err as Error).message);
+  }
   const check = validatePlan(applied);
   if (!check.valid) {
-    throw new Error(`edit would leave the plan invalid: ${check.errors.join('; ')}`);
+    throw new InvalidPatchError(`edit would leave the plan invalid: ${check.errors.join('; ')}`);
   }
 
   // `applied` differs from `before` only on editable paths, so the reverse

@@ -7,7 +7,7 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
 ## Status
 
 **Phase 1 — Foundations:** complete (Tasks 1–8).
-**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–10.5 done; Task 10.6 (measured walls + manual room sketch) is next.
+**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–10.6 done; Task 11 (vision extraction endpoint) is next.
 
 ## Stack
 
