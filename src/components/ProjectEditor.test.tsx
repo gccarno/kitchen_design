@@ -2,6 +2,11 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import ProjectEditor from './ProjectEditor';
+
+// The Konva canvas needs a real browser; it's covered by the Playwright specs.
+vi.mock('./FloorPlanCanvas', () => ({
+  default: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
+}));
 import { useEditorStore } from '@/store/editor';
 import { ProjectSchema, type Project } from '@/lib/plan/schemas';
 
