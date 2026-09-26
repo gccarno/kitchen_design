@@ -1,6 +1,6 @@
-import type { z } from 'zod';
 import type {
   LLMProvider,
+  OutputSchema,
   ProviderConfig,
   TextRequest,
   VisionRequest,
@@ -30,6 +30,40 @@ interface ChatCompletionsResponse {
   choices: Array<{ message: { content: string | null } }>;
 }
 
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+/**
+ * The model answered, but not with valid JSON matching the schema. Worth
+ * retrying with the problem fed back — unlike transport or HTTP errors,
+ * which surface as `LLMRequestError`.
+ */
+export class LLMResponseError extends Error {
+  constructor(
+    message: string,
+    /** The model's raw reply, for feeding back on retry. */
+    readonly raw: string
+  ) {
+    super(message);
+    this.name = 'LLMResponseError';
+  }
+}
+
+/** The request itself failed: network error, timeout, or non-2xx status. Not retried. */
+export class LLMRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LLMRequestError';
+  }
+}
+
+/** No LLM is configured (`LLM_API_KEY` unset). The rest of the app still works. */
+export class LLMNotConfiguredError extends Error {
+  constructor() {
+    super('LLM_API_KEY is not set. Copy .env.example to .env.local and add your key.');
+    this.name = 'LLMNotConfiguredError';
+  }
+}
+
 /**
  * OpenAI-compatible provider. Works against any server that implements the
  * `/v1/chat/completions` endpoint — OpenAI, OpenRouter, Together, Groq,
@@ -46,6 +80,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly visionModel: string;
+  private readonly timeoutMs: number;
 
   constructor(cfg: ProviderConfig) {
     // Trim trailing slash so concat is predictable.
@@ -53,6 +88,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.apiKey = cfg.apiKey;
     this.model = cfg.model;
     this.visionModel = cfg.visionModel;
+    this.timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   async completeText(req: TextRequest): Promise<string> {
@@ -73,7 +109,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   async completeJSON<T>(req: {
     system: string;
     user: string;
-    schema: z.ZodType<T>;
+    schema: OutputSchema<T>;
   }): Promise<T> {
     const body: ChatCompletionsRequest = {
       model: this.model,
@@ -116,47 +152,51 @@ export class OpenAICompatibleProvider implements LLMProvider {
     body: ChatCompletionsRequest
   ): Promise<string> {
     const url = `${this.baseUrl}/chat/completions`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (err) {
+      if ((err as Error)?.name === 'TimeoutError') {
+        throw new LLMRequestError(`LLM request timed out after ${this.timeoutMs} ms`);
+      }
+      throw new LLMRequestError(`LLM request failed: ${(err as Error).message}`);
+    }
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '<unreadable>');
-      throw new Error(
-        `LLM request failed: ${res.status} ${res.statusText} — ${errText.slice(0, 500)}`
-      );
+      throw new LLMRequestError(`LLM request failed: ${res.status} ${res.statusText} — ${errText.slice(0, 500)}`);
     }
 
     const data = (await res.json()) as ChatCompletionsResponse;
     const choice = data.choices?.[0];
     if (!choice || choice.message.content == null) {
-      throw new Error('LLM response had no choices or empty content');
+      throw new LLMRequestError('LLM response had no choices or empty content');
     }
     return choice.message.content;
   }
 }
 
 /** Strip ```json fences and parse; throw with the raw text on failure. */
-function parseAndValidate<T>(raw: string, schema: z.ZodType<T>): T {
+function parseAndValidate<T>(raw: string, schema: OutputSchema<T>): T {
   const stripped = stripCodeFence(raw);
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripped);
   } catch (err) {
-    throw new Error(
-      `LLM returned non-JSON content: ${(err as Error).message}\n--- raw ---\n${raw.slice(0, 1000)}`
-    );
+    throw new LLMResponseError(`LLM returned non-JSON content: ${(err as Error).message}`, raw);
   }
   const result = schema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(
-      `LLM response failed schema validation: ${result.error.message}\n--- raw ---\n${raw.slice(0, 1000)}`
-    );
+    const issues = result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ');
+    throw new LLMResponseError(`LLM response failed schema validation: ${issues}`, raw);
   }
   return result.data;
 }
@@ -174,11 +214,7 @@ function stripCodeFence(s: string): string {
  */
 export function providerFromEnv(): LLMProvider {
   const apiKey = process.env.LLM_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      'LLM_API_KEY is not set. Copy .env.example to .env.local and add your key.'
-    );
-  }
+  if (!apiKey) throw new LLMNotConfiguredError();
   return new OpenAICompatibleProvider({
     baseUrl: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
     apiKey,

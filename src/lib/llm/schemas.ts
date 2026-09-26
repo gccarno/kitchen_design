@@ -36,6 +36,11 @@ export const ExtractedRoomSchema = z.object({
   polygonMm: z.array(z.tuple([z.number(), z.number()])).min(3),
   walls: z.array(ExtractedWallSchema),
   openings: z.array(ExtractedOpeningSchema),
+  /**
+   * For each user measurement (in order), the index of the wall it measures.
+   * Lets the server rescale the outline so measured walls come out exact.
+   */
+  measuredWalls: z.array(z.number().int().nonnegative()).default([]),
   /** Free-form notes for the user. */
   notes: z.string(),
 });
@@ -46,10 +51,23 @@ export type ExtractedRoom = z.infer<typeof ExtractedRoomSchema>;
  * to confirm the room is geometrically plausible: one wall per edge, openings
  * on real walls and within their length, polygon simple with non-zero area.
  */
-export function refineExtractedRoom(room: ExtractedRoom): CheckResult<ExtractedRoom> {
+export function refineExtractedRoom(
+  room: ExtractedRoom,
+  opts: { measurementCount?: number } = {}
+): CheckResult<ExtractedRoom> {
   const issues: string[] = [];
   const poly = room.polygonMm as Point[];
   const n = poly.length;
+
+  const expected = opts.measurementCount ?? 0;
+  if (room.measuredWalls.length !== expected) {
+    issues.push(
+      `measuredWalls has ${room.measuredWalls.length} entries but there are ${expected} measurements; give exactly one wall index per measurement`
+    );
+  }
+  room.measuredWalls.forEach((w, i) => {
+    if (w >= n) issues.push(`measuredWalls[${i}] is ${w}, but walls are numbered 0..${n - 1}`);
+  });
 
   if (room.walls.length !== n) {
     issues.push(`got ${room.walls.length} walls but polygonMm has ${n} edges; return exactly one wall per edge`);

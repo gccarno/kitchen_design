@@ -20,7 +20,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 10 — Reference-marker UI (completed in Task 10.5)
 - [x] Task 10.5 — Hardening + data model migration (manual phone check waits until Task 13 mounts `PhotoCapture` on a page)
 - [x] Task 10.6 — Measured walls + manual room sketch (`RoomSketch` mounts on a page in Task 13)
-- [ ] **Next: Task 11 — Vision extraction endpoint**
+- [x] Task 11 — Vision extraction endpoint (REST; tRPC dropped)
+- [ ] **Next: Task 12 — Diff preview component**
 
 ## Decisions (locked in with user)
 
@@ -30,12 +31,13 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 | Photo-to-plan pipeline | Photos + 1–2 user-measured wall lengths (primary scale) → vision-LLM extraction, rescaled server-side to the measured walls. Reference object is an optional secondary hint. Manual "sketch room" path works with zero LLM calls. |
 | Catalog | Parametric generator + curated seed of standard dimensions. Public-source ingest/scraping is out of scope for v1 (brittle, ToS risk). |
 | LLM | OpenAI-compatible interface, default to OpenAI, swap via config (works for any compatible provider: OpenAI, OpenRouter, Together, Groq, local llama.cpp server) |
+| API style | Plain Next.js route handlers (JSON over `fetch`), Zod-validated on the server; shared Zod schemas give client/server types. tRPC was dropped at Task 11 — fewer moving parts for a single-user local app. |
 | LLM edit format | LLM emits typed commands (`addItem`, `moveItem`, …); the server compiles them to JSON Patch. The LLM never writes raw patch paths. |
 | Output | JSON + 2D SVG/PNG only. No 3D. |
 
 ## Current Context / Assumptions
 
-- Tasks 1–10.6 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–11 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -52,7 +54,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 │   React + Tailwind + shadcn/ui + Zustand            │
 │   PWA manifest, mobile-first camera capture         │
 └──────────────────┬──────────────────────────────────┘
-                   │ tRPC
+                   │ JSON routes (fetch)
 ┌──────────────────▼──────────────────────────────────┐
 │              Node.js API (Next routes)               │
 │  - photo upload + EXIF normalize                    │
@@ -77,8 +79,8 @@ Data flow:
 ## Tech Stack
 
 - **Frontend:** Next.js 15 (App Router), React 19, TypeScript, Tailwind, shadcn/ui, Zustand for local state, `react-konva` or `pixi.js` for the 2D canvas editor.
-- **Backend:** Next.js API routes + tRPC for typed RPC.
-- **LLM:** `openai` npm SDK pointed at a configurable base URL (`LLM_BASE_URL`). One abstraction layer with `chat()`, `chatWithVision()`, `completeJSON()`.
+- **Backend:** Next.js route handlers under `src/app/api/**`, request bodies validated with Zod.
+- **LLM:** `fetch` against any OpenAI-compatible `/chat/completions` endpoint at `LLM_BASE_URL` (no vendor SDK). One abstraction layer with `completeText()`, `completeJSON()`, `chatWithVision()`; 60 s timeout; typed errors (`LLMRequestError` not retried, `LLMResponseError` retried once with feedback).
 - **Storage:** Local filesystem under `./data/projects/<id>/` (photos + plan.json). Easy to swap for S3 later.
 - **Testing:** Vitest for unit, Playwright for one end-to-end happy path.
 - **Lint/format:** ESLint + Prettier, strict TS.
@@ -177,9 +179,15 @@ All LLM responses are validated against a Zod schema before they ever touch stat
 │   │   ├── page.tsx                   # project list / new
 │   │   ├── project/[id]/page.tsx      # main editor
 │   │   └── api/
-│   │       ├── trpc/[trpc]/route.ts
-│   │       ├── upload/route.ts
-│   │       └── projects/[id]/photos/[photoId]/route.ts  # serves photos from data/
+│   │       ├── upload/route.ts                          # POST photo
+│   │       └── projects/
+│   │           ├── route.ts                             # POST create project
+│   │           └── [id]/
+│   │               ├── revisions/route.ts               # POST commit a patch (the one plan-edit path)
+│   │               ├── extract/route.ts                 # POST photos → candidate room (no mutation)
+│   │               └── photos/[photoId]/
+│   │                   ├── route.ts                     # GET photo bytes
+│   │                   └── reference/route.ts           # PUT/DELETE reference object
 │   ├── components/
 │   │   ├── PhotoCapture.tsx
 │   │   ├── ReferenceMarker.tsx        # draw box over credit card
@@ -192,6 +200,8 @@ All LLM responses are validated against a Zod schema before they ever touch stat
 │   │   ├── llm/
 │   │   │   ├── provider.ts            # interface
 │   │   │   ├── openai-compatible.ts   # default impl
+│   │   │   ├── images.ts              # downscale photos for vision requests
+│   │   │   ├── extract.ts             # photos → candidate room (+ retry, rescale, patch)
 │   │   │   ├── prompts.ts             # versioned prompts as functions returning strings
 │   │   │   └── schemas.ts             # Zod schemas for every LLM response
 │   │   ├── plan/
@@ -207,15 +217,9 @@ All LLM responses are validated against a Zod schema before they ever touch stat
 │   │   │   ├── generator.ts           # parametric cabinet variants
 │   │   │   └── seed.json              # curated appliances/furniture
 │   │   ├── storage/
-│   │   │   └── projects.ts            # read/write Project JSON, atomic writes
+│   │   │   ├── projects.ts            # read/write Project JSON, atomic writes, per-project lock
+│   │   │   └── photos.ts              # photo lookup + file paths
 │   │   └── exif.ts
-│   ├── server/
-│   │   ├── trpc.ts                    # init
-│   │   └── routers/
-│   │       ├── projects.ts
-│   │       ├── photos.ts
-│   │       ├── llm.ts                 # extractRoomFromPhotos, refinePlan
-│   │       └── catalog.ts
 │   └── store/
 │       └── editor.ts                  # Zustand
 └── tests/
@@ -240,7 +244,7 @@ All LLM responses are validated against a Zod schema before they ever touch stat
 - Create: `package.json`, `next.config.ts`, `tsconfig.json`, `tailwind.config.ts`, `postcss.config.mjs`, `vitest.config.ts`, `playwright.config.ts`, `.gitignore`, `.env.example`, `.eslintrc.json`, `.prettierrc`.
 
 **Step 1:** `npx create-next-app@latest . --ts --tailwind --app --eslint --src-dir --use-npm`
-**Step 2:** Add deps: `npm i zod zustand @trpc/server @trpc/client @trpc/react-query @tanstack/react-query react-konva@^19 konva openai react-dropzone exifr`
+**Step 2:** Add deps: `npm i zod zustand react-konva@~19.2 konva react-dropzone exifr sharp fast-json-patch`
 **Step 3:** Add dev deps: `npm i -D vitest @vitest/ui @testing-library/react @playwright/test happy-dom`
 **Step 4:** Configure `tsconfig.json` strict mode, path alias `@/*` → `src/*`.
 **Step 5:** Initialize git, first commit.
@@ -422,7 +426,7 @@ Commit: `feat: reference-marker ui`.
 
 **Steps:**
 1. **Path traversal.** `projectDir()` validates `id` as a UUID and throws otherwise; the upload route returns 400 on a bad id and 404 if the project doesn't exist. Test: `projectId=../../etc` is rejected and nothing is written outside `data/projects/`.
-2. **Register uploaded photos.** Upload loads the project, appends the `Photo`, bumps `updatedAt`, and calls `saveProject`. Remove the `.ref.json` sidecar. Add a `setReference(projectId, photoId, referenceObject)` write (route now; moves to the tRPC `photos` router in Task 11). Serialize writes per project (simple in-process mutex) so concurrent uploads don't lose photos.
+2. **Register uploaded photos.** Upload loads the project, appends the `Photo`, bumps `updatedAt`, and calls `saveProject`. Remove the `.ref.json` sidecar. Add a `setReference(projectId, photoId, referenceObject)` write (a REST route). Serialize writes per project (simple in-process mutex) so concurrent uploads don't lose photos.
 3. **Serve photos.** `GET /api/projects/[id]/photos/[photoId]` streams the JPEG with the same id validation. `photoId` must match an entry in `project.photos`.
 4. **Reference sizes.** Create `reference-objects.ts` (`{ longMm, shortMm }` per kind); delete the size tables in the upload route and `ReferenceMarker`. Drop `tape_measure`. Add `side` to the reference schema.
 5. **ReferenceMarker.** Use pointer events (mouse + touch + pen) with `touch-action: none`; convert to natural pixels via `naturalWidth / clientWidth`; draw a live preview rectangle; custom-size input; long/short side selector; call `setReference` on change. Remove the leftover stream-of-thought comments. Create `PhotoCapture.tsx` (file input with `capture="environment"`, multi-select, upload progress).
@@ -454,18 +458,21 @@ Commit: `feat: measured walls + manual room sketch`.
 
 ### Task 11: Vision extraction endpoint
 
-**Objective:** tRPC mutation that calls the vision LLM and returns a validated `Room`.
+**Objective:** `POST /api/projects/[id]/extract` calls the vision LLM and returns a validated candidate `Room`.
 
 **Files:**
-- Create: `src/server/trpc.ts`, `src/server/routers/llm.ts`, `src/server/routers/photos.ts`.
+- Create: `src/app/api/projects/[id]/extract/route.ts`, `src/lib/llm/extract.ts`, `src/lib/llm/images.ts` (+ tests).
 
 Steps:
-1. Build `trpc` server + a `trpcClient` provider in `src/app/providers.tsx`.
-2. `llm.extractRoom({ projectId })` → loads photos, **downscales each to ≤1568px long edge** with `sharp` before base64 (uploads can be 20 MB), builds the prompt (measured wall lengths first, reference-object size/side/pixel box as a secondary hint), calls `chatWithVision`, validates with `ExtractedRoomSchema` + `refineExtractedRoom`, then applies `rescaleRoomToMeasurements` and returns a candidate `Room` plus `confidence` and `notes`.
-3. The prompt asks the model to identify which polygon edge corresponds to each measured wall (by `wallHint`/photo), so the rescale has an anchor.
+1. Request body: `{ measurements?: [{ description, lengthMm }] (≤ 4), hint? }` — measurements are described in the user's words ("sink wall"), since the extracted outline's walls don't exist yet.
+2. `extractRoom()` → loads photos, **downscales each to ≤1568px long edge** with `sharp` before base64 (uploads can be 20 MB), builds the prompt (measured wall lengths first, reference-object size/side/pixel box as a secondary hint), calls `chatWithVision`, validates with `ExtractedRoomSchema` + `refineExtractedRoom`, then applies `rescaleRoomToMeasurements` and returns a candidate `Room` plus `confidence` and `notes`.
+3. The model returns `measuredWalls` — for each measurement, the edge it describes — so the rescale has an anchor. Reference boxes are mapped into the downscaled image's pixels.
 4. Request timeout (60s) and a single retry that feeds the Zod/refine errors back to the model.
-5. **Important:** does NOT mutate the project. The candidate goes back to the client for review with `baseRevision`.
-6. Commit: `feat: vision extraction endpoint`.
+5. **Important:** does NOT mutate the project. Returns `{ room, confidence, notes, scale, residual, warnings, baseRevision, patch }`; the client commits `patch` via `POST .../revisions` on confirm.
+6. Status codes: 400 bad body / no photos, 404, 502 LLM failure, 503 no `LLM_API_KEY` (manual sketch still works).
+7. Commit: `feat: vision extraction endpoint`.
+
+> ✅ Done. Removed the unused `@trpc/*`, `@tanstack/react-query`, and `openai` packages. The dev-server integration test runs against a fake OpenAI-compatible server via `LLM_BASE_URL`, exercising the real provider over HTTP.
 
 ### Task 12: Diff preview component
 
@@ -477,7 +484,7 @@ Steps:
 Steps:
 1. Render current vs proposed room polygon on a small canvas.
 2. List openings/walls as a table of changes; for LLM proposals show `confidence` and `notes` prominently.
-3. "Apply" calls `applyJsonPatch` server-side with `baseRevision` (stale → "plan changed, re-run"); "Discard" drops it.
+3. "Apply" posts the patch to `POST /api/projects/[id]/revisions` with `baseRevision` (409 → "plan changed, re-run"); "Discard" drops it.
 4. Commit: `feat: diff preview component`.
 
 ### Task 13: Project page shell + routing
@@ -576,7 +583,8 @@ Commit: `feat: place catalog items`.
 
 **Files:**
 - Create: `src/lib/plan/commands.ts`, `src/lib/plan/commands.test.ts`, `src/components/ChatPanel.tsx`.
-- Modify: `src/server/routers/llm.ts`, `src/lib/llm/prompts.ts` (add `buildRefinePrompt`), `src/lib/llm/schemas.ts` (add `RefinementSchema`).
+- Create: `src/app/api/projects/[id]/refine/route.ts`.
+- Modify: `src/lib/llm/prompts.ts` (add `buildRefinePrompt`), `src/lib/llm/schemas.ts` (add `RefinementSchema`).
 
 Command set (discriminated union on `type`):
 ```ts
@@ -600,7 +608,7 @@ Commit: `feat: chat panel + refinement endpoint`.
 **Objective:** Higher-level command: "design me an L-shape with the fridge near the sink". LLM proposes several `PlacedItem`s at once.
 
 **Files:**
-- Modify: `src/server/routers/llm.ts`, `src/lib/llm/prompts.ts`.
+- Modify: `src/app/api/projects/[id]/refine/route.ts` (or a sibling `layout/route.ts`), `src/lib/llm/prompts.ts`.
 
 Same command/diff/confirm flow as Task 20 (mostly `addItem` commands). The prompt includes room geometry, door/window locations, clearance rules, and the catalog.
 
@@ -668,7 +676,7 @@ Commit: `test: e2e happy path`.
 ## Tests / Validation Strategy
 
 - **Unit (Vitest):** geometry, JSON Patch (incl. allowlist + inverse round-trip), Zod schemas, room-edit, scale, commands compiler, catalog loader/generator, plan validation, SVG generation. Target ≥ 80% lines on `src/lib/**`.
-- **Integration (Vitest + supertest-style):** tRPC routes with a stub LLM.
+- **Integration (Vitest):** route handlers called directly with a stub LLM; one live `next dev` suite (`tests/integration/dev-server.test.ts`) against a fake OpenAI-compatible server.
 - **E2E (Playwright):** exactly one happy-path test (Task 26). Keep it tight.
 - **Manual QA gate at each phase boundary:** open the app on a real phone, do the happy path by hand.
 

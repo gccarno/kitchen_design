@@ -103,42 +103,97 @@ describe('OpeningKindSchema', () => {
   });
 });
 
+describe('refineExtractedRoom with measurements', () => {
+  const room = ExtractedRoomSchema.parse({
+    confidence: 0.8,
+    polygonMm: [
+      [0, 0],
+      [4000, 0],
+      [4000, 3000],
+      [0, 3000],
+    ],
+    walls: [{ thicknessMm: 100 }, { thicknessMm: 100 }, { thicknessMm: 100 }, { thicknessMm: 100 }],
+    openings: [],
+    measuredWalls: [2],
+    notes: '',
+  });
+
+  it('accepts one wall index per measurement', () => {
+    expect(refineExtractedRoom(room, { measurementCount: 1 }).ok).toBe(true);
+  });
+
+  it('flags a measuredWalls count that does not match the measurements', () => {
+    const r = refineExtractedRoom(room, { measurementCount: 2 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.issues.join(' ')).toMatch(/measuredWalls has 1.*2 measurements/);
+  });
+
+  it('flags an out-of-range measured wall', () => {
+    const r = refineExtractedRoom({ ...room, measuredWalls: [7] }, { measurementCount: 1 });
+    expect(r.ok).toBe(false);
+  });
+
+  it('defaults measuredWalls to [] when the model omits it', () => {
+    const { measuredWalls: _omit, ...rest } = room;
+    expect(ExtractedRoomSchema.parse(rest).measuredWalls).toEqual([]);
+  });
+});
+
 describe('buildExtractRoomPrompt', () => {
-  it('includes the reference object known size and kind when provided', () => {
+  const photo = (index: number, extra = {}) => ({ index, width: 1568, height: 1176, ...extra });
+
+  it('lists each measurement and asks for one measuredWalls entry per measurement', () => {
     const p = buildExtractRoomPrompt({
-      units: 'mm',
-      photoCount: 4,
-      reference: { kind: 'credit_card', knownSizeMm: 85.6, side: 'long' },
+      photos: [photo(0), photo(1)],
+      measurements: [
+        { description: 'sink wall', lengthMm: 3600 },
+        { description: 'wall with the window', lengthMm: 2450 },
+      ],
     });
-    // The reference line appears verbatim with the known size.
-    expect(p.system).toMatch(/85\.6\s*mm/);
-    expect(p.system).toMatch(/credit_card/);
-    expect(p.user).toMatch(/4 photos?/i);
+    expect(p.user).toMatch(/Measurement 1: "sink wall" = 3600 mm/);
+    expect(p.user).toMatch(/Measurement 2: "wall with the window" = 2450 mm/);
+    expect(p.system).toMatch(/measuredWalls/);
+    expect(p.user).toMatch(/measuredWalls must have exactly 2 entries/);
   });
 
-  it('handles a custom reference size', () => {
-    const p = buildExtractRoomPrompt({
-      units: 'mm',
-      photoCount: 1,
-      reference: { kind: 'custom', knownSizeMm: 250, side: 'long' },
-    });
-    expect(p.system).toMatch(/250\s*mm/);
+  it('says there are no measurements when none are given', () => {
+    const p = buildExtractRoomPrompt({ photos: [photo(0)], measurements: [] });
+    expect(p.user).toMatch(/no measured walls/i);
+    expect(p.user).toMatch(/measuredWalls must be \[\]/);
   });
 
-  it('omits the "use that to compute scale" guidance when no reference is given', () => {
-    const p = buildExtractRoomPrompt({ units: 'mm', photoCount: 3 });
-    expect(p.system).not.toMatch(/Use that to compute the millimetre-per-pixel scale/);
-    expect(p.user).toMatch(/3 photos?/i);
+  it('describes each photo, its wall hint, and its reference box', () => {
+    const p = buildExtractRoomPrompt({
+      photos: [
+        photo(0, { wallHint: 'north' }),
+        photo(1, { reference: { kind: 'credit_card', side: 'long', knownSizeMm: 85.6, pixelBox: [10, 20, 60, 50] } }),
+      ],
+      measurements: [],
+    });
+    expect(p.user).toMatch(/2 photos/);
+    expect(p.user).toMatch(/Photo 1 \(1568×1176 px\).*north wall/);
+    expect(p.user).toMatch(/Photo 2 .*credit_card.*\[10, 20, 60, 50\].*long edge.*85\.6 mm/);
+  });
+
+  it('treats measurements as the scale and references as a secondary hint', () => {
+    const p = buildExtractRoomPrompt({ photos: [photo(0)], measurements: [] });
+    expect(p.system).toMatch(/measured.*exact/i);
+    expect(p.system).toMatch(/reference object.*secondary/i);
+  });
+
+  it('includes the user hint', () => {
+    const p = buildExtractRoomPrompt({ photos: [photo(0)], measurements: [], hint: 'galley kitchen' });
+    expect(p.user).toMatch(/galley kitchen/);
   });
 
   it('describes walls as one entry per polygon edge', () => {
-    const p = buildExtractRoomPrompt({ units: 'mm', photoCount: 1 });
+    const p = buildExtractRoomPrompt({ photos: [photo(0)], measurements: [] });
     expect(p.system).toMatch(/walls\[i\].*edge/i);
     expect(p.system).not.toMatch(/fromIdx/);
   });
 
-  it('returns a prompt that requests a JSON object (response_format compatible)', () => {
-    const p = buildExtractRoomPrompt({ units: 'mm', photoCount: 1 });
+  it('requests a JSON object with the room fields', () => {
+    const p = buildExtractRoomPrompt({ photos: [photo(0)], measurements: [] });
     expect(p.system).toMatch(/json/i);
     expect(p.system).toMatch(/polygonMm/);
   });

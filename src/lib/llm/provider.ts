@@ -1,11 +1,19 @@
 import type { z } from 'zod';
 
+/**
+ * A schema whose parsed OUTPUT is `T`. The input side is left open so
+ * schemas with defaults or transforms (input ≠ output) are accepted.
+ */
+export type OutputSchema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
+
 /** Common configuration for any OpenAI-compatible LLM provider. */
 export interface ProviderConfig {
   baseUrl: string; // e.g. https://api.openai.com/v1
   apiKey: string;
   model: string; // text model
   visionModel: string; // vision-capable model
+  /** Per-request timeout. Defaults to 60 s — vision calls with several photos are slow. */
+  timeoutMs?: number;
 }
 
 export interface TextRequest {
@@ -24,7 +32,7 @@ export interface VisionRequest<T> {
   system: string;
   user: string;
   images: ImageAttachment[];
-  schema: z.ZodType<T>;
+  schema: OutputSchema<T>;
 }
 
 /**
@@ -42,7 +50,7 @@ export interface LLMProvider {
    * fallback for older providers). The result is parsed and validated against
    * the supplied Zod schema.
    */
-  completeJSON<T>(req: { system: string; user: string; schema: z.ZodType<T> }): Promise<T>;
+  completeJSON<T>(req: { system: string; user: string; schema: OutputSchema<T> }): Promise<T>;
 
   /**
    * Vision completion. Images are sent as base64 data URLs in the user
