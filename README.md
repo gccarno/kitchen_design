@@ -1,12 +1,13 @@
 # Kitchen Design App
 
-Design a kitchen with the help of an LLM. Upload room photos with a reference object for scale, get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON and SVG/PNG.
+Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON and SVG/PNG.
 
-See [`docs/plan.md`](docs/plan.md) for the full implementation plan (26 tasks across 5 phases).
+See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
 
 ## Status
 
-**Phase 1 — Foundations:** in progress. Starting with Task 1 (repo bootstrap).
+**Phase 1 — Foundations:** complete (Tasks 1–8).
+**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–10 done; Task 10.5 (post-review hardening + data model migration) is next.
 
 ## Stack
 
