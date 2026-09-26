@@ -5,12 +5,16 @@
  * the response is well-formed.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { createProject, loadProject, projectDir } from '@/lib/storage/projects';
+import { planToJsonPatch } from '@/lib/plan/diff';
+import { validatePlan, wallLengthMm } from '@/lib/plan/validate';
+import type { Project, Room } from '@/lib/plan/schemas';
 
 let server: ChildProcess | null = null;
 let dataDir: string;
@@ -21,16 +25,17 @@ const BASE = `http://127.0.0.1:${PORT}`;
 
 beforeAll(async () => {
   dataDir = mkdtempSync(join(tmpdir(), 'kd-e2e-'));
-  server = spawn(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['next', 'dev', '-p', String(PORT)],
-    {
-      env: { ...process.env, DATA_DIR: dataDir, NEXT_TELEMETRY_DISABLED: '1' },
-      cwd: process.cwd(),
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: true,
-    }
-  );
+  // Run Next's CLI with node directly: no npx/shell wrapper whose death
+  // would orphan the real server. `detached` gives it its own process group
+  // on POSIX so teardown can kill the whole tree.
+  const nextBin = createRequire(import.meta.url).resolve('next/dist/bin/next');
+  server = spawn(process.execPath, [nextBin, 'dev', '-p', String(PORT)], {
+    // No LLM key: everything exercised here must work without one.
+    env: { ...process.env, DATA_DIR: dataDir, NEXT_TELEMETRY_DISABLED: '1', LLM_API_KEY: '' },
+    cwd: process.cwd(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: process.platform !== 'win32',
+  });
 
   // Wait for "Ready in" or up to 60s. If the process dies before
   // "Ready", surface that to the caller so the suite fails fast and
@@ -63,20 +68,32 @@ beforeAll(async () => {
   });
 }, 90_000);
 
+/**
+ * Kill the dev server and every child it started. `next dev` forks a
+ * separate start-server process, so killing only the top pid leaks it.
+ */
+function killTree(child: ChildProcess): void {
+  if (child.pid === undefined || child.exitCode !== null) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  } else {
+    try {
+      process.kill(-child.pid, 'SIGKILL');
+    } catch {
+      // Group already gone.
+    }
+  }
+}
+
 afterAll(async () => {
   // Always reap the server + data dir, even if a test threw.
-  if (server && server.exitCode === null) {
-    server.kill('SIGTERM');
-    await new Promise<void>((resolve) => {
-      const t = setTimeout(() => {
-        server?.kill('SIGKILL');
-        resolve();
-      }, 3000);
-      server?.on('exit', () => {
-        clearTimeout(t);
-        resolve();
-      });
+  if (server) {
+    const exited = new Promise<void>((resolve) => {
+      if (server?.exitCode !== null) resolve();
+      server?.on('exit', () => resolve());
     });
+    killTree(server);
+    await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);
   }
   if (dataDir) {
     try {
@@ -165,5 +182,48 @@ describe('dev server end-to-end', () => {
     form.append('file', new Blob([new Uint8Array(4)], { type: 'image/jpeg' }), 'x.jpg');
     const res = await fetch(BASE + '/api/upload', { method: 'POST', body: form });
     expect(res.status).toBe(400);
+  });
+
+  it('creates a project and saves a sketched 3000 × 4000 room with no LLM key', async () => {
+    const created = await fetch(BASE + '/api/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Sketched' }),
+    });
+    expect(created.status).toBe(201);
+    const { project } = (await created.json()) as { project: Project };
+
+    // What RoomSketch's rectangle quick start produces.
+    const room: Room = {
+      polygon: [
+        [0, 0],
+        [3000, 0],
+        [3000, 4000],
+        [0, 4000],
+      ],
+      walls: ['a', 'b', 'c', 'd'].map((id) => ({ id, thicknessMm: 100 })),
+      openings: [],
+      measurements: [
+        { wallId: 'a', lengthMm: 3000, source: 'user' },
+        { wallId: 'b', lengthMm: 4000, source: 'user' },
+      ],
+    };
+    const res = await fetch(`${BASE}/api/projects/${project.id}/revisions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        baseRevision: project.revision,
+        patch: planToJsonPatch(project, { ...project, room }),
+        summary: 'sketch room',
+      }),
+    });
+    expect(res.status).toBe(200);
+
+    const saved = loadProject(dataDir, project.id);
+    expect(saved.revision).toBe(1);
+    expect(saved.room).toEqual(room);
+    expect(wallLengthMm(saved.room, 0)).toBe(3000);
+    expect(saved.history[0]).toMatchObject({ source: 'user', summary: 'sketch room' });
+    expect(validatePlan(saved).valid).toBe(true);
   });
 });

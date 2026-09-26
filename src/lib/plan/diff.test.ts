@@ -6,6 +6,7 @@ import {
   validatePatchOnProject,
   commitRevision,
   StaleRevisionError,
+  InvalidPatchError,
   HISTORY_LIMIT,
 } from './diff';
 import { ProjectSchema, type Project } from './schemas';
@@ -274,6 +275,17 @@ describe('commitRevision', () => {
     const dropWall = [{ op: 'remove' as const, path: '/room/walls/3' }];
     expect(() => commitRevision(p, dropWall, { baseRevision: 0, source: 'user', summary: 's', at })).toThrow(
       /3 walls/
+    );
+  });
+
+  it.each([
+    ['a non-editable path', [{ op: 'replace' as const, path: '/id', value: 'x' }]],
+    ['a patch that fails to apply', [{ op: 'remove' as const, path: '/items/9' }]],
+    ['a schema-invalid result', [{ op: 'replace' as const, path: '/room/walls/0/thicknessMm', value: -1 }]],
+    ['a semantically invalid result', [{ op: 'remove' as const, path: '/room/walls/3' }]],
+  ])('throws InvalidPatchError for %s', (_label, patch) => {
+    expect(() => commitRevision(newProject(), patch, { baseRevision: 0, source: 'user', summary: 's', at })).toThrow(
+      InvalidPatchError
     );
   });
 
