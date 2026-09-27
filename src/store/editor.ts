@@ -16,6 +16,8 @@ interface EditorState {
   /** The server committed the proposal and returned the saved project. */
   applied: (project: Project) => void;
   discard: () => void;
+  /** A direct edit was saved. Any pending proposal is kept (the server will report it stale). */
+  saved: (project: Project) => void;
   /** Photos are saved directly (not revisions), so they update in place. */
   setPhotos: (photos: Photo[]) => void;
 }
@@ -27,5 +29,6 @@ export const useEditorStore = create<EditorState>()((set) => ({
   propose: (proposal) => set({ proposal }),
   applied: (project) => set({ project, proposal: null }),
   discard: () => set({ proposal: null }),
+  saved: (project) => set({ project }),
   setPhotos: (photos) => set((s) => (s.project ? { project: { ...s.project, photos } } : s)),
 }));

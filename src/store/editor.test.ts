@@ -54,4 +54,11 @@ describe('editor store', () => {
     expect(useEditorStore.getState().project?.photos).toEqual(photos);
     expect(useEditorStore.getState().project?.revision).toBe(0);
   });
+
+  it('saved() replaces the project but keeps a pending proposal', () => {
+    useEditorStore.getState().propose(proposal);
+    useEditorStore.getState().saved({ ...project, revision: 1 });
+    expect(useEditorStore.getState().project?.revision).toBe(1);
+    expect(useEditorStore.getState().proposal).toEqual(proposal);
+  });
 });

@@ -4,11 +4,17 @@ import React from 'react';
 import ProjectEditor from './ProjectEditor';
 
 // The Konva canvas needs a real browser; it's covered by the Playwright specs.
+// The stub exposes its onEditRoom so tests can drive a direct edit.
+let editRoom: ((room: Room, summary: string) => Promise<string | null>) | undefined;
 vi.mock('./FloorPlanCanvas', () => ({
-  default: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
+  default: (props: { label: string; onEditRoom?: typeof editRoom }) => {
+    editRoom = props.onEditRoom;
+    return <div role="img" aria-label={props.label} />;
+  },
 }));
 import { useEditorStore } from '@/store/editor';
-import { ProjectSchema, type Project } from '@/lib/plan/schemas';
+import { ProjectSchema, type Project, type Room } from '@/lib/plan/schemas';
+import { act } from '@testing-library/react';
 
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
 const project: Project = ProjectSchema.parse({
@@ -120,5 +126,40 @@ describe('ProjectEditor', () => {
     expect(within(review).getByText(/64%/)).not.toBeNull();
     expect(within(review).getByText('Guessed the hidden corner.')).not.toBeNull();
     expect(within(review).getByText(/Wall 1 thickness: 100 → 150 mm/)).not.toBeNull();
+  });
+
+  it('saves a canvas edit straight away as a user revision, without a review step', async () => {
+    render(<ProjectEditor initialProject={project} />);
+    const edited: Room = {
+      ...project.room,
+      polygon: [
+        [0, 0],
+        [3500, 0],
+        [3000, 4000],
+        [0, 4000],
+      ],
+    };
+    fetchMock.mockImplementationOnce(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toMatchObject({ baseRevision: 0, source: 'user', summary: 'Move corner 2' });
+      return json({ project: { ...project, room: edited, revision: 1 } });
+    });
+    let result: string | null = 'unset';
+    await act(async () => {
+      result = await editRoom!(edited, 'Move corner 2');
+    });
+    expect(result).toBeNull();
+    expect(screen.getByText(/revision 1/i)).not.toBeNull();
+    expect(screen.queryByRole('region', { name: /review proposed change/i })).toBeNull();
+  });
+
+  it('reports a rejected canvas edit back to the canvas', async () => {
+    render(<ProjectEditor initialProject={project} />);
+    fetchMock.mockResolvedValueOnce(json({ error: 'edit would leave the plan invalid' }, 400));
+    let result: string | null = null;
+    await act(async () => {
+      result = await editRoom!(project.room, 'Move corner 1');
+    });
+    expect(result).toMatch(/invalid/);
+    expect(screen.getByText(/revision 0/i)).not.toBeNull();
   });
 });
