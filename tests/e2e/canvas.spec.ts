@@ -1,38 +1,9 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-
-type View = { scale: number; x: number; y: number };
+import { createProject, inner, toScreen, toWorld, view } from './helpers';
 
 async function openNewProject(page: Page): Promise<Locator> {
-  await page.goto('/');
-  await page.getByLabel('New project name').fill('Canvas e2e');
-  await page.getByRole('button', { name: 'Create project' }).click();
-  await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
-  const canvas = page.getByTestId('floor-plan');
-  await canvas.scrollIntoViewIfNeeded();
-  await expect(canvas.locator('canvas').first()).toBeVisible();
-  await expect.poll(() => view(canvas).then((v) => v.scale)).toBeGreaterThan(0);
-  return canvas;
+  return (await createProject(page, 'Canvas e2e')).canvas;
 }
-
-async function view(canvas: Locator): Promise<View> {
-  const [scale, x, y] = await Promise.all(['data-scale', 'data-x', 'data-y'].map((a) => canvas.getAttribute(a)));
-  return { scale: Number(scale), x: Number(x), y: Number(y) };
-}
-
-/** The canvas's inner (padding-box) rectangle in page coordinates — where the stage is drawn. */
-async function inner(canvas: Locator) {
-  const box = (await canvas.boundingBox())!;
-  const { left, top, width, height } = await canvas.evaluate((el) => ({
-    left: el.clientLeft,
-    top: el.clientTop,
-    width: el.clientWidth,
-    height: el.clientHeight,
-  }));
-  return { x: box.x + left, y: box.y + top, width, height };
-}
-
-const toScreen = (v: View, [wx, wy]: [number, number]): [number, number] => [wx * v.scale + v.x, wy * v.scale + v.y];
-const toWorld = (v: View, [sx, sy]: [number, number]): [number, number] => [(sx - v.x) / v.scale, (sy - v.y) / v.scale];
 
 /** Darkest channel value at a CSS-pixel point, across all Konva layer canvases (255 = white/empty). */
 async function darkness(canvas: Locator, [x, y]: [number, number]): Promise<number> {

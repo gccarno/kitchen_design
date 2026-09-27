@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
+import { Circle, Group, Layer, Line, Rect, Stage, Text } from 'react-konva';
 import { screenToWorld, gridStepMm, formatLength, type Viewport } from '@/lib/plan/viewport';
 import { wallLengthMm } from '@/lib/plan/validate';
 import { signedPolygonArea, type Point } from '@/lib/plan/geometry';
@@ -14,6 +14,10 @@ export interface FloorPlanStageProps {
   room: Room;
   items: PlacedItem[];
   units: 'mm' | 'in';
+  /** Show corner handles and "+" handles on each wall. */
+  editing?: boolean;
+  /** Highlighted corner (editing only). */
+  selected?: number | null;
 }
 
 const OPENING_COLOR = { door: '#2563eb', window: '#0d9488', pass_through: '#9333ea' } as const;
@@ -26,7 +30,16 @@ const LABEL_H = 18;
  * the viewport. Screen-constant sizes (grid lines, labels) divide by scale.
  * Loaded client-side only (Konva needs `window`).
  */
-export default function FloorPlanStage({ width, height, viewport, room, items, units }: FloorPlanStageProps) {
+export default function FloorPlanStage({
+  width,
+  height,
+  viewport,
+  room,
+  items,
+  units,
+  editing = false,
+  selected = null,
+}: FloorPlanStageProps) {
   const { scale } = viewport;
   const px = (n: number) => n / scale; // n screen pixels in world mm
   const [x0, y0] = screenToWorld(viewport, [0, 0]);
@@ -136,6 +149,33 @@ export default function FloorPlanStage({ width, height, viewport, room, items, u
           );
         })}
       </Layer>
+      {editing && (
+        // Hit testing is done in FloorPlanCanvas (canvas-hit.ts), so handles don't listen.
+        <Layer listening={false}>
+          {poly.map((a, i) => {
+            const b = poly[(i + 1) % n];
+            const [mx, my] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+            return (
+              <Group key={`add-${i}`} x={mx} y={my}>
+                <Circle radius={px(8)} fill="white" stroke="#2563eb" strokeWidth={px(1.5)} />
+                <Line points={[-px(4), 0, px(4), 0]} stroke="#2563eb" strokeWidth={px(1.5)} />
+                <Line points={[0, -px(4), 0, px(4)]} stroke="#2563eb" strokeWidth={px(1.5)} />
+              </Group>
+            );
+          })}
+          {poly.map((p, i) => (
+            <Circle
+              key={`corner-${i}`}
+              x={p[0]}
+              y={p[1]}
+              radius={px(i === selected ? 9 : 7)}
+              fill={i === selected ? '#dc2626' : 'white'}
+              stroke="#111827"
+              strokeWidth={px(2)}
+            />
+          ))}
+        </Layer>
+      )}
     </Stage>
   );
 }

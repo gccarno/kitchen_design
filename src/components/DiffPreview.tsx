@@ -7,6 +7,7 @@ import { validatePatchOnProject } from '@/lib/plan/diff';
 import { polygonBounds, type Bounds, type Point } from '@/lib/plan/geometry';
 import type { Project } from '@/lib/plan/schemas';
 import type { Proposal } from '@/lib/plan/proposal';
+import { submitRevision } from '@/lib/client/revisions';
 
 export type { Proposal };
 
@@ -43,30 +44,13 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
     if (inFlight.current) return;
     inFlight.current = true;
     setStatus({ state: 'applying' });
-    try {
-      const res = await fetch(`/api/projects/${projectId}/revisions`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          baseRevision: proposal.baseRevision,
-          patch: proposal.patch,
-          summary: proposal.summary,
-          source: proposal.source,
-        }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { project?: Project; error?: string };
-      if (res.status === 409) {
-        setStatus({ state: 'stale' });
-      } else if (!res.ok || !body.project) {
-        setStatus({ state: 'error', message: body.error ?? `could not apply (${res.status})` });
-      } else {
-        setStatus({ state: 'idle' });
-        onApplied(body.project);
-      }
-    } catch (err) {
-      setStatus({ state: 'error', message: (err as Error).message });
-    } finally {
-      inFlight.current = false;
+    const result = await submitRevision(projectId, proposal);
+    inFlight.current = false;
+    if (result.ok) {
+      setStatus({ state: 'idle' });
+      onApplied(result.project);
+    } else {
+      setStatus(result.stale ? { state: 'stale' } : { state: 'error', message: result.error });
     }
   }
 

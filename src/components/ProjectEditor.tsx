@@ -9,7 +9,8 @@ import FloorPlanCanvas from './FloorPlanCanvas';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForRoom } from '@/lib/plan/proposal';
-import type { Project } from '@/lib/plan/schemas';
+import type { Project, Room } from '@/lib/plan/schemas';
+import { submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
 
 /**
@@ -25,7 +26,18 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
   const stored = useEditorStore((s) => s.project);
   const project = stored?.id === initialProject.id ? stored : initialProject;
   const proposal = useEditorStore((s) => s.proposal);
-  const { propose, applied, discard, setPhotos } = useEditorStore.getState();
+  const { propose, applied, discard, saved, setPhotos } = useEditorStore.getState();
+
+  // Direct edits on the canvas are committed straight away (no review step)
+  // as user revisions, so they land in history for undo.
+  async function editRoom(room: Room, summary: string): Promise<string | null> {
+    const result = await submitRevision(project.id, proposalForRoom(project, room, summary));
+    if (result.ok) {
+      saved(result.project);
+      return null;
+    }
+    return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
+  }
 
   const bounds = polygonBounds(project.room.polygon as Point[]);
   const areaM2 = polygonAreaMm2(project.room.polygon as Point[]) / 1e6;
@@ -52,7 +64,13 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
 
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-semibold">Current room</h2>
-        <FloorPlanCanvas room={project.room} items={project.items} units={project.units} label="Current room" />
+        <FloorPlanCanvas
+          room={project.room}
+          items={project.items}
+          units={project.units}
+          label="Current room"
+          onEditRoom={editRoom}
+        />
         <p className="text-sm text-gray-600">
           {Math.round(bounds.maxX - bounds.minX)} × {Math.round(bounds.maxY - bounds.minY)} mm, {areaM2.toFixed(1)} m²
         </p>

@@ -17,7 +17,7 @@ import {
   signedPolygonArea,
   type Point,
 } from './geometry';
-import type { Project, Room } from './schemas';
+import type { PlacedItem, Project, Room } from './schemas';
 
 export interface PlanValidationResult {
   valid: boolean;
@@ -32,9 +32,13 @@ export function wallLengthMm(room: Room, wallIndex: number): number {
 }
 
 export function validatePlan(plan: Project): PlanValidationResult {
+  return validateRoom(plan.room, plan.items);
+}
+
+/** The checks behind `validatePlan`, for a candidate room (e.g. mid-edit) and the items in it. */
+export function validateRoom(room: Room, items: PlacedItem[] = []): PlanValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const { room } = plan;
   const poly = room.polygon as Point[];
 
   // --- Room polygon ---
@@ -88,7 +92,7 @@ export function validatePlan(plan: Project): PlanValidationResult {
   // --- Items ---
   const itemIds = new Set<string>();
   const footprints: Array<{ id: string; poly: Point[] }> = [];
-  plan.items.forEach((it, i) => {
+  items.forEach((it, i) => {
     if (itemIds.has(it.id)) {
       errors.push(`duplicate placed item id "${it.id}" at index ${i}`);
     }

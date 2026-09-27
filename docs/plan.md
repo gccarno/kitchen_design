@@ -25,7 +25,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 13 — Project page shell — **milestone 1 reached** (photos + measurements → proposed room, or a hand sketch → review → saved)
 - [ ] Manual phone check of Tasks 10–13 (now possible: `next dev -H 0.0.0.0`, open `http://<laptop-ip>:3000` on the phone)
 - [x] Task 14 — Konva canvas + viewport
-- [ ] **Next: Task 15 — Drag-to-edit walls and polygon vertices**
+- [x] Task 15 — Drag-to-edit walls and polygon vertices
+- [ ] **Next: Task 16 — Insert doors/windows on walls**
 
 ## Decisions (locked in with user)
 
@@ -41,7 +42,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–14 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–15 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -532,6 +533,8 @@ Because walls are derived from polygon edges, `room-edit.ts` owns the bookkeepin
 - `removeVertex(room, vertexIdx)` merges the two adjacent walls; openings are remapped onto the merged wall.
 - `moveVertex(room, vertexIdx, point)` keeps opening positions proportional along the resized walls and drops `measurements` for the changed walls (they're no longer true).
 - Every edit goes through the diff path as `source: 'user'` so undo works.
+
+> ✅ Done. `room-edit.ts` (17 tests) plus a pure hit test (`canvas-hit.ts`) that decides whether a pointer grabs a corner, taps a wall's "+" handle, or pans — so all gestures stay in `FloorPlanCanvas`'s pointer handlers. "Edit outline" mode: drag corners (snap to 50 mm, toggleable — the plan's "free placement" mode), "+" on a wall adds a corner, "Delete corner" removes the selected one. Direct edits commit immediately via `/revisions` (no review dialog; that's for LLM proposals) using the shared `submitRevision()` client helper; edits that fail `validateRoom` (e.g. crossing walls) are refused before saving. The view no longer refits after an edit — only when the room is replaced wholesale.
 
 Commit: `feat: edit room polygon`.
 
