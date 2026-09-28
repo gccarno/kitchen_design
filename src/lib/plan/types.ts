@@ -17,4 +17,5 @@ export type {
   ReferenceObject,
   ReferenceSide,
   Measurement,
+  Mount,
 } from './schemas';

@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
+import CatalogSidebar from './CatalogSidebar';
 import DiffPreview from './DiffPreview';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
@@ -9,6 +10,7 @@ import FloorPlanCanvas from './FloorPlanCanvas';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForRoom } from '@/lib/plan/proposal';
+import { loadCatalog } from '@/lib/catalog/loader';
 import type { Project, Room } from '@/lib/plan/schemas';
 import { submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
@@ -74,6 +76,11 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
         <p className="text-sm text-gray-600">
           {Math.round(bounds.maxX - bounds.minX)} × {Math.round(bounds.maxY - bounds.minY)} mm, {areaM2.toFixed(1)} m²
         </p>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Catalog</h2>
+        <CatalogSidebar items={loadCatalog().items} units={project.units} />
       </section>
 
       <section className="flex flex-col gap-3">

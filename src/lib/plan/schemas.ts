@@ -86,6 +86,11 @@ export const JsonPatchOpSchema = z.object({
 });
 export type JsonPatchOp = z.infer<typeof JsonPatchOpSchema>;
 
+// Vertical level an item occupies. Items only collide with items at the same
+// level: a wall cabinet can hang above a base cabinet, a microwave sit on a counter.
+export const MountSchema = z.enum(['floor', 'counter', 'wall']);
+export type Mount = z.infer<typeof MountSchema>;
+
 // An item placed on the plan from the catalog.
 const PlacedItemSchema = z.object({
   id: z.string().min(1),
@@ -93,6 +98,8 @@ const PlacedItemSchema = z.object({
   // Snapshot of the catalog item's size at placement, so validation never
   // needs the catalog and plans survive catalog changes.
   sizeMm: z.object({ w: z.number().positive(), d: z.number().positive(), h: z.number().positive() }),
+  // Level it occupies; absent means 'floor'. Snapshot from the catalog item.
+  mount: MountSchema.optional(),
   // Item centre, mm.
   position: z.object({ x: z.number(), y: z.number() }),
   rotationDeg: z.number(),

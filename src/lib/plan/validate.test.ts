@@ -215,6 +215,25 @@ describe('validatePlan', () => {
     expect(r.warnings.join(' ')).toMatch(/overlap/i);
   });
 
+  it('only checks overlap between items at the same mount level', () => {
+    // A wall cabinet above a base cabinet, and a counter microwave on it: normal kitchen.
+    const r = validatePlan(
+      newProject({
+        items: [
+          item('base', 1000, 1000),
+          item('wall', 1000, 1000, { mount: 'wall' }),
+          item('micro', 1000, 1000, { mount: 'counter' }),
+        ],
+      })
+    );
+    expect(r.warnings).toEqual([]);
+  });
+
+  it('treats a missing mount as floor', () => {
+    const r = validatePlan(newProject({ items: [item('a', 1000, 1000), item('b', 1050, 1050, { mount: 'floor' })] }));
+    expect(r.warnings.join(' ')).toMatch(/overlap/);
+  });
+
   it('uses each item size: small items side by side do not overlap', () => {
     const small = { sizeMm: { w: 100, d: 100, h: 100 } };
     const r = validatePlan(newProject({ items: [item('i1', 1000, 1000, small), item('i2', 1150, 1000, small)] }));
