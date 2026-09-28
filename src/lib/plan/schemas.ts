@@ -38,11 +38,15 @@ const WallSchema = z.object({
   thicknessMm: z.number().positive(),
 });
 
+// The kind of opening cut into a wall.
+export const OpeningKindSchema = z.enum(['door', 'window', 'pass_through']);
+export type OpeningKind = z.infer<typeof OpeningKindSchema>;
+
 // An opening (door / window / pass-through) sits on a wall.
 const OpeningSchema = z.object({
   id: z.string().min(1),
   wallId: z.string().min(1),
-  kind: z.enum(['door', 'window', 'pass_through']),
+  kind: OpeningKindSchema,
   positionMm: z.number().min(0),
   widthMm: z.number().positive(),
   heightMm: z.number().positive(),

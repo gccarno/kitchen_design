@@ -82,6 +82,19 @@ export function validateRoom(room: Room, items: PlacedItem[] = []): PlanValidati
     }
   }
 
+  // Openings on the same wall must not overlap (touching end to end is fine).
+  const byWall = new Map<string, typeof room.openings>();
+  for (const o of room.openings) byWall.set(o.wallId, [...(byWall.get(o.wallId) ?? []), o]);
+  for (const [wallId, list] of byWall) {
+    const sorted = [...list].sort((p, q) => p.positionMm - q.positionMm);
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      if (sorted[i].positionMm < prev.positionMm + prev.widthMm - 0.5) {
+        errors.push(`openings "${prev.id}" and "${sorted[i].id}" overlap on wall "${wallId}"`);
+      }
+    }
+  }
+
   // --- Measurements ---
   for (const m of room.measurements ?? []) {
     if (!wallIndexById.has(m.wallId)) {

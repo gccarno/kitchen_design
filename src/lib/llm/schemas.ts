@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import { distance, polygonSelfIntersects, signedPolygonArea, type Point } from '../plan/geometry';
 import type { CheckResult } from '../result';
-
-/** The kind of opening cut into a wall. */
-export const OpeningKindSchema = z.enum(['door', 'window', 'pass_through']);
-export type OpeningKind = z.infer<typeof OpeningKindSchema>;
+import { OpeningKindSchema } from '../plan/schemas';
+export { OpeningKindSchema, type OpeningKind } from '../plan/schemas';
 
 /** walls[i] is the polygon edge polygonMm[i] → polygonMm[(i + 1) % n]. */
 const ExtractedWallSchema = z.object({

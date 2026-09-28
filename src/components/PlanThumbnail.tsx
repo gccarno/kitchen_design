@@ -1,6 +1,7 @@
 import React from 'react';
 import { polygonBounds, rotatedRectFootprint, type Bounds, type Point } from '@/lib/plan/geometry';
 import type { PlacedItem, Room } from '@/lib/plan/schemas';
+import { OPENING_COLOR } from './plan-colors';
 
 interface PlanThumbnailProps {
   room: Room;
@@ -11,7 +12,6 @@ interface PlanThumbnailProps {
   className?: string;
 }
 
-const OPENING_COLOR = { door: '#2563eb', window: '#0d9488', pass_through: '#9333ea' } as const;
 
 /** Static top-down drawing of a room: outline, numbered walls, openings, and item footprints. */
 export default function PlanThumbnail({ room, items = [], bounds, label, className }: PlanThumbnailProps) {
