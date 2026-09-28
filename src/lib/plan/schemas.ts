@@ -100,6 +100,8 @@ const PlacedItemSchema = z.object({
   sizeMm: z.object({ w: z.number().positive(), d: z.number().positive(), h: z.number().positive() }),
   // Level it occupies; absent means 'floor'. Snapshot from the catalog item.
   mount: MountSchema.optional(),
+  // Free space it needs in front and at each side; snapshot from the catalog item.
+  clearanceMm: z.object({ front: z.number().nonnegative(), sides: z.number().nonnegative() }).optional(),
   // Item centre, mm.
   position: z.object({ x: z.number(), y: z.number() }),
   rotationDeg: z.number(),

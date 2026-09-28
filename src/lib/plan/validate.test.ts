@@ -257,4 +257,75 @@ describe('validatePlan', () => {
     expect(r.valid).toBe(false);
     expect(r.errors.join(' ')).toMatch(/duplicate placed item id/i);
   });
+
+  describe('clearances', () => {
+    const fridge = (x: number, y: number, rotationDeg = 0): PlacedItem => ({
+      id: `fridge-${x}-${y}`,
+      catalogId: 'fridge-standard-910',
+      sizeMm: { w: 910, d: 890, h: 1780 },
+      clearanceMm: { front: 1000, sides: 50 },
+      position: { x, y },
+      rotationDeg,
+    });
+    // Against the top wall, front facing down into the room.
+    const goodFridge = () => fridge(1500, 445);
+
+    it('is quiet for a well-placed item', () => {
+      expect(validatePlan(newProject({ items: [goodFridge()] })).warnings).toEqual([]);
+    });
+
+    it('warns when something stands in the front clearance', () => {
+      const island = item('island', 1500, 1400, { catalogId: 'island-1200x900', sizeMm: { w: 1200, d: 900, h: 900 } });
+      const r = validatePlan(newProject({ items: [goodFridge(), island] }));
+      expect(r.warnings).toEqual(['not enough room in front of "fridge-standard-910": "island-1200x900" is in the way']);
+    });
+
+    it('ignores wall-mounted items above the clearance zone', () => {
+      const wallCab = item('wc', 1500, 1400, { catalogId: 'wall-600x320x720', mount: 'wall' });
+      expect(validatePlan(newProject({ items: [goodFridge(), wallCab] })).warnings).toEqual([]);
+    });
+
+    it('warns when the item faces a wall', () => {
+      const r = validatePlan(newProject({ items: [fridge(1500, 445, 180)] }));
+      expect(r.warnings).toContain('not enough room in front of "fridge-standard-910": it faces a wall');
+    });
+
+    it('warns when there is not enough room at the sides', () => {
+      const r = validatePlan(newProject({ items: [fridge(455, 445)] })); // tucked into the corner
+      expect(r.warnings).toEqual(['"fridge-standard-910" needs 50 mm at its sides: a wall is too close']);
+      const tall = item('tall', 1500 + 455 + 20 + 300, 280, { catalogId: 'tall-600x560x2100' });
+      const r2 = validatePlan(newProject({ items: [goodFridge(), tall] }));
+      expect(r2.warnings).toEqual(['"fridge-standard-910" needs 50 mm at its sides: "tall-600x560x2100" is too close']);
+    });
+
+    it('skips items without a clearance snapshot', () => {
+      const plain = { ...goodFridge(), clearanceMm: undefined };
+      expect(validatePlan(newProject({ items: [plain, item('x', 1500, 1400)] })).warnings).toEqual([]);
+    });
+  });
+
+  describe('door swing', () => {
+    // A door on the top wall from x=1000 to x=1800 swings into the room over (1000..1800, 0..800).
+    const door = { id: 'd', wallId: 'w0', kind: 'door' as const, positionMm: 1000, widthMm: 800, heightMm: 2100 };
+    const room = { polygon: RECT, walls: wallsFor(RECT), openings: [door] };
+
+    it('warns when a floor item is in the swing', () => {
+      const r = validatePlan(newProject({ room, items: [item('table', 1400, 700, { catalogId: 'table-dining-4' })] }));
+      expect(r.warnings).toEqual(['the door on wall 1 would hit "table-dining-4"']);
+    });
+
+    it('is quiet when the swing is clear, or the item is wall-mounted', () => {
+      expect(validatePlan(newProject({ room, items: [item('t', 1400, 1500)] })).warnings).toEqual([]);
+      expect(
+        validatePlan(newProject({ room, items: [item('w', 1400, 300, { catalogId: 'wall-600x320x720', mount: 'wall' })] }))
+          .warnings
+      ).toEqual([]);
+    });
+
+    it('ignores windows', () => {
+      const win = { ...door, kind: 'window' as const };
+      const r = validatePlan(newProject({ room: { ...room, openings: [win] }, items: [item('t', 1400, 700)] }));
+      expect(r.warnings).toEqual([]);
+    });
+  });
 });

@@ -32,9 +32,11 @@ test('draws the default 3000 × 4000 room fitted to the view, with metric rulers
   expect(cx).toBeCloseTo(ruler + (box.width - ruler) / 2, 0);
   expect(cy).toBeCloseTo(ruler + (box.height - ruler) / 2, 0);
 
-  // Floor fill inside, a dark wall on the top edge, nothing well outside the room.
+  // Floor fill inside; the top wall's body sits OUTSIDE the outline (the outline is
+  // the walls' interior face), so just inside it is floor, not wall.
   expect(await darkness(canvas, [cx, cy])).toBeLessThan(250);
-  expect(await darkness(canvas, toScreen(v, [1500, 0]))).toBeLessThan(80);
+  expect(await darkness(canvas, toScreen(v, [1500, -50]))).toBeLessThan(80);
+  expect(await darkness(canvas, toScreen(v, [1500, 40]))).toBeGreaterThan(200);
   expect(await darkness(canvas, toScreen(v, [-1500, 2000]))).toBeGreaterThan(200);
 
   await expect(page.getByTestId('ruler-x')).toContainText('1 m');

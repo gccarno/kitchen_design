@@ -1,17 +1,19 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import CatalogSidebar from './CatalogSidebar';
 import DiffPreview from './DiffPreview';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
-import FloorPlanCanvas from './FloorPlanCanvas';
+import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
-import { proposalForRoom } from '@/lib/plan/proposal';
+import { proposalForPlan, proposalForRoom } from '@/lib/plan/proposal';
+import { validatePlan } from '@/lib/plan/validate';
+import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
-import type { Project, Room } from '@/lib/plan/schemas';
+import type { Project } from '@/lib/plan/schemas';
 import { submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
 
@@ -30,10 +32,24 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
   const proposal = useEditorStore((s) => s.proposal);
   const { propose, applied, discard, saved, setPhotos } = useEditorStore.getState();
 
+  const catalog = loadCatalog();
+  const [placingItem, setPlacingItem] = useState<CatalogItem | null>(null);
+  const canvasRef = useRef<HTMLElement>(null);
+  const itemLabels = useMemo(
+    () => Object.fromEntries(project.items.map((it) => [it.id, catalog.byId.get(it.catalogId)?.name ?? it.catalogId])),
+    [project.items, catalog]
+  );
+  const warnings = useMemo(() => validatePlan(project).warnings, [project]);
+
+  function pickFromCatalog(item: CatalogItem) {
+    setPlacingItem((current) => (current?.id === item.id ? null : item));
+    canvasRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
+
   // Direct edits on the canvas are committed straight away (no review step)
   // as user revisions, so they land in history for undo.
-  async function editRoom(room: Room, summary: string): Promise<string | null> {
-    const result = await submitRevision(project.id, proposalForRoom(project, room, summary));
+  async function editPlan(change: PlanChange, summary: string): Promise<string | null> {
+    const result = await submitRevision(project.id, proposalForPlan(project, change, summary));
     if (result.ok) {
       saved(result.project);
       return null;
@@ -64,23 +80,42 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
         />
       )}
 
-      <section className="flex flex-col gap-2">
+      <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2">
         <h2 className="text-lg font-semibold">Current room</h2>
         <FloorPlanCanvas
           room={project.room}
           items={project.items}
           units={project.units}
           label="Current room"
-          onEditRoom={editRoom}
+          onEdit={editPlan}
+          placingItem={placingItem}
+          onPlacingDone={() => setPlacingItem(null)}
+          itemLabels={itemLabels}
         />
         <p className="text-sm text-gray-600">
           {Math.round(bounds.maxX - bounds.minX)} × {Math.round(bounds.maxY - bounds.minY)} mm, {areaM2.toFixed(1)} m²
         </p>
+        {warnings.length > 0 && (
+          <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+            <p className="font-medium">Heads up</p>
+            <ul aria-label="Plan warnings" className="list-disc pl-5">
+              {warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Catalog</h2>
-        <CatalogSidebar items={loadCatalog().items} units={project.units} />
+        <p className="text-sm text-gray-600">Pick an item, then tap the plan to place it.</p>
+        <CatalogSidebar
+          items={catalog.items}
+          units={project.units}
+          onPick={pickFromCatalog}
+          selectedId={placingItem?.id ?? null}
+        />
       </section>
 
       <section className="flex flex-col gap-3">

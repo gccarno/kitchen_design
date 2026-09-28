@@ -209,7 +209,7 @@ describe('extractRoom', () => {
       provider: new StubProvider([answer()]),
       measurements: [{ description: 'sink wall', lengthMm: 3600 }],
     });
-    expect(r.warnings.join(' ')).toMatch(/i1.*outside/);
+    expect(r.warnings.join(' ')).toMatch(/"c".*outside/);
   });
 
   it('refuses a project without photos', async () => {

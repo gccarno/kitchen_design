@@ -5,15 +5,19 @@ import ProjectEditor from './ProjectEditor';
 
 // The Konva canvas needs a real browser; it's covered by the Playwright specs.
 // The stub exposes its onEditRoom so tests can drive a direct edit.
-let editRoom: ((room: Room, summary: string) => Promise<string | null>) | undefined;
+type Edit = (change: { room?: Room; items?: PlacedItem[] }, summary: string) => Promise<string | null>;
+let onEdit: Edit | undefined;
+let canvasProps: { placingItem?: { id: string } | null; onPlacingDone?: () => void; itemLabels?: Record<string, string> } = {};
+const editRoom = (room: Room, summary: string) => onEdit!({ room }, summary);
 vi.mock('./FloorPlanCanvas', () => ({
-  default: (props: { label: string; onEditRoom?: typeof editRoom }) => {
-    editRoom = props.onEditRoom;
+  default: (props: { label: string; onEdit?: Edit } & typeof canvasProps) => {
+    onEdit = props.onEdit;
+    canvasProps = props;
     return <div role="img" aria-label={props.label} />;
   },
 }));
 import { useEditorStore } from '@/store/editor';
-import { ProjectSchema, type Project, type Room } from '@/lib/plan/schemas';
+import { ProjectSchema, type PlacedItem, type Project, type Room } from '@/lib/plan/schemas';
 import { act } from '@testing-library/react';
 
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
@@ -147,7 +151,7 @@ describe('ProjectEditor', () => {
     });
     let result: string | null = 'unset';
     await act(async () => {
-      result = await editRoom!(edited, 'Move corner 2');
+      result = await editRoom(edited, 'Move corner 2');
     });
     expect(result).toBeNull();
     expect(screen.getByText(/revision 1/i)).not.toBeNull();
@@ -159,9 +163,56 @@ describe('ProjectEditor', () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'edit would leave the plan invalid' }, 400));
     let result: string | null = null;
     await act(async () => {
-      result = await editRoom!(project.room, 'Move corner 1');
+      result = await editRoom(project.room, 'Move corner 1');
     });
     expect(result).toMatch(/invalid/);
     expect(screen.getByText(/revision 0/i)).not.toBeNull();
+  });
+
+  it('picking a catalog item arms placement on the canvas; picking it again cancels', () => {
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.click(screen.getByRole('button', { name: /Dishwasher \(600 mm\)/ }));
+    expect(canvasProps.placingItem?.id).toBe('dishwasher-600');
+    fireEvent.click(screen.getByRole('button', { name: /Dishwasher \(600 mm\)/ }));
+    expect(canvasProps.placingItem).toBeNull();
+  });
+
+  it('saves placed items and labels them with catalog names', async () => {
+    render(<ProjectEditor initialProject={project} />);
+    const placed: PlacedItem = {
+      id: 'i1',
+      catalogId: 'dishwasher-600',
+      sizeMm: { w: 600, d: 580, h: 850 },
+      position: { x: 1500, y: 290 },
+      rotationDeg: 0,
+    };
+    fetchMock.mockImplementationOnce(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      expect(body.patch.every((op: { path: string }) => op.path.startsWith('/items'))).toBe(true);
+      return json({ project: { ...project, items: [placed], revision: 1 } });
+    });
+    await act(async () => {
+      await onEdit!({ items: [placed] }, 'Add Dishwasher (600 mm)');
+    });
+    expect(canvasProps.itemLabels).toEqual({ i1: 'Dishwasher (600 mm)' });
+  });
+
+  it('lists plan warnings under the canvas', () => {
+    const blocked: Project = {
+      ...project,
+      items: [
+        {
+          id: 'f',
+          catalogId: 'fridge-standard-910',
+          sizeMm: { w: 910, d: 890, h: 1780 },
+          clearanceMm: { front: 1000, sides: 50 },
+          position: { x: 1500, y: 445 },
+          rotationDeg: 0,
+        },
+        { id: 'i', catalogId: 'island-1200x900', sizeMm: { w: 1200, d: 900, h: 900 }, position: { x: 1500, y: 1400 }, rotationDeg: 0 },
+      ],
+    };
+    render(<ProjectEditor initialProject={blocked} />);
+    expect(within(screen.getByRole('list', { name: /plan warnings/i })).getByText(/"island-1200x900" is in the way/)).not.toBeNull();
   });
 });

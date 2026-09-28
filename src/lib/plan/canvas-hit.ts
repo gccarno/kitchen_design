@@ -1,5 +1,5 @@
-import { pointToSegmentDistance, type Point } from './geometry';
-import type { Room } from './schemas';
+import { pointInPolygon, pointToSegmentDistance, rotatedRectFootprint, type Point } from './geometry';
+import type { PlacedItem, Room } from './schemas';
 import { worldToScreen, type Viewport } from './viewport';
 
 export type CanvasHit =
@@ -60,4 +60,21 @@ export function hitTest(room: Room, v: Viewport, screen: Point, tolerancePx: num
     if (d(mid) <= tolerancePx) return { kind: 'edge', index, point: mid };
   }
   return null;
+}
+
+const LEVEL_ORDER = { wall: 0, counter: 1, floor: 2 } as const;
+
+/**
+ * Ids of the items whose footprint contains world point `p`, topmost first:
+ * wall-mounted, then counter, then floor; within a level, later (drawn on
+ * top) first. Repeated taps can cycle through this list.
+ */
+export function itemsAt(items: PlacedItem[], p: Point): string[] {
+  return items
+    .map((it, index) => ({ it, index }))
+    .filter(({ it }) =>
+      pointInPolygon(p, rotatedRectFootprint([it.position.x, it.position.y], it.sizeMm.w, it.sizeMm.d, it.rotationDeg))
+    )
+    .sort((a, b) => LEVEL_ORDER[a.it.mount ?? 'floor'] - LEVEL_ORDER[b.it.mount ?? 'floor'] || b.index - a.index)
+    .map(({ it }) => it.id);
 }
