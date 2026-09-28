@@ -1,5 +1,5 @@
 import { planToJsonPatch } from './diff';
-import type { JsonPatchOp, Project, Room } from './schemas';
+import type { JsonPatchOp, PlacedItem, Project, Room } from './schemas';
 
 /** A proposed edit awaiting the user's confirmation in the diff preview. */
 export interface Proposal {
@@ -14,14 +14,19 @@ export interface Proposal {
   warnings?: string[];
 }
 
+/** Propose a user edit to the room and/or the placed items. */
+export function proposalForPlan(
+  project: Project,
+  change: { room?: Room; items?: PlacedItem[] },
+  summary: string
+): Proposal {
+  const next = { ...project, room: change.room ?? project.room, items: change.items ?? project.items };
+  return { patch: planToJsonPatch(project, next), baseRevision: project.revision, summary, source: 'user' };
+}
+
 /** Propose replacing the project's room (e.g. from the manual sketch). */
 export function proposalForRoom(project: Project, room: Room, summary: string): Proposal {
-  return {
-    patch: planToJsonPatch(project, { ...project, room }),
-    baseRevision: project.revision,
-    summary,
-    source: 'user',
-  };
+  return proposalForPlan(project, { room }, summary);
 }
 
 /** The fields of POST /api/projects/[id]/extract's response a proposal needs. */

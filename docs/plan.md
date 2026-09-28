@@ -29,7 +29,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 16 — Insert doors/windows on walls
 - [x] Task 17 — Catalog loader + sidebar
 - [x] Task 18 — Parametric catalog generator
-- [ ] **Next: Task 19 — Place items on the plan**
+- [x] Task 19 — Place items on the plan — **milestone 2 reached** (manual editor with the catalog)
+- [ ] **Next: Task 20 — Chat panel + refinement endpoint**
 
 ## Decisions (locked in with user)
 
@@ -45,7 +46,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–18 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–19 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -127,7 +128,7 @@ type Photo = {
 };
 
 type Room = {
-  polygon: [number, number][];  // mm, plan coords, implicitly closed
+  polygon: [number, number][];  // mm, plan coords, implicitly closed — the walls' INTERIOR face (walls extend outward)
   walls: Wall[];                // walls[i] is the edge polygon[i] → polygon[(i+1) % n]; length === polygon.length
   openings: Opening[];
   measurements?: { wallId: string; lengthMm: number; source: 'user' }[]; // scale anchors
@@ -144,6 +145,7 @@ type PlacedItem = {
   catalogId: string;            // FK into catalog
   sizeMm: { w: number; d: number; h: number }; // snapshot at placement; validation never needs the catalog
   mount?: 'floor' | 'counter' | 'wall';          // level it occupies (default floor); only same-level items can collide
+  clearanceMm?: { front: number; sides: number };  // snapshot from the catalog; drives clearance warnings
   position: { x: number; y: number };  // mm, item centre
   rotationDeg: number;
   tag?: string;                // 'fridge', 'sink', etc. — drives clearance rules
@@ -589,6 +591,8 @@ Commit: `feat: parametric catalog generator`.
 **Objective:** Drag from sidebar → drop on canvas → snap to grid → validate inside polygon → store as `PlacedItem` (with `sizeMm` copied from the catalog item).
 
 Clearance rules (resolved yes, from Open Questions): `validate.ts` emits **warnings** when an item's `clearanceMm.front` zone overlaps another item or a wall, and when a door swing overlaps an item.
+
+> ✅ Done. Pick an item in the catalog, tap the plan: `placement.ts` puts it back-to-wall facing into the room when the tap is within its depth + 300 mm of a wall (snapped along the wall, kept within it), otherwise on the 50 mm grid; wall-mounted items must go on a wall. Placed items snapshot size, mount, clearance and a tag. Tap to select (again to cycle through stacked items: wall cabinet → base cabinet), drag to move (re-snaps to walls), Rotate 90° / Remove item. Clearance warnings (front zone, side zones, door swings; floor-level items only) are listed under the canvas as "Heads up" and name items by catalog id. The canvas now draws walls outward from the outline with mitred corners (`walls.ts`) — the outline is the interior face, as tape measurements are — and wall-length labels sit outside the walls, along them.
 
 **Files:**
 - Modify: `src/components/FloorPlanCanvas.tsx`, `src/components/CatalogSidebar.tsx`.

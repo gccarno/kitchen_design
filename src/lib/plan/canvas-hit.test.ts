@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { hitTest } from './canvas-hit';
+import { hitTest, itemsAt } from './canvas-hit';
+import type { PlacedItem } from './schemas';
 import type { Room } from './schemas';
 import type { Viewport } from './viewport';
 
@@ -68,5 +69,31 @@ describe('hitTest', () => {
       };
       expect(hitTest(atCorner, v, [50, 50], 12)).toEqual({ kind: 'vertex', index: 0 });
     });
+  });
+});
+
+describe('itemsAt', () => {
+  const mk = (id: string, x: number, y: number, mount?: PlacedItem['mount'], rotationDeg = 0): PlacedItem => ({
+    id,
+    catalogId: id,
+    sizeMm: { w: 600, d: 400, h: 700 },
+    position: { x, y },
+    rotationDeg,
+    ...(mount ? { mount } : {}),
+  });
+
+  it('lists items under a point, topmost level first', () => {
+    const items = [mk('base', 1000, 1000), mk('wall', 1000, 1000, 'wall'), mk('micro', 1000, 1000, 'counter')];
+    expect(itemsAt(items, [1100, 1050])).toEqual(['wall', 'micro', 'base']);
+  });
+
+  it('respects rotation', () => {
+    const items = [mk('r', 1000, 1000, undefined, 90)]; // 400 wide, 600 deep once rotated
+    expect(itemsAt(items, [1000, 1280])).toEqual(['r']);
+    expect(itemsAt(items, [1280, 1000])).toEqual([]);
+  });
+
+  it('puts later items first within a level (they are drawn on top)', () => {
+    expect(itemsAt([mk('a', 1000, 1000), mk('b', 1100, 1000)], [1050, 1000])).toEqual(['b', 'a']);
   });
 });

@@ -47,3 +47,17 @@ export async function pagePoint(canvas: Locator, world: [number, number]): Promi
   const [sx, sy] = toScreen(v, world);
   return [box.x + sx, box.y + sy];
 }
+
+/** Wait until an element stops moving (e.g. after a smooth scroll). */
+export async function settle(locator: Locator): Promise<void> {
+  let last = '';
+  await expect
+    .poll(async () => {
+      const b = await locator.boundingBox();
+      const now = JSON.stringify(b);
+      const stable = now === last;
+      last = now;
+      return stable;
+    }, { intervals: [100] })
+    .toBe(true);
+}

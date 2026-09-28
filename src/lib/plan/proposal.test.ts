@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { proposalFromExtraction, proposalForRoom } from './proposal';
+import { proposalFromExtraction, proposalForPlan, proposalForRoom } from './proposal';
 import { commitRevision } from './diff';
 import { ProjectSchema, type Room } from './schemas';
 
@@ -42,6 +42,17 @@ describe('proposalForRoom', () => {
     expect(p).toMatchObject({ baseRevision: 4, summary: 'Sketched room', source: 'user' });
     const next = commitRevision(project, p.patch, { baseRevision: p.baseRevision, source: p.source, summary: p.summary });
     expect(next.room).toEqual(room);
+  });
+});
+
+describe('proposalForPlan', () => {
+  it('can change just the items', () => {
+    const items = [{ id: 'i', catalogId: 'c', sizeMm: { w: 600, d: 560, h: 720 }, position: { x: 1000, y: 1000 }, rotationDeg: 0 }];
+    const p = proposalForPlan(project, { items }, 'Add c');
+    expect(p.patch.every((op) => op.path.startsWith('/items'))).toBe(true);
+    const next = commitRevision(project, p.patch, { baseRevision: 4, source: 'user', summary: p.summary });
+    expect(next.items).toEqual(items);
+    expect(next.room).toEqual(project.room);
   });
 });
 
