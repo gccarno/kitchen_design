@@ -27,7 +27,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 14 — Konva canvas + viewport
 - [x] Task 15 — Drag-to-edit walls and polygon vertices
 - [x] Task 16 — Insert doors/windows on walls
-- [ ] **Next: Task 17 — Catalog loader + sidebar**
+- [x] Task 17 — Catalog loader + sidebar
+- [ ] **Next: Task 18 — Parametric catalog generator**
 
 ## Decisions (locked in with user)
 
@@ -43,7 +44,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–16 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–17 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -141,6 +142,7 @@ type PlacedItem = {
   id: string;
   catalogId: string;            // FK into catalog
   sizeMm: { w: number; d: number; h: number }; // snapshot at placement; validation never needs the catalog
+  mount?: 'floor' | 'counter' | 'wall';          // level it occupies (default floor); only same-level items can collide
   position: { x: number; y: number };  // mm, item centre
   rotationDeg: number;
   tag?: string;                // 'fridge', 'sink', etc. — drives clearance rules
@@ -556,9 +558,13 @@ Commit: `feat: insert openings`.
 **Files:**
 - Create: `src/lib/catalog/schema.ts` (`CatalogItemSchema`), `src/lib/catalog/loader.ts`, `src/lib/catalog/loader.test.ts`, `src/components/CatalogSidebar.tsx`, `src/lib/catalog/seed.json`.
 
+Each item also has a `mount` level (`floor` / `counter` / `wall`), snapshotted onto `PlacedItem`: overlap checks only compare items at the same level, so a wall cabinet above a base cabinet, a hood above a range, or a microwave on a counter isn't flagged.
+
 The curated seed covers the non-cabinet items with standard dimensions: refrigerator (standard + counter-depth), range/cooktop (600/760/900), dishwasher, sink base, microwave, range hood, island, dining table (4 sizes), chair, stool. Cabinets come from the generator. Each item: `{ id, category, name, sizeMm: {w,d,h}, tags: string[], clearanceMm?: {front, sides} }` — the footprint is `sizeMm.w × sizeMm.d`. The loader validates every item with Zod and fails loudly on duplicate ids.
 
 Commit: `feat: catalog sidebar + seed`.
+
+> ✅ Done. 24 seed items (`src/lib/catalog/seed.json`), `CatalogItemSchema` (`schema.ts`), `buildCatalog` / `loadCatalog` / `searchCatalog` (`loader.ts`; every invalid item reported at once, duplicate ids fail), and `CatalogSidebar` (search in any word order, category filter, sizes in project units). The catalog is bundled static data, identical on server and client. Mounted browse-only on the project page; Task 19 passes `onPick` to place items.
 
 ### Task 18: Parametric catalog generator
 

@@ -104,7 +104,7 @@ export function validateRoom(room: Room, items: PlacedItem[] = []): PlanValidati
 
   // --- Items ---
   const itemIds = new Set<string>();
-  const footprints: Array<{ id: string; poly: Point[] }> = [];
+  const footprints: Array<{ id: string; mount: string; poly: Point[] }> = [];
   items.forEach((it, i) => {
     if (itemIds.has(it.id)) {
       errors.push(`duplicate placed item id "${it.id}" at index ${i}`);
@@ -113,7 +113,7 @@ export function validateRoom(room: Room, items: PlacedItem[] = []): PlanValidati
 
     const center: Point = [it.position.x, it.position.y];
     const footprint = rotatedRectFootprint(center, it.sizeMm.w, it.sizeMm.d, it.rotationDeg);
-    footprints.push({ id: it.id, poly: footprint });
+    footprints.push({ id: it.id, mount: it.mount ?? 'floor', poly: footprint });
 
     if (poly.length < 3) return;
     if (!pointInPolygon(center, poly)) {
@@ -125,6 +125,8 @@ export function validateRoom(room: Room, items: PlacedItem[] = []): PlanValidati
 
   for (let i = 0; i < footprints.length; i++) {
     for (let j = i + 1; j < footprints.length; j++) {
+      // Items at different levels (floor / counter / wall) can stack.
+      if (footprints[i].mount !== footprints[j].mount) continue;
       if (convexPolygonsOverlap(footprints[i].poly, footprints[j].poly)) {
         warnings.push(`placed items "${footprints[i].id}" and "${footprints[j].id}" overlap`);
       }

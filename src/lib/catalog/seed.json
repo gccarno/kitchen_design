@@ -1,0 +1,33 @@
+[
+  { "id": "fridge-standard-910", "name": "Refrigerator, French door (910 mm)", "category": "appliance", "mount": "floor", "sizeMm": { "w": 910, "d": 890, "h": 1780 }, "tags": ["fridge", "refrigerator"], "clearanceMm": { "front": 1000, "sides": 50 } },
+  { "id": "fridge-counter-depth-910", "name": "Refrigerator, counter-depth (910 mm)", "category": "appliance", "mount": "floor", "sizeMm": { "w": 910, "d": 700, "h": 1780 }, "tags": ["fridge", "refrigerator", "counter-depth"], "clearanceMm": { "front": 1000, "sides": 50 } },
+  { "id": "fridge-600", "name": "Refrigerator, slim (600 mm)", "category": "appliance", "mount": "floor", "sizeMm": { "w": 600, "d": 650, "h": 1850 }, "tags": ["fridge", "refrigerator"], "clearanceMm": { "front": 900, "sides": 50 } },
+
+  { "id": "range-600", "name": "Range (600 mm)", "category": "appliance", "mount": "floor", "sizeMm": { "w": 600, "d": 600, "h": 900 }, "tags": ["range", "oven", "cooktop", "stove"], "clearanceMm": { "front": 1000, "sides": 0 } },
+  { "id": "range-760", "name": "Range (760 mm / 30\")", "category": "appliance", "mount": "floor", "sizeMm": { "w": 760, "d": 650, "h": 915 }, "tags": ["range", "oven", "cooktop", "stove"], "clearanceMm": { "front": 1000, "sides": 0 } },
+  { "id": "range-900", "name": "Range (900 mm)", "category": "appliance", "mount": "floor", "sizeMm": { "w": 900, "d": 650, "h": 915 }, "tags": ["range", "oven", "cooktop", "stove"], "clearanceMm": { "front": 1000, "sides": 0 } },
+
+  { "id": "dishwasher-600", "name": "Dishwasher (600 mm)", "category": "appliance", "mount": "floor", "sizeMm": { "w": 600, "d": 580, "h": 850 }, "tags": ["dishwasher"], "clearanceMm": { "front": 750, "sides": 0 } },
+  { "id": "dishwasher-450", "name": "Dishwasher, slim (450 mm)", "category": "appliance", "mount": "floor", "sizeMm": { "w": 450, "d": 580, "h": 850 }, "tags": ["dishwasher"], "clearanceMm": { "front": 750, "sides": 0 } },
+
+  { "id": "range-hood-760", "name": "Range hood (760 mm)", "category": "appliance", "mount": "wall", "sizeMm": { "w": 760, "d": 500, "h": 300 }, "tags": ["range-hood", "hood", "extractor"] },
+  { "id": "range-hood-900", "name": "Range hood (900 mm)", "category": "appliance", "mount": "wall", "sizeMm": { "w": 900, "d": 500, "h": 300 }, "tags": ["range-hood", "hood", "extractor"] },
+  { "id": "microwave-over-range-760", "name": "Microwave, over-the-range (760 mm)", "category": "appliance", "mount": "wall", "sizeMm": { "w": 760, "d": 400, "h": 420 }, "tags": ["microwave"] },
+  { "id": "microwave-countertop", "name": "Microwave, countertop", "category": "appliance", "mount": "counter", "sizeMm": { "w": 500, "d": 400, "h": 300 }, "tags": ["microwave"] },
+
+  { "id": "sink-base-800", "name": "Sink base cabinet (800 mm)", "category": "cabinet", "mount": "floor", "sizeMm": { "w": 800, "d": 600, "h": 870 }, "tags": ["sink", "base-cabinet"], "clearanceMm": { "front": 900, "sides": 0 } },
+  { "id": "sink-base-900", "name": "Sink base cabinet (900 mm)", "category": "cabinet", "mount": "floor", "sizeMm": { "w": 900, "d": 600, "h": 870 }, "tags": ["sink", "base-cabinet"], "clearanceMm": { "front": 900, "sides": 0 } },
+
+  { "id": "island-1200x900", "name": "Island (1200 × 900 mm)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 1200, "d": 900, "h": 900 }, "tags": ["island"], "clearanceMm": { "front": 1000, "sides": 1000 } },
+  { "id": "island-1800x900", "name": "Island (1800 × 900 mm)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 1800, "d": 900, "h": 900 }, "tags": ["island"], "clearanceMm": { "front": 1000, "sides": 1000 } },
+  { "id": "island-2400x1000", "name": "Island (2400 × 1000 mm)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 2400, "d": 1000, "h": 900 }, "tags": ["island"], "clearanceMm": { "front": 1000, "sides": 1000 } },
+
+  { "id": "table-dining-4", "name": "Dining table, seats 4 (1200 × 800 mm)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 1200, "d": 800, "h": 750 }, "tags": ["table", "dining"], "clearanceMm": { "front": 750, "sides": 750 } },
+  { "id": "table-dining-6", "name": "Dining table, seats 6 (1800 × 900 mm)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 1800, "d": 900, "h": 750 }, "tags": ["table", "dining"], "clearanceMm": { "front": 750, "sides": 750 } },
+  { "id": "table-dining-8", "name": "Dining table, seats 8 (2400 × 1000 mm)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 2400, "d": 1000, "h": 750 }, "tags": ["table", "dining"], "clearanceMm": { "front": 750, "sides": 750 } },
+  { "id": "table-dining-round-1000", "name": "Dining table, round, seats 4 (Ø 1000 mm)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 1000, "d": 1000, "h": 750 }, "tags": ["table", "dining", "round"], "clearanceMm": { "front": 750, "sides": 750 } },
+
+  { "id": "chair-dining", "name": "Dining chair", "category": "furniture", "mount": "floor", "sizeMm": { "w": 450, "d": 500, "h": 900 }, "tags": ["chair", "seat"] },
+  { "id": "stool-counter-650", "name": "Stool, counter height (650 mm seat)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 400, "d": 400, "h": 650 }, "tags": ["stool", "seat"] },
+  { "id": "stool-bar-750", "name": "Stool, bar height (750 mm seat)", "category": "furniture", "mount": "floor", "sizeMm": { "w": 400, "d": 400, "h": 750 }, "tags": ["stool", "seat"] }
+]

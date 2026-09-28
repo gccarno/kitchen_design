@@ -58,6 +58,8 @@ describe('ProjectEditor', () => {
     expect(screen.getByRole('heading', { name: 'Photos' })).not.toBeNull();
     expect(screen.getByRole('button', { name: /get room from photos/i })).not.toBeNull();
     expect(screen.getByRole('button', { name: /use rectangle/i })).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Catalog' })).not.toBeNull();
+    expect(screen.getByLabelText(/search catalog/i)).not.toBeNull();
   });
 
   it('sketch → review → apply updates the page from the saved project', async () => {
