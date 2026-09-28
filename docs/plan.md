@@ -26,7 +26,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [ ] Manual phone check of Tasks 10–13 (now possible: `next dev -H 0.0.0.0`, open `http://<laptop-ip>:3000` on the phone)
 - [x] Task 14 — Konva canvas + viewport
 - [x] Task 15 — Drag-to-edit walls and polygon vertices
-- [ ] **Next: Task 16 — Insert doors/windows on walls**
+- [x] Task 16 — Insert doors/windows on walls
+- [ ] **Next: Task 17 — Catalog loader + sidebar**
 
 ## Decisions (locked in with user)
 
@@ -42,7 +43,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–15 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–16 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -545,6 +546,8 @@ Commit: `feat: edit room polygon`.
 **Files:** extend `FloorPlanCanvas.tsx`, add `src/lib/plan/openings.ts`.
 
 Commit: `feat: insert openings`.
+
+> ✅ Done. `openings.ts` (18 tests): `nearestWallPoint`, `addOpening` (standard sizes — door 800, window 1200, pass-through 900 mm — centred on the tap, shifted/narrowed to fit), `resizeOpening` (either end, min 300 mm), `moveOpening`, `removeOpening`; none let an opening leave its wall or overlap a neighbour, and `validateRoom` now rejects overlaps too. In edit mode: "Add door / window / pass-through" then tap a wall; drag an opening's end squares to resize or its body to slide (50 mm snap); Delete acts on the selected corner or opening; the selected opening's width and position are shown in the project's units; a colour legend explains the opening kinds.
 
 ### Task 17: Catalog loader + sidebar
 

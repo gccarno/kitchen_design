@@ -131,6 +131,40 @@ describe('validatePlan', () => {
     expect(r.valid).toBe(true);
   });
 
+  it('rejects openings that overlap on the same wall', () => {
+    const r = validatePlan(
+      newProject({
+        room: {
+          polygon: RECT,
+          walls: wallsFor(RECT),
+          openings: [
+            { id: 'd1', wallId: 'w0', kind: 'door', positionMm: 100, widthMm: 900, heightMm: 2100 },
+            { id: 'w1', wallId: 'w0', kind: 'window', positionMm: 900, widthMm: 1200, heightMm: 1200 },
+            { id: 'w2', wallId: 'w1', kind: 'window', positionMm: 100, widthMm: 900, heightMm: 1200 },
+          ],
+        },
+      })
+    );
+    expect(r.valid).toBe(false);
+    expect(r.errors).toEqual(['openings "d1" and "w1" overlap on wall "w0"']);
+  });
+
+  it('allows openings that touch end to end', () => {
+    const r = validatePlan(
+      newProject({
+        room: {
+          polygon: RECT,
+          walls: wallsFor(RECT),
+          openings: [
+            { id: 'd1', wallId: 'w0', kind: 'door', positionMm: 100, widthMm: 900, heightMm: 2100 },
+            { id: 'w1', wallId: 'w0', kind: 'window', positionMm: 1000, widthMm: 1200, heightMm: 1200 },
+          ],
+        },
+      })
+    );
+    expect(r.valid).toBe(true);
+  });
+
   it('rejects a measurement referencing an unknown wall', () => {
     const r = validatePlan(
       newProject({

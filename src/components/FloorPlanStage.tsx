@@ -6,6 +6,7 @@ import { screenToWorld, gridStepMm, formatLength, type Viewport } from '@/lib/pl
 import { wallLengthMm } from '@/lib/plan/validate';
 import { signedPolygonArea, type Point } from '@/lib/plan/geometry';
 import type { PlacedItem, Room } from '@/lib/plan/schemas';
+import { OPENING_COLOR } from './plan-colors';
 
 export interface FloorPlanStageProps {
   width: number;
@@ -14,13 +15,14 @@ export interface FloorPlanStageProps {
   room: Room;
   items: PlacedItem[];
   units: 'mm' | 'in';
-  /** Show corner handles and "+" handles on each wall. */
+  /** Show corner handles, "+" handles on each wall, and opening end handles. */
   editing?: boolean;
   /** Highlighted corner (editing only). */
-  selected?: number | null;
+  selectedCorner?: number | null;
+  /** Highlighted opening id (editing only). */
+  selectedOpening?: string | null;
 }
 
-const OPENING_COLOR = { door: '#2563eb', window: '#0d9488', pass_through: '#9333ea' } as const;
 /** Wall label box, in screen pixels. */
 const LABEL_W = 110;
 const LABEL_H = 18;
@@ -38,7 +40,8 @@ export default function FloorPlanStage({
   items,
   units,
   editing = false,
-  selected = null,
+  selectedCorner = null,
+  selectedOpening = null,
 }: FloorPlanStageProps) {
   const { scale } = viewport;
   const px = (n: number) => n / scale; // n screen pixels in world mm
@@ -85,18 +88,32 @@ export default function FloorPlanStage({
           const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
           const [dx, dy] = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
           const thickness = room.walls[i].thicknessMm;
+          const points = [
+            a[0] + dx * o.positionMm,
+            a[1] + dy * o.positionMm,
+            a[0] + dx * (o.positionMm + o.widthMm),
+            a[1] + dy * (o.positionMm + o.widthMm),
+          ];
           return (
-            <Line
-              key={o.id}
-              points={[
-                a[0] + dx * o.positionMm,
-                a[1] + dy * o.positionMm,
-                a[0] + dx * (o.positionMm + o.widthMm),
-                a[1] + dy * (o.positionMm + o.widthMm),
-              ]}
-              stroke={OPENING_COLOR[o.kind]}
-              strokeWidth={thickness * 1.2}
-            />
+            <Group key={o.id}>
+              {editing && o.id === selectedOpening && (
+                <Line points={points} stroke="#dc2626" strokeWidth={thickness * 1.2 + px(8)} opacity={0.5} />
+              )}
+              <Line points={points} stroke={OPENING_COLOR[o.kind]} strokeWidth={thickness * 1.2} />
+              {editing &&
+                [0, 2].map((k) => (
+                  <Rect
+                    key={k}
+                    x={points[k] - px(5)}
+                    y={points[k + 1] - px(5)}
+                    width={px(10)}
+                    height={px(10)}
+                    fill="white"
+                    stroke={OPENING_COLOR[o.kind]}
+                    strokeWidth={px(2)}
+                  />
+                ))}
+            </Group>
           );
         })}
         {items.map((it) => (
@@ -155,6 +172,12 @@ export default function FloorPlanStage({
           {poly.map((a, i) => {
             const b = poly[(i + 1) % n];
             const [mx, my] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+            // No "+" where an opening covers the midpoint: a tap there selects the opening.
+            const half = Math.hypot(b[0] - a[0], b[1] - a[1]) / 2;
+            const covered = room.openings.some(
+              (o) => o.wallId === room.walls[i]?.id && o.positionMm <= half && half <= o.positionMm + o.widthMm
+            );
+            if (covered) return null;
             return (
               <Group key={`add-${i}`} x={mx} y={my}>
                 <Circle radius={px(8)} fill="white" stroke="#2563eb" strokeWidth={px(1.5)} />
@@ -168,8 +191,8 @@ export default function FloorPlanStage({
               key={`corner-${i}`}
               x={p[0]}
               y={p[1]}
-              radius={px(i === selected ? 9 : 7)}
-              fill={i === selected ? '#dc2626' : 'white'}
+              radius={px(i === selectedCorner ? 9 : 7)}
+              fill={i === selectedCorner ? '#dc2626' : 'white'}
               stroke="#111827"
               strokeWidth={px(2)}
             />
