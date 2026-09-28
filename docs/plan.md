@@ -28,7 +28,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 15 — Drag-to-edit walls and polygon vertices
 - [x] Task 16 — Insert doors/windows on walls
 - [x] Task 17 — Catalog loader + sidebar
-- [ ] **Next: Task 18 — Parametric catalog generator**
+- [x] Task 18 — Parametric catalog generator
+- [ ] **Next: Task 19 — Place items on the plan**
 
 ## Decisions (locked in with user)
 
@@ -44,7 +45,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–17 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–18 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -580,6 +581,8 @@ Tests assert: deterministic, stable ids (e.g. `base-600x560x720`) so saved plans
 > Scraping IKEA / retailer sites was dropped (brittle, ToS risk, little value over standard dimensions). See Out of Scope.
 
 Commit: `feat: parametric catalog generator`.
+
+> ✅ Done. 40 cabinets: base in 7 widths × 560/610 deep, wall in 7 widths × 720/900 high (320 deep, `mount: 'wall'`), 4 tall pantries, corner base 900 × 900 and corner wall 600 × 600, and base/wall fillers at 50/75/100 mm. `loadCatalog()` merges seed + generated; `buildCatalog` would fail on any id clash.
 
 ### Task 19: Place items on the plan
 
