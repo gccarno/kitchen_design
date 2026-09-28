@@ -1,10 +1,11 @@
 /**
  * The catalog: a curated seed of standard-size appliances, fixtures, and
- * furniture (plus, from Task 18, generated cabinets). Static data, so it is
+ * furniture, plus generated standard cabinets. Static data, so it is
  * bundled and loads the same on the server and in the browser.
  */
 
 import seed from './seed.json';
+import { generateCabinets } from './generator';
 import { CatalogItemSchema, type CatalogCategory, type CatalogItem } from './schema';
 
 export interface Catalog {
@@ -44,7 +45,7 @@ let cached: Catalog | null = null;
 
 /** The shipped catalog (validated once, then cached). */
 export function loadCatalog(): Catalog {
-  cached ??= buildCatalog(seed);
+  cached ??= buildCatalog(seed, generateCabinets());
   return cached;
 }
 

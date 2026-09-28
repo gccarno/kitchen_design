@@ -36,8 +36,10 @@ describe('buildCatalog', () => {
 describe('the shipped catalog', () => {
   const catalog = loadCatalog();
 
-  it('loads and validates', () => {
-    expect(catalog.items.length).toBeGreaterThanOrEqual(20);
+  it('loads and validates, with the seed and the generated cabinets', () => {
+    expect(catalog.byId.get('fridge-counter-depth-910')).toBeDefined();
+    expect(catalog.byId.get('base-600x560x720')).toBeDefined();
+    expect(catalog.items.filter((i) => i.category === 'cabinet').length).toBeGreaterThan(30);
   });
 
   it('covers what a kitchen plan needs', () => {
