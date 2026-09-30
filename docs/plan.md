@@ -644,6 +644,8 @@ Commit: `feat: chat panel + refinement endpoint`.
 
 Same command/diff/confirm flow as Task 20 (mostly `addItem` commands). The prompt includes room geometry, door/window locations, clearance rules, and the catalog.
 
+> ✅ Done. Same chat and endpoint; the model tells a layout from a small edit. New command `addRun{ wall, items[], from? }`: the model lists a row of catalog ids for one wall and the server packs them back to back (`src/lib/plan/runs.ts`), skipping doors and pass-throughs, windows (for wall cabinets and items ≥ 1400 mm tall), items already there at the same level, and the corner taken by a run on the neighbouring wall; wall cabinets sit above base cabinets but not above a fridge. A run that doesn't fit fails with the space needed and what's in the way, which feeds the one retry. The refine prompt (v1.1.0) adds a short layout guide (L/U/galley, work triangle, dishwasher by the sink, sink not range under a window, hood aligned over the range). Live with free models: "add an island" 17 s; "design me an L-shaped kitchen with the fridge near the sink" gave a sensible L (sink under the window, dishwasher beside it, fridge at the corner, range with hood on the other wall) in 212 s. Gemma was rate-limited; dots reasons for 2–4 min on a whole layout and ignores reasoning caps (7 s with reasoning off, but the layouts were wrong), so `LLM_TIMEOUT_MS` is now 300 s. Known gap: at an L corner the front-clearance check flags the two runs meeting (e.g. "not enough room in front of the corner cabinet").
+
 Commit: `feat: layout proposals`.
 
 ### Task 22: Undo/redo + revision history

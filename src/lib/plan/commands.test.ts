@@ -3,6 +3,7 @@ import { compileCommands, CommandError, CommandSchema, planRefs, type Command } 
 import { commitRevision } from './diff';
 import { loadCatalog } from '../catalog/loader';
 import { ProjectSchema, type PlacedItem, type Project } from './schemas';
+import { validatePlan } from './validate';
 
 const catalog = loadCatalog();
 
@@ -159,6 +160,58 @@ describe('compileCommands', () => {
     expect(() => run(project(), [{ type: 'addOpening', wall: 'w4', kind: 'window', alongMm: 3100 }])).toThrow(
       /commands\[0\].*overlap/
     );
+  });
+
+  describe('addRun', () => {
+    it('builds an L-shape on two walls without overlaps, the second run clearing the corner', () => {
+      const { project: next } = run(project(), [
+        { type: 'addRun', wall: 'w1', items: ['fridge-standard-910', 'base-600x560x720', 'sink-base-800', 'dishwasher-600'] },
+        { type: 'addRun', wall: 'w2', items: ['base-600x560x720', 'range-760', 'base-600x560x720'] },
+        { type: 'addRun', wall: 'w1', items: ['wall-600x320x720', 'wall-800x320x720'], from: 'end' },
+      ]);
+      expect(next.items.map((it) => it.catalogId)).toEqual([
+        'fridge-standard-910',
+        'base-600x560x720',
+        'sink-base-800',
+        'dishwasher-600',
+        'base-600x560x720',
+        'range-760',
+        'base-600x560x720',
+        'wall-600x320x720',
+        'wall-800x320x720',
+      ]);
+      // w1 packs from the NW corner; the fridge is flush against it.
+      expect(next.items[0]).toMatchObject({ position: { x: 455, y: 445 }, rotationDeg: 0 });
+      // w2's run starts after the dishwasher's 580 mm depth in the NE corner.
+      expect(next.items[4]).toMatchObject({ position: { x: 2720, y: 880 }, rotationDeg: 90 });
+      // Wall cabinets pack from the NE end of w1, above the base cabinets.
+      expect(next.items[8].position.x).toBe(2600);
+      expect(validatePlan(next).warnings.filter((w) => /overlap/.test(w))).toEqual([]);
+    });
+
+    it('keeps a run clear of doors', () => {
+      // The door on w4 spans 2800–3600 mm along it.
+      const { project: next } = run(project(), [
+        { type: 'addRun', wall: 'w4', items: ['base-900x560x720', 'base-900x560x720', 'base-900x560x720', 'base-400x560x720'] },
+      ]);
+      const ys = next.items.map((it) => it.position.y);
+      expect(ys).toEqual([3550, 2650, 1750, 200]); // the 400 jumps past the door
+    });
+
+    it('explains a run that does not fit, naming what is in the way', () => {
+      expect(() =>
+        run(project({ items: [dishwasher] }), [
+          { type: 'addRun', wall: 'w1', items: ['base-1200x560x720', 'base-1200x560x720', 'base-900x560x720'] },
+        ])
+      ).toThrow(/commands\[0\] \(addRun\).*add up to 3300 mm.*free space is 0–950 mm and 1550–3000 mm \(2400 mm in total, at most 1450 mm in one piece\); in the way: i1 at 950–1550 mm/);
+    });
+
+    it('rejects unknown catalog ids and walls in a run', () => {
+      expect(() => run(project(), [{ type: 'addRun', wall: 'w1', items: ['base-600x560x720', 'hot-tub'] }])).toThrow(
+        /unknown catalog id "hot-tub"/
+      );
+      expect(() => run(project(), [{ type: 'addRun', wall: 'w7', items: ['base-600x560x720'] }])).toThrow(/unknown wall "w7"/);
+    });
   });
 
   it('parses LLM command JSON with the schema', () => {

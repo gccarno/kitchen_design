@@ -94,7 +94,7 @@ export function buildExtractRoomPrompt(input: ExtractPromptInput): { system: str
   return { system, user: lines.join('\n') };
 }
 
-export const REFINE_PROMPT_VERSION = '1.0.0';
+export const REFINE_PROMPT_VERSION = '1.1.0';
 
 export interface RefinePromptInput {
   /** From describePlanForLLM. */
@@ -111,6 +111,8 @@ export interface RefinePromptInput {
  * Design rules: the model names things only by refs from the plan text, uses
  * wall + alongMm for anything against a wall (the server does the geometry),
  * and says so in `reply` instead of guessing when a request is unclear.
+ * Whole layouts use `addRun` (one per wall): the server packs each run
+ * around doors, windows, corners, and existing items.
  */
 export function buildRefinePrompt(input: RefinePromptInput): { system: string; user: string } {
   const system = [
@@ -126,6 +128,7 @@ export function buildRefinePrompt(input: RefinePromptInput): { system: string; u
     'Commands (exact shapes):',
     '- {"type":"addItem","catalogId":"<catalog id>","wall":"w1","alongMm":1200}   // against a wall; alongMm = item centre measured from the wall start corner (omit for the middle)',
     '- {"type":"addItem","catalogId":"<catalog id>","x":1500,"y":2000,"rotationDeg":0}   // free-standing (islands, tables)',
+    '- {"type":"addRun","wall":"w1","items":["<catalog id>","<catalog id>",...],"from":"start"|"end"|"centre"}   // a row of items along a wall, listed from its start corner to its end; the app packs them back to back, skipping doors (and windows, for wall cabinets and tall items) and keeping clear of other runs; "from" = which corner the row is pushed against (default start)',
     '- {"type":"moveItem","item":"i1","wall":"w2"}   // or add "alongMm", or use "x"/"y" instead of "wall"',
     '- {"type":"rotateItem","item":"i1","rotationDeg":90}   // absolute; 0 = front faces south',
     '- {"type":"removeItem","item":"i1"}',
@@ -140,6 +143,16 @@ export function buildRefinePrompt(input: RefinePromptInput): { system: string; u
     '- Match compass words ("north wall") and descriptions ("the fridge") to the refs using the plan text.',
     '- All distances are millimetres.',
     '- Do only what was asked. Do not add, move, or remove anything else.',
+    '',
+    'Layouts (e.g. "design an L-shaped kitchen"):',
+    '- Use one addRun per wall: L-shape = two walls meeting at a corner, U-shape = three walls, galley = two opposite walls, one-wall = one. Prefer walls without doors.',
+    '- Include a sink base, a range, a fridge, and a dishwasher (next to the sink) unless the user says otherwise; fill the rest of each run with base cabinets (base-…), leaving counter space (at least one base cabinet) beside the range and the sink.',
+    '- Keep the sink, range, and fridge in a work triangle (each 1200–2700 mm apart). Put the sink under a window if there is one; never the range. Put the fridge at the end of a run, not in the middle.',
+    '- Optionally add wall cabinets (wall-…) and a range hood with a second addRun on the same wall with the same "from" as the base run; they go above base cabinets automatically. Give them the same widths, in the same order, as the base run below (a hood of the same width as the range, in its place, nothing over the fridge) so the hood lands above the range.',
+    '- A run must fit: add up its widths. Budget the wall length minus doors, minus about 600 mm for each corner a run on the neighbouring wall already uses (in an L, the second run loses 600 mm at the shared corner). Prefer fewer, wider cabinets and leave a little spare.',
+    '- Islands and tables are free-standing: addItem with x/y, keeping about 1000 mm clear from the runs.',
+    '- If the room already has items, keep them and design around them, unless the user asks to start over (then removeItem them first).',
+    '',
     '- If the request is a question, unclear, or impossible with these commands, return "commands": [] and explain in "reply".',
     '- Return ONLY the JSON object. No prose, no markdown fences.',
   ].join('\n');
