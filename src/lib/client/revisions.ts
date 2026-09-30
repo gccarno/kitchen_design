@@ -26,3 +26,19 @@ export async function submitRevision(projectId: string, proposal: Proposal): Pro
     return { ok: false, stale: false, error: (err as Error).message };
   }
 }
+
+/** Undo the last change, or redo the last undo, via POST /api/projects/[id]/undo. Never throws. */
+export async function submitUndo(projectId: string, action: 'undo' | 'redo', baseRevision: number): Promise<SubmitResult> {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/undo`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action, baseRevision }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { project?: Project; error?: string };
+    if (res.ok && body.project) return { ok: true, project: body.project };
+    return { ok: false, stale: res.status === 409, error: body.error ?? `could not ${action} (${res.status})` };
+  } catch (err) {
+    return { ok: false, stale: false, error: (err as Error).message };
+  }
+}

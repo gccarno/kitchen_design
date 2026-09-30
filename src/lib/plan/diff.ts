@@ -147,6 +147,9 @@ export interface CommitOptions {
   summary: string;
   /** ISO timestamp; defaults to now. */
   at?: string;
+  /** Marks the revision as an undo (or redo) of the given revision. */
+  undoes?: number;
+  redoes?: number;
 }
 
 /**
@@ -175,7 +178,16 @@ export function commitRevision(before: Project, patch: JsonPatchOp[], opts: Comm
   const inverse = planToJsonPatch(applied, before);
   const at = opts.at ?? new Date().toISOString();
   const revision = before.revision + 1;
-  const entry: PlanRevision = { revision, patch, inverse, at, source: opts.source, summary: opts.summary };
+  const entry: PlanRevision = {
+    revision,
+    patch,
+    inverse,
+    at,
+    source: opts.source,
+    summary: opts.summary,
+    ...(opts.undoes !== undefined ? { undoes: opts.undoes } : {}),
+    ...(opts.redoes !== undefined ? { redoes: opts.redoes } : {}),
+  };
 
   return ProjectSchema.parse({
     ...applied,
