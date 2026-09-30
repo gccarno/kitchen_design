@@ -63,6 +63,7 @@ describe('ProjectEditor', () => {
     expect(screen.getByRole('button', { name: /get room from photos/i })).not.toBeNull();
     expect(screen.getByRole('button', { name: /use rectangle/i })).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Catalog' })).not.toBeNull();
+    expect(screen.getByLabelText(/ask for a change/i)).not.toBeNull();
     expect(screen.getByLabelText(/search catalog/i)).not.toBeNull();
   });
 
@@ -214,5 +215,25 @@ describe('ProjectEditor', () => {
     };
     render(<ProjectEditor initialProject={blocked} />);
     expect(within(screen.getByRole('list', { name: /plan warnings/i })).getByText(/"island-1200x900" is in the way/)).not.toBeNull();
+  });
+
+  it('turns a chat edit into a proposal for review', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json({
+        commands: [{ type: 'renameProject', name: 'Galley' }],
+        patch: [{ op: 'replace', path: '/name', value: 'Galley' }],
+        summary: 'Rename the project to Galley',
+        reply: 'Renamed.',
+        warnings: [],
+        baseRevision: 0,
+      })
+    );
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.change(screen.getByLabelText(/ask for a change/i), { target: { value: 'call it Galley' } });
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+
+    const review = await screen.findByRole('region', { name: /review proposed change/i });
+    expect(within(review).getByText('Rename the project to Galley')).not.toBeNull();
+    expect(within(review).getByText(/Rename "Our kitchen" → "Galley"/)).not.toBeNull();
   });
 });

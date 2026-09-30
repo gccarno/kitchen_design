@@ -6,8 +6,9 @@
  */
 
 import { pointInPolygon, type Point } from './geometry';
-import { nearestWallPoint } from './openings';
-import type { Mount, Room } from './schemas';
+import { alongWallMm, nearestWallPoint } from './openings';
+import type { CatalogItem } from '../catalog/schema';
+import type { Mount, PlacedItem, Room } from './schemas';
 import { inwardNormal } from './walls';
 
 /** Snap to a wall when the drop point is within the item's depth plus this much of it. */
@@ -28,10 +29,14 @@ export function positionItem(
   size: { w: number; d: number },
   mount: Mount,
   at: Point,
-  opts: { snapMm?: number; rotationDeg?: number } = {}
+  opts: { snapMm?: number; rotationDeg?: number; wallIndex?: number } = {}
 ): ItemPose {
   const step = opts.snapMm ?? 0;
-  const near = nearestWallPoint(room, at);
+  // A forced wall (e.g. "against the north wall") skips the nearest-wall search.
+  const near =
+    opts.wallIndex === undefined
+      ? nearestWallPoint(room, at)
+      : { wallIndex: opts.wallIndex, alongMm: alongWallMm(room, opts.wallIndex, at), distanceMm: 0 };
   let pose: ItemPose;
 
   if (near.distanceMm <= size.d + WALL_SNAP_MM) {
@@ -65,4 +70,18 @@ export function positionItem(
     throw new Error('place it inside the room');
   }
   return pose;
+}
+
+/** A placed item for catalog item `item` at `pose`, snapshotting what validation needs. */
+export function placedFromCatalog(item: CatalogItem, pose: ItemPose, id: string): PlacedItem {
+  return {
+    id,
+    catalogId: item.id,
+    sizeMm: item.sizeMm,
+    ...(item.mount !== 'floor' ? { mount: item.mount } : {}),
+    ...(item.clearanceMm ? { clearanceMm: item.clearanceMm } : {}),
+    ...(item.tags[0] ? { tag: item.tags[0] } : {}),
+    position: pose.position,
+    rotationDeg: pose.rotationDeg,
+  };
 }

@@ -16,7 +16,7 @@ import {
   resizeOpening,
   wallIndexOf,
 } from '@/lib/plan/openings';
-import { positionItem } from '@/lib/plan/placement';
+import { placedFromCatalog, positionItem } from '@/lib/plan/placement';
 import { insertVertex, moveVertex, removeVertex } from '@/lib/plan/room-edit';
 import type { OpeningKind, PlacedItem, Room } from '@/lib/plan/schemas';
 import { validateRoom } from '@/lib/plan/validate';
@@ -248,16 +248,7 @@ export default function FloorPlanCanvas({
       setEditError(`Can’t place it there: ${(err as Error).message}.`);
       return;
     }
-    const placed: PlacedItem = {
-      id: newId(),
-      catalogId: item.id,
-      sizeMm: item.sizeMm,
-      ...(item.mount !== 'floor' ? { mount: item.mount } : {}),
-      ...(item.clearanceMm ? { clearanceMm: item.clearanceMm } : {}),
-      ...(item.tags[0] ? { tag: item.tags[0] } : {}),
-      position: pose.position,
-      rotationDeg: pose.rotationDeg,
-    };
+    const placed = placedFromCatalog(item, pose, newId());
     onPlacingDone?.();
     void commit({ items: [...items, placed] }, `Add ${item.name}`).then(
       (ok) => ok && setSelected({ kind: 'item', id: placed.id })

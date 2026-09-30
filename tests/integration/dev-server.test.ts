@@ -41,14 +41,24 @@ const FAKE_ROOM = {
   notes: 'from the fake LLM',
 };
 
+const FAKE_REFINE = {
+  commands: [{ type: 'addItem', catalogId: 'dishwasher-600', wall: 'w1', alongMm: 1500 }],
+  summary: 'Add a dishwasher on the north wall',
+  reply: 'Added a 600 mm dishwasher, centred on the north wall.',
+};
+
 async function startFakeLlm(): Promise<string> {
   fakeLlm = createServer((req, res) => {
     let raw = '';
     req.on('data', (c) => (raw += c));
     req.on('end', () => {
-      llmRequests.push({ auth: req.headers.authorization, body: JSON.parse(raw) });
+      const body = JSON.parse(raw);
+      llmRequests.push({ auth: req.headers.authorization, body });
+      // Answer refine prompts with commands, everything else with a room outline.
+      const isRefine = String(body.messages[0]?.content ?? '').includes('You edit kitchen floor plans');
+      const answer = isRefine ? FAKE_REFINE : FAKE_ROOM;
       res.setHeader('content-type', 'application/json');
-      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(FAKE_ROOM) } }] }));
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answer) } }] }));
     });
   });
   await new Promise<void>((r) => fakeLlm.listen(0, '127.0.0.1', r));
@@ -316,5 +326,39 @@ describe('dev server end-to-end', () => {
     });
     expect(committed.status).toBe(200);
     expect(loadProject(dataDir, p.id).room).toEqual(result.room);
+  });
+
+  it('turns a chat request into commands via the real provider, then commits them', async () => {
+    const p = createProject(dataDir, { name: 'Refine' });
+    const before = llmRequests.length;
+    const res = await fetch(`${BASE}/api/projects/${p.id}/refine`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'add a dishwasher on the north wall' }),
+    });
+    expect(res.status).toBe(200);
+    const result = (await res.json()) as { patch: unknown[]; baseRevision: number; summary: string; reply: string };
+    expect(result.reply).toMatch(/dishwasher/);
+
+    // The prompt the model saw: plan refs, catalog, and the request; text model, JSON mode.
+    const sent = llmRequests[before];
+    expect(sent.body.model).not.toBe('fake-vision');
+    const user = String(sent.body.messages[1].content);
+    expect(user).toContain('- w1: north wall');
+    expect(user).toContain('- dishwasher-600: Dishwasher (600 mm)');
+    expect(user).toMatch(/Request: add a dishwasher on the north wall$/);
+
+    expect(loadProject(dataDir, p.id).items).toEqual([]); // nothing until the user applies
+    const committed = await fetch(`${BASE}/api/projects/${p.id}/revisions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ baseRevision: result.baseRevision, patch: result.patch, summary: result.summary, source: 'llm' }),
+    });
+    expect(committed.status).toBe(200);
+    expect(loadProject(dataDir, p.id).items[0]).toMatchObject({
+      catalogId: 'dishwasher-600',
+      position: { x: 1500, y: 290 },
+      rotationDeg: 0,
+    });
   });
 });
