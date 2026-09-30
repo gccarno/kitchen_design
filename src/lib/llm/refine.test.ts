@@ -108,6 +108,25 @@ describe('refinePlan', () => {
     expect(r.summary).toBe('Move the fridge to the north wall');
   });
 
+  it('proposes a whole layout as runs, retrying a run that does not fit with the space fed back', async () => {
+    const tooLong = { commands: [{ type: 'addRun', wall: 'w1', items: ['base-1200x560x720', 'base-1200x560x720', 'base-1200x560x720'] }] };
+    const layout = {
+      commands: [
+        { type: 'addRun', wall: 'w1', items: ['base-600x560x720', 'sink-base-800', 'dishwasher-600', 'base-600x560x720'] },
+        { type: 'addRun', wall: 'w2', items: ['base-600x560x720', 'range-760', 'base-600x560x720'] },
+      ],
+      summary: 'L-shaped layout on the north and east walls',
+      reply: 'Sink run on the north wall, range on the east wall.',
+    };
+    const provider = new StubProvider([tooLong, layout]);
+    const r = await run(provider, 'design me an L-shaped kitchen');
+    expect(provider.requests[0].system).toMatch(/"type":"addRun"/);
+    expect(provider.requests[1].user).toMatch(/add up to 3600 mm.*3000 mm wall/);
+    expect(r.commands).toHaveLength(2);
+    expect(r.patch.filter((op) => op.op === 'add' && op.path.startsWith('/items/'))).toHaveLength(7);
+    expect(r.warnings.filter((w) => /overlap/.test(w))).toEqual([]);
+  });
+
   it('retries once on malformed JSON', async () => {
     const provider = new StubProvider([new LLMResponseError('LLM returned non-JSON content: x', 'oops'), moveFridgeNorth]);
     await run(provider);

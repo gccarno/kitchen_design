@@ -105,7 +105,7 @@ export default function ChatPanel({ projectId, onProposal }: ChatPanelProps) {
         >
           Send
         </button>
-        {busy && <span className="text-sm text-gray-600">Thinking… free models can take a minute.</span>}
+        {busy && <span className="text-sm text-gray-600">Thinking… free models can take a minute, or a few for a whole layout.</span>}
       </div>
     </div>
   );

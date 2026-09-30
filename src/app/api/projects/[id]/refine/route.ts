@@ -13,8 +13,9 @@ import { isValidProjectId, loadProject, projectExists, resolveDataDir } from '@/
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-// Free models can take a minute or more; allow for the provider timeout plus one retry.
-export const maxDuration = 300;
+// Free models can take a minute or more (whole layouts 2–4 min with a reasoning
+// model); allow for the provider timeout plus one retry.
+export const maxDuration = 660;
 
 type Ctx = { params: Promise<{ id: string }> };
 

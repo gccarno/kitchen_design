@@ -11,6 +11,7 @@ import type { Catalog } from '../catalog/loader';
 import { planToJsonPatch } from './diff';
 import { addOpening, alongWallMm, removeOpening } from './openings';
 import { placedFromCatalog, positionItem } from './placement';
+import { packRun } from './runs';
 import { OpeningKindSchema, type JsonPatchOp, type Project } from './schemas';
 import { validateRoom } from './validate';
 import type { Point } from './geometry';
@@ -27,6 +28,14 @@ const position = {
 
 export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('addItem'), catalogId: z.string(), ...position, rotationDeg: z.number().optional() }),
+  z.object({
+    type: z.literal('addRun'),
+    wall: z.string(),
+    /** Catalog ids, in order from the wall's start corner toward its end. */
+    items: z.array(z.string()).min(1).max(20),
+    /** Push the run against the start or end corner, or centre it (default: start). */
+    from: z.enum(['start', 'end', 'centre', 'center']).optional(),
+  }),
   z.object({ type: z.literal('moveItem'), item: z.string(), ...position }),
   z.object({ type: z.literal('rotateItem'), item: z.string(), rotationDeg: z.number() }),
   z.object({ type: z.literal('removeItem'), item: z.string() }),
@@ -80,6 +89,8 @@ export function compileCommands(
   makeId: () => string
 ): { project: Project; patch: JsonPatchOp[] } {
   const refs = planRefs(project);
+  const itemRef = new Map([...refs.items].map(([ref, id]) => [id, ref]));
+  const openingRef = new Map([...refs.openings].map(([ref, id]) => [id, ref]));
   let room = project.room;
   let items = project.items;
   let name = project.name;
@@ -130,6 +141,22 @@ export function compileCommands(
           return fail('needs a wall (and optionally alongMm) or x and y');
         });
         items = [...items, placedFromCatalog(cat, pose, makeId())];
+        break;
+      }
+      case 'addRun': {
+        const i = wallIndex(cmd.wall);
+        const cats = cmd.items.map((id) => catalog.byId.get(id) ?? fail(`unknown catalog id "${id}"`));
+        const from = cmd.from === 'center' ? 'centre' : (cmd.from ?? 'start');
+        const centres = attempt(() =>
+          packRun(room, items, i, cats.map((c) => ({ ...c, catalogId: c.id })), from, {
+            item: (it) => itemRef.get(it.id) ?? `${it.catalogId} (added by an earlier command)`,
+            opening: (o) => `${o.kind.replace('_', '-')} ${openingRef.get(o.id) ?? ''}`.trim(),
+          })
+        );
+        cats.forEach((cat, k) => {
+          const pose = attempt(() => positionItem(room, cat.sizeMm, cat.mount, wallPoint(i, centres[k]), { wallIndex: i }));
+          items = [...items, placedFromCatalog(cat, pose, makeId())];
+        });
         break;
       }
       case 'moveItem': {
