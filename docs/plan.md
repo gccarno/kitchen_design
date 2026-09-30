@@ -656,6 +656,8 @@ Commit: `feat: layout proposals`.
 - `inverse` is computed at apply time as `planToJsonPatch(after, before)` restricted to allowlisted paths — no hand-written inverses.
 - History is capped at 200 entries (oldest dropped).
 
+> ✅ Done. Undo and redo are revisions like any other (`src/lib/plan/history.ts`): an undo applies the `inverse` of the change it reverts and is marked `undoes: <revision>`; a redo applies the undo's `inverse` and is marked `redoes`. Both go through `commitRevision` (allowlist, validation, stale check). What undo/redo act on next is derived by replaying the history, so it survives reloads and the 200 cap; a new edit clears redo. `POST /api/projects/[id]/undo` `{ action, baseRevision }`. The editor shows Undo / Redo (Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y, ignored while typing), the last change, and a collapsible list of the last 20 revisions (`HistoryControls`). No canvas changes were needed.
+
 **Files:**
 - Modify: `src/lib/plan/diff.ts`, `src/lib/storage/projects.ts`, `src/components/FloorPlanCanvas.tsx`.
 

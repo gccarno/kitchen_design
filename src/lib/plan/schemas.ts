@@ -117,6 +117,10 @@ const PlanRevisionSchema = z.object({
   at: z.string().min(1),
   source: z.enum(['user', 'llm']),
   summary: z.string(),
+  // Set on an undo: the revision whose change it reverts.
+  undoes: z.number().int().nonnegative().optional(),
+  // Set on a redo: the undo revision it reverts.
+  redoes: z.number().int().nonnegative().optional(),
 });
 
 // Top-level project document. Single source of truth, versioned via `revision`.

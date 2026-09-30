@@ -8,6 +8,7 @@ import DiffPreview from './DiffPreview';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
 import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
+import HistoryControls from './HistoryControls';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForPlan, proposalForRoom } from '@/lib/plan/proposal';
@@ -91,6 +92,7 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
 
       <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2">
         <h2 className="text-lg font-semibold">Current room</h2>
+        <HistoryControls project={project} onSaved={saved} />
         <FloorPlanCanvas
           room={project.room}
           items={project.items}
