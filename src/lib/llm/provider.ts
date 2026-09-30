@@ -14,6 +14,15 @@ export interface ProviderConfig {
   visionModel: string; // vision-capable model
   /** Per-request timeout. Defaults to 60 s — vision calls with several photos are slow. */
   timeoutMs?: number;
+  /**
+   * OpenRouter only: models to fall back to, in order, when the primary is
+   * rate-limited or down (sent as `models`). Leave empty for other providers,
+   * which reject unknown request fields.
+   */
+  fallbackModels?: string[];
+  visionFallbackModels?: string[];
+  /** Wait before the single retry after HTTP 429 when there's no Retry-After. Default 2 s. */
+  retryDelayMs?: number;
 }
 
 export interface TextRequest {

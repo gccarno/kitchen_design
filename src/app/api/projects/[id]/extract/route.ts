@@ -91,6 +91,8 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
     if (err instanceof LLMRequestError) {
       return NextResponse.json({ error: err.message }, { status: 502 });
     }
-    throw err;
+    // Anything else is a bug; still answer in JSON so the client can show it.
+    console.error('extract failed', err);
+    return NextResponse.json({ error: 'unexpected server error during extraction' }, { status: 500 });
   }
 }

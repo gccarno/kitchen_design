@@ -36,3 +36,6 @@ Copy `.env.example` to `.env.local` and set:
 - `LLM_API_KEY` — your API key
 - `LLM_MODEL` — text model (default `gpt-4o-mini`)
 - `LLM_VISION_MODEL` — vision model (default `gpt-4o-mini`)
+- `LLM_TIMEOUT_MS` — per-request timeout (default `60000`)
+
+Any OpenAI-compatible endpoint works. For **OpenRouter**, set `LLM_BASE_URL=https://openrouter.ai/api/v1`; `LLM_MODEL` and `LLM_VISION_MODEL` may then be comma-separated lists — the first model is used and the rest are fallbacks OpenRouter tries when it is rate-limited or down (useful with `:free` models, which are often busy). Rate-limited requests (HTTP 429) are retried once. See `.env.example`.

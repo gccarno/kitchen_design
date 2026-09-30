@@ -144,6 +144,16 @@ describe('POST /api/projects/[id]/extract', () => {
     expect((await res.json()).error).toMatch(/timed out/);
   });
 
+  it('answers unexpected errors with JSON (never an empty 500)', async () => {
+    const p = await projectWithPhoto(dataDir);
+    providerFromEnv.mockReturnValue(stub([new TypeError('something unexpected')]));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await post(p.id, MEASURED);
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/unexpected/);
+    spy.mockRestore();
+  });
+
   it('retries a malformed reply once before succeeding', async () => {
     const p = await projectWithPhoto(dataDir);
     const provider = stub([new LLMResponseError('LLM returned non-JSON content', 'x'), ANSWER]);

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { OpenAICompatibleProvider, LLMResponseError, LLMRequestError } from './openai-compatible';
+import { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, providerFromEnv } from './openai-compatible';
 import type { LLMProvider, ProviderConfig } from './provider';
 
 // Capture every fetch call and let each test decide the response.
@@ -202,6 +202,137 @@ describe('failure modes', () => {
     await expect(
       new OpenAICompatibleProvider({ ...cfg, timeoutMs: 20 }).completeText({ system: 's', user: 'u' })
     ).rejects.toThrow(/timed out after 20 ms/);
+  });
+});
+
+describe('timeouts while the body is still arriving', () => {
+  // OpenRouter sends headers right away and holds the body until the model answers,
+  // so the timeout can fire while reading the body, not just during fetch().
+  const slowBody = () =>
+    ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
+      json: async () => {
+        throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      },
+      text: async () => {
+        throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      },
+    }) as unknown as Response;
+
+  it('reports it as a timed-out LLMRequestError, not an unhandled error', async () => {
+    fetchMock.mockResolvedValueOnce(slowBody());
+    const err = await new OpenAICompatibleProvider({ ...cfg, timeoutMs: 1234 })
+      .completeText({ system: 's', user: 'u' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LLMRequestError);
+    expect((err as Error).message).toMatch(/timed out after 1234 ms/);
+  });
+
+  it('reports an unreadable (non-JSON) envelope as an LLMRequestError', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
+      text: async () => '<html>gateway error</html>',
+      json: async () => JSON.parse('<html>'),
+    } as unknown as Response);
+    await expect(new OpenAICompatibleProvider(cfg).completeText({ system: 's', user: 'u' })).rejects.toBeInstanceOf(
+      LLMRequestError
+    );
+  });
+});
+
+describe('model fallbacks (OpenRouter)', () => {
+  const ok = () => okJson({ choices: [{ message: { content: '{"a":1}' } }] });
+  const body = (i = 0) => JSON.parse((fetchMock.mock.calls[i] as [string, RequestInit])[1].body as string);
+
+  it('sends fallback models in `models` after the primary', async () => {
+    fetchMock.mockResolvedValueOnce(ok());
+    const p = new OpenAICompatibleProvider({ ...cfg, fallbackModels: ['b/text', 'c/text'], visionFallbackModels: ['b/vision'] });
+    await p.completeText({ system: 's', user: 'u' });
+    expect(body()).toMatchObject({ model: 'gpt-test', models: ['b/text', 'c/text'] });
+    fetchMock.mockResolvedValueOnce(ok());
+    await p.chatWithVision({ system: 's', user: 'u', images: [], schema: z.object({ a: z.number() }) });
+    expect(body(1)).toMatchObject({ model: 'gpt-vision-test', models: ['b/vision'] });
+  });
+
+  it('omits `models` when there are no fallbacks (plain OpenAI rejects unknown fields)', async () => {
+    fetchMock.mockResolvedValueOnce(ok());
+    await new OpenAICompatibleProvider(cfg).completeText({ system: 's', user: 'u' });
+    expect(body()).not.toHaveProperty('models');
+  });
+});
+
+describe('rate limits (429)', () => {
+  const tooMany = (retryAfter?: string) =>
+    ({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: new Headers(retryAfter ? { 'retry-after': retryAfter } : {}),
+      json: async () => ({}),
+      text: async () => 'rate limited',
+    }) as unknown as Response;
+
+  it('retries once after a 429, then succeeds', async () => {
+    fetchMock.mockResolvedValueOnce(tooMany('0')).mockResolvedValueOnce(okJson({ choices: [{ message: { content: 'x' } }] }));
+    const out = await new OpenAICompatibleProvider({ ...cfg, retryDelayMs: 1 }).completeText({ system: 's', user: 'u' });
+    expect(out).toBe('x');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after the retry with a clear error', async () => {
+    fetchMock.mockResolvedValue(tooMany());
+    await expect(
+      new OpenAICompatibleProvider({ ...cfg, retryDelayMs: 1 }).completeText({ system: 's', user: 'u' })
+    ).rejects.toThrow(/429/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry other errors', async () => {
+    fetchMock.mockResolvedValue(errJson(500, {}));
+    await expect(new OpenAICompatibleProvider({ ...cfg, retryDelayMs: 1 }).completeText({ system: 's', user: 'u' })).rejects.toThrow(
+      /500/
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('providerFromEnv', () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  it('reads LLM_TIMEOUT_MS', async () => {
+    process.env.LLM_API_KEY = 'sk-x';
+    process.env.LLM_TIMEOUT_MS = '777';
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
+      text: async () => {
+        throw new DOMException('aborted', 'TimeoutError');
+      },
+    } as unknown as Response);
+    await expect(providerFromEnv().completeText({ system: 's', user: 'u' })).rejects.toThrow(/timed out after 777 ms/);
+  });
+
+  it('reads comma-separated model lists: the first is primary, the rest are fallbacks', async () => {
+    process.env.LLM_API_KEY = 'sk-x';
+    process.env.LLM_BASE_URL = 'https://openrouter.ai/api/v1';
+    process.env.LLM_MODEL = 'a/text';
+    process.env.LLM_VISION_MODEL = ' a/vision , b/vision,c/vision ';
+    fetchMock.mockResolvedValueOnce(okJson({ choices: [{ message: { content: '{"a":1}' } }] }));
+    await providerFromEnv().chatWithVision({ system: 's', user: 'u', images: [], schema: z.object({ a: z.number() }) });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+    expect(JSON.parse(init.body as string)).toMatchObject({ model: 'a/vision', models: ['b/vision', 'c/vision'] });
   });
 });
 
