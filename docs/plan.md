@@ -39,7 +39,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 | Platform | Web (PWA, mobile-first, starts as web app) |
 | Photo-to-plan pipeline | Photos + 1–2 user-measured wall lengths (primary scale) → vision-LLM extraction, rescaled server-side to the measured walls. Reference object is an optional secondary hint. Manual "sketch room" path works with zero LLM calls. |
 | Catalog | Parametric generator + curated seed of standard dimensions. Public-source ingest/scraping is out of scope for v1 (brittle, ToS risk). |
-| LLM | OpenAI-compatible interface, default to OpenAI, swap via config (works for any compatible provider: OpenAI, OpenRouter, Together, Groq, local llama.cpp server) |
+| LLM | OpenAI-compatible interface, swap via config (OpenAI, OpenRouter, Together, Groq, local llama.cpp server). **In use: OpenRouter free models** (Gemma 4 vision) with fallback lists, a 429 retry, and a 120 s timeout — free models are slow and often rate-limited; a paid model (e.g. `google/gemini-2.5-flash`) is a one-line change. |
 | API style | Plain Next.js route handlers (JSON over `fetch`), Zod-validated on the server; shared Zod schemas give client/server types. tRPC was dropped at Task 11 — fewer moving parts for a single-user local app. |
 | LLM edit format | LLM emits typed commands (`addItem`, `moveItem`, …); the server compiles them to JSON Patch. The LLM never writes raw patch paths. |
 | Output | JSON + 2D SVG/PNG only. No 3D. |
