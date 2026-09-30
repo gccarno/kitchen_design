@@ -30,7 +30,8 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 17 — Catalog loader + sidebar
 - [x] Task 18 — Parametric catalog generator
 - [x] Task 19 — Place items on the plan — **milestone 2 reached** (manual editor with the catalog)
-- [ ] **Next: Task 20 — Chat panel + refinement endpoint**
+- [x] Task 20 — Chat panel + refinement endpoint (verified against OpenRouter free models)
+- [ ] **Next: Task 21 — Layout proposals**
 
 ## Decisions (locked in with user)
 
@@ -46,7 +47,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 
 ## Current Context / Assumptions
 
-- Tasks 1–19 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
+- Tasks 1–20 are complete (see Status). Package manager is **npm** (`package-lock.json`), not pnpm.
 - User has OpenAI API key (or equivalent) — read from env var `LLM_API_KEY`.
 - Photos come from phone camera; EXIF orientation is normalized server-side with `sharp` (Task 9).
 - **Storage is always mm.** `Project.units` is display-only; conversion happens at the UI edge.
@@ -629,6 +630,8 @@ Prompt contract:
 - Response: `z.object({ commands: z.array(CommandSchema), summary: z.string() })`.
 
 Server compiles, runs `validatePlan` on the result, and returns `{ patch, summary, warnings, baseRevision }`; client shows it in `DiffPreview`; on confirm, applies.
+
+> ✅ Done. `POST /api/projects/[id]/refine` `{ message, history? }` → `{ commands, patch, summary, reply, warnings, baseRevision }` (never mutates). The model sees the plan as compact text (`src/lib/llm/plan-context.ts`) with short refs — walls `w1…` matching the on-screen numbers, with compass sides (north is up); openings `o1…`; items `i1…` with facing and the wall they're against — plus the catalog. Commands (`src/lib/plan/commands.ts`) can place items by `wall` + `alongMm`, reusing the canvas's back-to-wall placement, or by x/y. Compile errors and malformed JSON get one retry with the problem fed back; only warnings the change introduces are reported; the model may just `reply` (questions, unclear requests). `ChatPanel` keeps the conversation on the page and sends the last turns as history; edits go to the review dialog. Real test with free models: "move the fridge to the north wall", "add a dishwasher on the east wall", and a question all correct in 5–15 s.
 
 Commit: `feat: chat panel + refinement endpoint`.
 

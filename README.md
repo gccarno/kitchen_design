@@ -7,7 +7,7 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
 ## Status
 
 **Phase 1 — Foundations:** complete (Tasks 1–8).
-**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–13 done — milestone 1: photos + measurements (or a hand sketch) → reviewed, saved room. Phase 3 in progress: Tasks 14–16 (canvas, outline editing, doors and windows) done; Tasks 17–18 (catalog: 24 appliances/fixtures/furniture + 40 generated cabinets) done; Task 19 done — milestone 2: a manual kitchen editor (outline, doors/windows, catalog items with wall snapping and clearance warnings). Phase 4 (LLM refinement) is next.
+**Phase 2 — Photo capture & extraction:** in progress. Tasks 9–13 done — milestone 1: photos + measurements (or a hand sketch) → reviewed, saved room. Phase 3 in progress: Tasks 14–16 (canvas, outline editing, doors and windows) done; Tasks 17–18 (catalog: 24 appliances/fixtures/furniture + 40 generated cabinets) done; Task 19 done — milestone 2: a manual kitchen editor (outline, doors/windows, catalog items with wall snapping and clearance warnings). Phase 4 in progress: Task 20 done — ask for changes in plain words ("move the fridge to the north wall"); every edit is reviewed before it's applied.
 
 ## Stack
 

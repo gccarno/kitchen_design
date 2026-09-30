@@ -49,3 +49,23 @@ export function proposalFromExtraction(r: ExtractionResponse): Proposal {
     warnings: r.warnings,
   };
 }
+
+/** The fields of POST /api/projects/[id]/refine's response a proposal needs. */
+export interface RefinementResponse {
+  patch: JsonPatchOp[];
+  baseRevision: number;
+  summary: string;
+  reply: string;
+  warnings: string[];
+}
+
+export function proposalFromRefinement(r: RefinementResponse): Proposal {
+  return {
+    patch: r.patch,
+    baseRevision: r.baseRevision,
+    summary: r.summary || 'Chat edit',
+    source: 'llm',
+    ...(r.reply ? { notes: r.reply } : {}),
+    warnings: r.warnings,
+  };
+}

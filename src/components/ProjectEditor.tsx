@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import CatalogSidebar from './CatalogSidebar';
+import ChatPanel from './ChatPanel';
 import DiffPreview from './DiffPreview';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
@@ -35,6 +36,12 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
   const catalog = loadCatalog();
   const [placingItem, setPlacingItem] = useState<CatalogItem | null>(null);
   const canvasRef = useRef<HTMLElement>(null);
+  const reviewRef = useRef<HTMLDivElement>(null);
+
+  // Bring each new proposal (from photos, chat, or the sketch) into view for review.
+  useEffect(() => {
+    if (proposal) reviewRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [proposal]);
   const itemLabels = useMemo(
     () => Object.fromEntries(project.items.map((it) => [it.id, catalog.byId.get(it.catalogId)?.name ?? it.catalogId])),
     [project.items, catalog]
@@ -71,13 +78,15 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
       </header>
 
       {proposal && (
-        <DiffPreview
-          projectId={project.id}
-          current={project}
-          proposal={proposal}
-          onApplied={applied}
-          onDiscard={discard}
-        />
+        <div ref={reviewRef} className="scroll-mt-4">
+          <DiffPreview
+            projectId={project.id}
+            current={project}
+            proposal={proposal}
+            onApplied={applied}
+            onDiscard={discard}
+          />
+        </div>
       )}
 
       <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2">
@@ -105,6 +114,11 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
             </ul>
           </div>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Ask for changes</h2>
+        <ChatPanel projectId={project.id} onProposal={propose} />
       </section>
 
       <section className="flex flex-col gap-3">

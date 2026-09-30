@@ -15,7 +15,7 @@ import { photoFilePath } from '@/lib/storage/photos';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 // Vision calls with several photos are slow; allow for the provider timeout plus one retry.
-export const maxDuration = 150;
+export const maxDuration = 300;
 
 type Ctx = { params: Promise<{ id: string }> };
 

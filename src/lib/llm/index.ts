@@ -5,3 +5,4 @@
 export type { LLMProvider, ProviderConfig, TextRequest, ImageAttachment, VisionRequest } from './provider';
 export { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, LLMNotConfiguredError, providerFromEnv } from './openai-compatible';
 export { extractRoom, ExtractionError, type ExtractRoomResult, type MeasurementInput } from './extract';
+export { refinePlan, RefinementError, type RefineResult } from './refine';

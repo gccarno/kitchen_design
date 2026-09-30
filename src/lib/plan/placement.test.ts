@@ -71,4 +71,15 @@ describe('positionItem', () => {
   it('snaps to a wall from just outside it', () => {
     expect(pose([1500, -150]).position).toEqual({ x: 1500, y: 290 });
   });
+
+  it('can be told which wall to use, even when another is nearer', () => {
+    // (100, 60) is nearest the top wall; force the left wall (index 3) instead.
+    const p = positionItem(room, dishwasher, 'floor', [100, 60], { snapMm: 50, wallIndex: 3 });
+    expect(p).toEqual({ position: { x: 290, y: 300 }, rotationDeg: 270, wallIndex: 3 });
+  });
+
+  it('uses a forced wall even from far away', () => {
+    const p = positionItem(room, dishwasher, 'floor', [1500, 2000], { snapMm: 50, wallIndex: 0 });
+    expect(p).toEqual({ position: { x: 1500, y: 290 }, rotationDeg: 0, wallIndex: 0 });
+  });
 });

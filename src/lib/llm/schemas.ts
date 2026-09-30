@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { distance, polygonSelfIntersects, signedPolygonArea, type Point } from '../plan/geometry';
 import type { CheckResult } from '../result';
 import { OpeningKindSchema } from '../plan/schemas';
+import { CommandSchema } from '../plan/commands';
 export { OpeningKindSchema, type OpeningKind } from '../plan/schemas';
 
 /** walls[i] is the polygon edge polygonMm[i] → polygonMm[(i + 1) % n]. */
@@ -93,3 +94,14 @@ export function refineExtractedRoom(
 
   return issues.length > 0 ? { ok: false, issues } : { ok: true, value: room };
 }
+
+/**
+ * The model's answer to a chat request: commands to apply (possibly none),
+ * a one-line summary of the change, and a reply to show in the chat.
+ */
+export const RefinementSchema = z.object({
+  commands: z.array(CommandSchema).default([]),
+  summary: z.string().default(''),
+  reply: z.string().default(''),
+});
+export type Refinement = z.infer<typeof RefinementSchema>;
