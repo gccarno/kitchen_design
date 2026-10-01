@@ -684,6 +684,8 @@ Commit: `feat: svg export`.
 
 **Objective:** Rasterize the SVG to PNG at 1× and 2× via `sharp`.
 
+> ✅ Done. `GET /api/export/[id]/png?scale=1|2` rasterizes the Task 23 drawing with `sharp` (`src/lib/export/drawing.ts`, shared with the SVG route). 1× is 1 px per 5 mm of plan (a 5 m room ≈ 1000 px wide), 2× doubles it; white background, no alpha; file names `<name>.png` / `<name>@2x.png`. The editor header links SVG · PNG · PNG (2×). Wall polygons get a hairline stroke so mitred corners show no anti-aliasing seams.
+
 **Files:**
 - Create: `src/app/api/export/[id]/png/route.ts`.
 

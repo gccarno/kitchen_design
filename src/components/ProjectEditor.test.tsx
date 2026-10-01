@@ -69,9 +69,11 @@ describe('ProjectEditor', () => {
 
   it('offers the plan as a drawing to download', () => {
     render(<ProjectEditor initialProject={project} />);
-    const link = screen.getByRole('link', { name: 'Download drawing (SVG)' });
-    expect(link.getAttribute('href')).toBe(`/api/export/${ID}/svg?rev=0`);
-    expect(link.hasAttribute('download')).toBe(true);
+    const href = (name: string) => screen.getByRole('link', { name }).getAttribute('href');
+    expect(href('SVG')).toBe(`/api/export/${ID}/svg?rev=0`);
+    expect(href('PNG')).toBe(`/api/export/${ID}/png?scale=1&rev=0`);
+    expect(href('PNG (2×)')).toBe(`/api/export/${ID}/png?scale=2&rev=0`);
+    expect(screen.getByRole('link', { name: 'SVG' }).hasAttribute('download')).toBe(true);
   });
 
   it('sketch → review → apply updates the page from the saved project', async () => {
