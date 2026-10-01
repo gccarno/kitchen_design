@@ -75,7 +75,8 @@ export function planToSvg(project: Project, opts: SvgOptions = {}): string {
   );
 
   // Walls.
-  out.push('<g id="walls" fill="#111827">');
+  // A hairline stroke in the fill colour hides anti-aliasing seams at the mitred corners.
+  out.push('<g id="walls" fill="#111827" stroke="#111827" stroke-width="2" stroke-linejoin="round">');
   quads.forEach((q) => out.push(`<polygon points="${pts(q)}"/>`));
   out.push('</g>');
 
@@ -110,8 +111,8 @@ export function planToSvg(project: Project, opts: SvgOptions = {}): string {
       .join('');
     const angle = readable((Math.atan2(c[1] - a[1], c[0] - a[0]) * 180) / Math.PI);
     // Just outside the dimension line, clear of it.
-    const tx = (p[0] + q[0]) / 2 - nx * (TEXT_MM * 0.8);
-    const ty = (p[1] + q[1]) / 2 - ny * (TEXT_MM * 0.8);
+    const tx = (p[0] + q[0]) / 2 - nx * TEXT_MM;
+    const ty = (p[1] + q[1]) / 2 - ny * TEXT_MM;
     out.push(
       `<line x1="${r(p[0])}" y1="${r(p[1])}" x2="${r(q[0])}" y2="${r(q[1])}"/>${ticks}` +
         `<text x="${r(tx)}" y="${r(ty)}" transform="rotate(${r(angle)} ${r(tx)} ${r(ty)})" text-anchor="middle" dominant-baseline="middle" stroke="none">` +
