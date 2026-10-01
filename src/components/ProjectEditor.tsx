@@ -75,7 +75,13 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
           All projects
         </Link>
         <h1 className="text-2xl font-semibold">{project.name}</h1>
-        <p className="text-sm text-gray-500">Revision {project.revision}</p>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-gray-500">Revision {project.revision}</span>
+          {/* The revision in the URL makes each export fresh after an edit. */}
+          <a className="text-blue-700 underline" href={`/api/export/${project.id}/svg?rev=${project.revision}`} download>
+            Download drawing (SVG)
+          </a>
+        </div>
       </header>
 
       {proposal && (

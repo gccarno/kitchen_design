@@ -67,6 +67,13 @@ describe('ProjectEditor', () => {
     expect(screen.getByLabelText(/search catalog/i)).not.toBeNull();
   });
 
+  it('offers the plan as a drawing to download', () => {
+    render(<ProjectEditor initialProject={project} />);
+    const link = screen.getByRole('link', { name: 'Download drawing (SVG)' });
+    expect(link.getAttribute('href')).toBe(`/api/export/${ID}/svg?rev=0`);
+    expect(link.hasAttribute('download')).toBe(true);
+  });
+
   it('sketch → review → apply updates the page from the saved project', async () => {
     render(<ProjectEditor initialProject={project} />);
     fireEvent.change(screen.getByLabelText(/width/i), { target: { value: '3600' } });

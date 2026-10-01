@@ -676,6 +676,8 @@ Commit: `feat: undo/redo`.
 
 Output: walls as black strokes, openings as arcs (doors) and double lines (windows), items as labeled rectangles, a ruler, and a scale bar. mm units.
 
+> ✅ Done. `planToSvg(project, { labels })` (`src/lib/plan/svg.ts`) draws a 1:50 drawing in plan mm (document width/height in paper mm): mitred black walls (`wallQuads`), openings cut into them — doors with the leaf and a dashed swing arc (hinged at the start, opening inward, as in the clearance check), windows as two glass lines, pass-throughs as a plain gap — items as outlines with a heavy front edge and fitted, never-upside-down labels (wall cabinets dashed), each wall's length on a dimension line outside it (numbered like the canvas, in the project's units), a 2 m (6 ft) scale bar, a north arrow, and a title block (name, scale, revision, date). Instead of rulers, every wall is dimensioned. `GET /api/export/[id]/svg` labels items with catalog names; the editor header has "Download drawing (SVG)".
+
 Commit: `feat: svg export`.
 
 ### Task 24: PNG export
