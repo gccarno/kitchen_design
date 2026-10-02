@@ -5,6 +5,7 @@ import {
   readFileSync,
   readdirSync,
   renameSync,
+  rmSync,
   writeFileSync,
   statSync,
 } from 'node:fs';
@@ -132,13 +133,18 @@ export async function updateProject(
   id: string,
   update: (current: Project) => Project | Promise<Project>
 ): Promise<Project> {
-  const key = projectDir(dataDir, id);
-  const locks = projectLocks();
-  const run = (locks.get(key) ?? Promise.resolve()).then(async () => {
+  return withProjectLock(dataDir, id, async () => {
     const next = await update(loadProject(dataDir, id));
     saveProject(dataDir, next);
     return next;
   });
+}
+
+/** Run `task` after every earlier write to the project has finished. */
+async function withProjectLock<T>(dataDir: string, id: string, task: () => Promise<T>): Promise<T> {
+  const key = projectDir(dataDir, id);
+  const locks = projectLocks();
+  const run = (locks.get(key) ?? Promise.resolve()).then(task);
   const tail = run.catch(() => undefined);
   locks.set(key, tail);
   try {
@@ -148,8 +154,21 @@ export async function updateProject(
   }
 }
 
-/** Minimal summary used by the project list page. */
-export type ProjectSummary = Pick<Project, 'id' | 'name' | 'updatedAt' | 'revision'>;
+/**
+ * Delete a project and all its files (photos included), after any write in
+ * flight has finished. Permanent: there is no trash. Returns false if the
+ * project didn't exist.
+ */
+export async function deleteProject(dataDir: string, id: string): Promise<boolean> {
+  return withProjectLock(dataDir, id, async () => {
+    if (!projectExists(dataDir, id)) return false;
+    rmSync(projectDir(dataDir, id), { recursive: true, force: true });
+    return true;
+  });
+}
+
+/** What the project list page shows: name, last change, and enough of the plan to draw a thumbnail. */
+export type ProjectSummary = Pick<Project, 'id' | 'name' | 'updatedAt' | 'revision' | 'room' | 'items'>;
 
 /**
  * List all projects under `dataDir`. Skips directories whose `project.json`
@@ -173,6 +192,8 @@ export function listProjects(dataDir: string): ProjectSummary[] {
         name: project.name,
         updatedAt: project.updatedAt,
         revision: project.revision,
+        room: project.room,
+        items: project.items,
       });
     } catch {
       // Skip malformed projects — surfaced via logs, not errors.
