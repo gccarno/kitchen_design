@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import NewProjectForm from '@/components/NewProjectForm';
+import ProjectList from '@/components/ProjectList';
 import { listProjects, resolveDataDir } from '@/lib/storage/projects';
 
 // The list reads the data directory on every request.
@@ -21,18 +21,7 @@ export default function Home() {
         {projects.length === 0 ? (
           <p className="text-sm text-gray-600">No projects yet.</p>
         ) : (
-          <ul className="flex flex-col divide-y rounded border">
-            {projects.map((p) => (
-              <li key={p.id}>
-                <Link href={`/project/${p.id}`} className="flex justify-between gap-4 p-3 hover:bg-gray-50">
-                  <span className="font-medium">{p.name}</span>
-                  <span className="text-sm text-gray-500">
-                    revision {p.revision} · {new Date(p.updatedAt).toLocaleDateString()}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <ProjectList projects={projects} />
         )}
       </section>
     </main>

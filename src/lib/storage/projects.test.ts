@@ -8,6 +8,8 @@ import {
   loadProject,
   saveProject,
   listProjects,
+  deleteProject,
+  projectExists,
   projectDir,
   atomicWriteJson,
   updateProject,
@@ -178,6 +180,36 @@ describe('project storage', () => {
     });
   });
 
+  describe('deleteProject', () => {
+    it('removes the project and its photos, and leaves other projects alone', async () => {
+      const a = createProject(dataDir, { name: 'A' });
+      const b = createProject(dataDir, { name: 'B' });
+      writeFileSync(join(projectDir(dataDir, a.id), 'photos', 'x.jpg'), 'x');
+      expect(await deleteProject(dataDir, a.id)).toBe(true);
+      expect(projectExists(dataDir, a.id)).toBe(false);
+      expect(existsSync(projectDir(dataDir, a.id))).toBe(false);
+      expect(listProjects(dataDir).map((p) => p.id)).toEqual([b.id]);
+    });
+
+    it('returns false for a project that does not exist, and rejects bad ids', async () => {
+      expect(await deleteProject(dataDir, '00000000-0000-4000-8000-000000000000')).toBe(false);
+      await expect(deleteProject(dataDir, '../x')).rejects.toThrow(/invalid project id/);
+    });
+
+    it('waits for a write in flight instead of racing it', async () => {
+      const p = createProject(dataDir, { name: 'A' });
+      let release!: () => void;
+      const slow = updateProject(dataDir, p.id, (cur) => new Promise((res) => (release = () => res({ ...cur, name: 'late' }))));
+      const del = deleteProject(dataDir, p.id);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(projectExists(dataDir, p.id)).toBe(true); // still waiting its turn
+      release();
+      await slow;
+      expect(await del).toBe(true);
+      expect(projectExists(dataDir, p.id)).toBe(false);
+    });
+  });
+
   describe('listProjects', () => {
     it('returns summaries of all projects in dataDir, newest first', () => {
       const a = createProject(dataDir, { name: 'A' });
@@ -189,6 +221,11 @@ describe('project storage', () => {
       expect(list[0]).toEqual(
         expect.objectContaining({ name: expect.any(String), id: expect.any(String) })
       );
+    });
+
+    it('includes the room and items, for thumbnails', () => {
+      const p = createProject(dataDir, { name: 'A' });
+      expect(listProjects(dataDir)[0]).toMatchObject({ id: p.id, room: p.room, items: [] });
     });
 
     it('skips directories without a valid project.json', () => {
