@@ -2,7 +2,7 @@
 
 Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON and SVG/PNG.
 
-See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases).
+See [`docs/plan.md`](docs/plan.md) for the full implementation plan (5 phases) and [`docs/testing-guide.md`](docs/testing-guide.md) for how to test the app.
 
 ## Status
 

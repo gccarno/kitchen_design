@@ -760,7 +760,7 @@ Commit: `test: e2e happy path`.
 ## Verification Checklist (run before declaring v1 done)
 
 - [ ] `npm run lint && npm run typecheck && npm test` all green.
-- [ ] `npx playwright test` green (one happy-path test).
+- [x] `npx playwright test` green (31 tests, including the happy path).
 - [ ] Manual: create project on phone → upload 4 photos → enter one measured wall → extract → confirm room outline; measured wall length matches exactly.
 - [ ] Manual: with no `LLM_API_KEY`, sketch a room by hand and place items — full editor works.
 - [ ] Manual: drag fridge from sidebar onto plan → export SVG → opens cleanly in browser.
