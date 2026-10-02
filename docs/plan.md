@@ -711,6 +711,8 @@ Commit: `feat: project list + pwa`.
 
 The e2e test must mock the LLM HTTP call.
 
+> ✅ Done. `tests/e2e/happy-path.spec.ts` runs the whole journey in one test: new project → upload the synthetic `fixtures/kitchen-photo.jpg` → measured wall ("sink wall", 4000 mm) → "Get room from photos" → review and Apply → place a base cabinet → download the SVG and check it. The extract response is mocked in the browser (the e2e server has no LLM key); its patch is built with `planToJsonPatch` from the saved project. The real endpoint → provider path stays covered by `tests/integration/dev-server.test.ts`. Manual walkthrough: `docs/testing-guide.md`.
+
 Commit: `test: e2e happy path`.
 
 ---
