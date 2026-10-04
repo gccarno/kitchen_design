@@ -49,9 +49,21 @@ export function snapX(closet: Closet, xMm: number, widthMm: number, ignoreId?: s
   return best ? best.x : roundTo(xMm, GRID_MM);
 }
 
-/** A height above the floor on the grid; boxes near the floor sit on it. */
+/**
+ * Standard closet heights (mm): shoe shelves (6", 16"), lower double-hang rod
+ * (42"), hooks / valet (60"), long-hang rod (68"), upper double-hang rod
+ * (81"), top shelf (84"). Rods, shelves and hooks dragged near one land on it.
+ */
+export const STANDARD_HEIGHTS_MM = [152, 406, 1067, 1524, 1727, 2057, 2134];
+
+/** A height above the floor: boxes near the floor sit on it, lines near a standard height take it, else the grid. */
 export function snapY(kind: ClosetComponentKind, yMm: number): number {
-  if (CLOSET_COMPONENTS[kind].box && yMm < FLOOR_SNAP_MM) return 0;
+  if (CLOSET_COMPONENTS[kind].box) {
+    if (yMm < FLOOR_SNAP_MM) return 0;
+  } else {
+    const near = STANDARD_HEIGHTS_MM.find((h) => Math.abs(h - yMm) <= EDGE_SNAP_MM / 2);
+    if (near !== undefined) return near;
+  }
   return Math.max(0, roundTo(yMm, GRID_MM));
 }
 

@@ -66,7 +66,7 @@ describe('ClosetEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hanging rod' }));
     fireEvent.pointerDown(svg, { pointerId: 1, ...at(450, 1727) });
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
-    expect(server.closet!.components).toEqual([expect.objectContaining({ kind: 'rod', xMm: 0, widthMm: 900, yMm: 1725 })]);
+    expect(server.closet!.components).toEqual([expect.objectContaining({ kind: 'rod', xMm: 0, widthMm: 900, yMm: 1727 })]);
     expect(server.history.at(-1)?.summary).toBe('Add hanging rod');
   });
 

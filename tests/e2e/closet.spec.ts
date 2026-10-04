@@ -42,7 +42,7 @@ test('design a closet: place, drag, warnings, undo, export, list', async ({ page
   await page.mouse.click(...(await closetPoint(svg, 450, 800)));
   await expect(page.getByText('Revision 2')).toBeVisible();
   const [shelf, rod] = projectJson(id).closet.components;
-  expect(shelf).toMatchObject({ kind: 'shelf', yMm: 2125 });
+  expect(shelf).toMatchObject({ kind: 'shelf', yMm: 2134 }); // snapped to the standard top-shelf height
   expect(rod).toMatchObject({ kind: 'rod', xMm: 0, yMm: 800 });
 
   // A rod at 800 mm leaves clothes on the floor: warned, not refused.
@@ -57,7 +57,7 @@ test('design a closet: place, drag, warnings, undo, export, list', async ({ page
   await page.mouse.move(...to, { steps: 4 });
   await page.mouse.up();
   await expect(page.getByText('Revision 3')).toBeVisible();
-  expect(projectJson(id).closet.components[1].yMm).toBe(1725);
+  expect(projectJson(id).closet.components[1].yMm).toBe(1727); // the standard long-hang height
   await expect(page.getByRole('list', { name: 'Closet warnings' })).toHaveCount(0);
 
   // Undo puts it back.

@@ -37,13 +37,22 @@ describe('snapY', () => {
   it('drops boxes near the floor onto it and rounds the rest to the grid', () => {
     expect(snapY('drawers', 40)).toBe(0);
     expect(snapY('rod', 40)).toBe(50);
-    expect(snapY('shelf', 2131)).toBe(2125);
+    expect(snapY('drawers', 1000)).toBe(1000);
+  });
+
+  it('puts rods and shelves near a standard height on it', () => {
+    expect(snapY('shelf', 2125)).toBe(2134);
+    expect(snapY('rod', 1715)).toBe(1727);
+    expect(snapY('rod', 1060)).toBe(1067);
+    expect(snapY('rod', 1600)).toBe(1600);
+    // Boxes don't: a basket at 1060 stays on the grid.
+    expect(snapY('basket', 1060)).toBe(1050);
   });
 });
 
 describe('placeAt', () => {
   it('centres a rod on the tap at the tapped height', () => {
-    expect(placeAt(closet, 'rod', 'r', [350, 1720])).toMatchObject({ kind: 'rod', xMm: 0, widthMm: 900, yMm: 1725 });
+    expect(placeAt(closet, 'rod', 'r', [350, 1720])).toMatchObject({ kind: 'rod', xMm: 0, widthMm: 900, yMm: 1727 });
   });
 
   it('stands drawers on the floor whatever the tapped height, against the nearest side', () => {
