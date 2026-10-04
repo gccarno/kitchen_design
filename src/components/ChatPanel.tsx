@@ -7,6 +7,7 @@ interface ChatPanelProps {
   projectId: string;
   /** Called when the model proposes a change; it goes to the review step. */
   onProposal: (proposal: Proposal) => void;
+  placeholder?: string;
 }
 
 /** `content` is what was said (and goes back as history); `note` is UI-only guidance. */
@@ -20,7 +21,11 @@ const HISTORY_TURNS = 6;
  * The model's edit is never applied directly: it becomes a proposal the
  * user reviews and applies. The conversation lives only in this page.
  */
-export default function ChatPanel({ projectId, onProposal }: ChatPanelProps) {
+export default function ChatPanel({
+  projectId,
+  onProposal,
+  placeholder = 'e.g. move the fridge to the north wall, add a dishwasher next to the sink',
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -86,7 +91,7 @@ export default function ChatPanel({ projectId, onProposal }: ChatPanelProps) {
           className="min-h-16 rounded border px-2 py-1"
           value={draft}
           maxLength={1000}
-          placeholder="e.g. move the fridge to the north wall, add a dishwasher next to the sink"
+          placeholder={placeholder}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {

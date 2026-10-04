@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import CatalogSidebar from './CatalogSidebar';
 import ChatPanel from './ChatPanel';
+import ClosetEditor from './ClosetEditor';
 import DiffPreview from './DiffPreview';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
@@ -20,9 +21,10 @@ import { submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
 
 /**
- * The project page's client side: photos, the current room, the two ways
- * to get a room (from photos, or sketched), and the review step that every
- * change goes through before it is saved.
+ * The project page's client side. A kitchen: photos, the current room, the
+ * two ways to get a room (from photos, or sketched). A closet: its front
+ * elevation (`ClosetEditor`). Both: export links, and the review step that
+ * proposed changes go through before they are saved.
  */
 export default function ProjectEditor({ initialProject }: { initialProject: Project }) {
   const load = useEditorStore((s) => s.load);
@@ -106,64 +108,70 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
         </div>
       )}
 
-      <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2">
-        <h2 className="text-lg font-semibold">Current room</h2>
-        <HistoryControls project={project} onSaved={saved} />
-        <FloorPlanCanvas
-          room={project.room}
-          items={project.items}
-          units={project.units}
-          label="Current room"
-          onEdit={editPlan}
-          placingItem={placingItem}
-          onPlacingDone={() => setPlacingItem(null)}
-          itemLabels={itemLabels}
-        />
-        <p className="text-sm text-gray-600">
-          {Math.round(bounds.maxX - bounds.minX)} × {Math.round(bounds.maxY - bounds.minY)} mm, {areaM2.toFixed(1)} m²
-        </p>
-        {warnings.length > 0 && (
-          <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
-            <p className="font-medium">Heads up</p>
-            <ul aria-label="Plan warnings" className="list-disc pl-5">
-              {warnings.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+      {project.closet ? (
+        <ClosetEditor project={{ ...project, closet: project.closet }} onSaved={saved} onProposal={propose} />
+      ) : (
+        <>
+          <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2">
+            <h2 className="text-lg font-semibold">Current room</h2>
+            <HistoryControls project={project} onSaved={saved} />
+            <FloorPlanCanvas
+              room={project.room}
+              items={project.items}
+              units={project.units}
+              label="Current room"
+              onEdit={editPlan}
+              placingItem={placingItem}
+              onPlacingDone={() => setPlacingItem(null)}
+              itemLabels={itemLabels}
+            />
+            <p className="text-sm text-gray-600">
+              {Math.round(bounds.maxX - bounds.minX)} × {Math.round(bounds.maxY - bounds.minY)} mm, {areaM2.toFixed(1)} m²
+            </p>
+            {warnings.length > 0 && (
+              <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+                <p className="font-medium">Heads up</p>
+                <ul aria-label="Plan warnings" className="list-disc pl-5">
+                  {warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Ask for changes</h2>
-        <ChatPanel projectId={project.id} onProposal={propose} />
-      </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Ask for changes</h2>
+            <ChatPanel projectId={project.id} onProposal={propose} />
+          </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Catalog</h2>
-        <p className="text-sm text-gray-600">Pick an item, then tap the plan to place it.</p>
-        <CatalogSidebar
-          items={catalog.items}
-          units={project.units}
-          onPick={pickFromCatalog}
-          selectedId={placingItem?.id ?? null}
-        />
-      </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Catalog</h2>
+            <p className="text-sm text-gray-600">Pick an item, then tap the plan to place it.</p>
+            <CatalogSidebar
+              items={catalog.items}
+              units={project.units}
+              onPick={pickFromCatalog}
+              selectedId={placingItem?.id ?? null}
+            />
+          </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Photos</h2>
-        <PhotoCapture projectId={project.id} initialPhotos={project.photos} onPhotosChange={setPhotos} />
-      </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Photos</h2>
+            <PhotoCapture projectId={project.id} initialPhotos={project.photos} onPhotosChange={setPhotos} />
+          </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Room from photos</h2>
-        <ExtractPanel projectId={project.id} hasPhotos={project.photos.length > 0} onProposal={propose} />
-      </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Room from photos</h2>
+            <ExtractPanel projectId={project.id} hasPhotos={project.photos.length > 0} onProposal={propose} />
+          </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Or sketch it by hand</h2>
-        <RoomSketch onSave={(room) => propose(proposalForRoom(project, room, 'Sketched room'))} />
-      </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Or sketch it by hand</h2>
+            <RoomSketch onSave={(room) => propose(proposalForRoom(project, room, 'Sketched room'))} />
+          </section>
+        </>
+      )}
     </main>
   );
 }

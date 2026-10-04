@@ -1,5 +1,6 @@
+import { withCloset } from '../closet/commands';
 import { planToJsonPatch } from './diff';
-import type { JsonPatchOp, PlacedItem, Project, Room } from './schemas';
+import type { Closet, JsonPatchOp, PlacedItem, Project, Room } from './schemas';
 
 /** A proposed edit awaiting the user's confirmation in the diff preview. */
 export interface Proposal {
@@ -22,6 +23,11 @@ export function proposalForPlan(
 ): Proposal {
   const next = { ...project, room: change.room ?? project.room, items: change.items ?? project.items };
   return { patch: planToJsonPatch(project, next), baseRevision: project.revision, summary, source: 'user' };
+}
+
+/** Propose a user edit to a closet project's closet (its footprint follows). */
+export function proposalForCloset(project: Project, closet: Closet, summary: string): Proposal {
+  return { patch: planToJsonPatch(project, withCloset(project, closet)), baseRevision: project.revision, summary, source: 'user' };
 }
 
 /** Propose replacing the project's room (e.g. from the manual sketch). */

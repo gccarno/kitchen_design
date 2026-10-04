@@ -67,6 +67,24 @@ describe('ProjectEditor', () => {
     expect(screen.getByLabelText(/search catalog/i)).not.toBeNull();
   });
 
+  it('shows a closet project as its elevation, palette and chat — none of the room tools', () => {
+    const closet = {
+      widthMm: 1830,
+      heightMm: 2440,
+      depthMm: 610,
+      opening: { style: 'bifold' as const, leftMm: 0, widthMm: 1830 },
+      components: [],
+    };
+    render(<ProjectEditor initialProject={{ ...project, name: 'Hall closet', kind: 'closet', closet }} />);
+    expect(screen.getByRole('heading', { name: 'Hall closet' })).not.toBeNull();
+    expect(screen.getByRole('img', { name: 'Closet elevation' })).not.toBeNull();
+    expect(screen.getByRole('group', { name: 'Closet components' })).not.toBeNull();
+    expect(screen.getByLabelText(/ask for a change/i).getAttribute('placeholder')).toMatch(/double hang/);
+    expect(screen.queryByRole('heading', { name: 'Photos' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Catalog' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'SVG' })).not.toBeNull();
+  });
+
   it('offers the plan as a drawing to download', () => {
     render(<ProjectEditor initialProject={project} />);
     const href = (name: string) => screen.getByRole('link', { name }).getAttribute('href');

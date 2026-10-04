@@ -2,11 +2,13 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { ProjectKind } from '@/lib/plan/schemas';
 
 /** Create a project and go straight to its page. */
 export default function NewProjectForm() {
   const router = useRouter();
   const [name, setName] = useState('');
+  const [kind, setKind] = useState<ProjectKind>('kitchen');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +21,7 @@ export default function NewProjectForm() {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: name.trim(), kind }),
       });
       const body = (await res.json().catch(() => ({}))) as { project?: { id: string }; error?: string };
       if (!res.ok || !body.project) throw new Error(body.error ?? `could not create project (${res.status})`);
@@ -32,13 +34,36 @@ export default function NewProjectForm() {
 
   return (
     <form onSubmit={create} className="flex flex-wrap items-end gap-2">
+      <fieldset className="flex flex-col gap-1 text-sm">
+        <legend className="mb-1">Design a</legend>
+        <div className="flex rounded border">
+          {(
+            [
+              ['kitchen', 'Kitchen'],
+              ['closet', 'Closet'],
+            ] as const
+          ).map(([value, label]) => (
+            <label key={value} className={`cursor-pointer px-3 py-1 ${kind === value ? 'bg-black text-white' : ''}`}>
+              <input
+                type="radio"
+                name="kind"
+                value={value}
+                className="sr-only"
+                checked={kind === value}
+                onChange={() => setKind(value)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <label className="flex flex-col gap-1 text-sm">
         <span>New project name</span>
         <input
           className="w-64 rounded border px-2 py-1"
           value={name}
           maxLength={200}
-          placeholder="e.g. Home kitchen"
+          placeholder={kind === 'closet' ? 'e.g. Bedroom closet' : 'e.g. Home kitchen'}
           onChange={(e) => setName(e.target.value)}
         />
       </label>

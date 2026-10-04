@@ -12,6 +12,11 @@ interface ClosetElevationProps {
   /** Makes components clickable; other shapes ignore the pointer. */
   onComponentPointerDown?: (id: string, e: React.PointerEvent<SVGElement>) => void;
   svgRef?: React.Ref<SVGSVGElement>;
+  /** Pointer handlers for the <svg> itself (background taps, drags captured on it). */
+  svgHandlers?: Pick<
+    React.SVGProps<SVGSVGElement>,
+    'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerCancel'
+  >;
   /** Extra SVG drawn on top, in elevation mm (y down). */
   children?: React.ReactNode;
 }
@@ -28,6 +33,7 @@ export default function ClosetElevation({
   frame,
   onComponentPointerDown,
   svgRef,
+  svgHandlers,
   children,
 }: ClosetElevationProps) {
   const w = frame?.widthMm ?? closet.widthMm;
@@ -43,6 +49,7 @@ export default function ClosetElevation({
       role="img"
       aria-label={label}
       fontFamily="Helvetica, Arial, sans-serif"
+      {...svgHandlers}
     >
       {closetDrawing(closet, { selectedId }).map((s, i) => (
         <ShapeEl key={i} shape={s} onPointerDown={onComponentPointerDown} />
