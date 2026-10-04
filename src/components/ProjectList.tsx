@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import ClosetElevation from './ClosetElevation';
 import PlanThumbnail from './PlanThumbnail';
 import { submitRevision } from '@/lib/client/revisions';
 import type { ProjectSummary } from '@/lib/storage/projects';
@@ -65,14 +66,21 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
       {projects.map((p) => (
         <li key={p.id} className="flex flex-col gap-2 rounded border p-3">
           <Link href={`/project/${p.id}`} className="flex flex-col gap-2 hover:opacity-80">
-            <PlanThumbnail
-              room={p.room}
-              items={p.items}
-              label={`Plan of ${p.name}`}
-              className="h-40 w-full rounded border bg-white"
-            />
+            {p.closet ? (
+              <ClosetElevation closet={p.closet} label={`Elevation of ${p.name}`} className="h-40 w-full rounded border bg-white" />
+            ) : (
+              <PlanThumbnail
+                room={p.room}
+                items={p.items}
+                label={`Plan of ${p.name}`}
+                className="h-40 w-full rounded border bg-white"
+              />
+            )}
             <span className="flex flex-col">
-              <span className="font-medium">{p.name}</span>
+              <span className="flex items-center gap-2 font-medium">
+                {p.name}
+                {p.kind === 'closet' && <span className="rounded bg-violet-100 px-1.5 text-xs font-normal text-violet-800">Closet</span>}
+              </span>
               <span className="text-sm text-gray-500">
                 revision {p.revision} · {p.updatedAt.slice(0, 10)}
               </span>

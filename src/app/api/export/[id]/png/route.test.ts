@@ -40,6 +40,16 @@ describe('GET /api/export/[id]/png', () => {
     expect(Math.abs(m2.height! - 2 * m1.height!)).toBeLessThanOrEqual(2);
   });
 
+  it('rasterizes a closet elevation', async () => {
+    const p = createProject(dataDir, { name: 'Hall closet', kind: 'closet' });
+    const res = await get(p.id);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toBe('inline; filename="hall-closet.png"');
+    const m = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    // 1830 mm wide closet plus margins.
+    expect(m.width).toBeGreaterThan(1830 / 5);
+  });
+
   it('rejects other scales, unknown projects, and bad ids', async () => {
     const p = createProject(dataDir, { name: 'P' });
     expect((await get(p.id, '?scale=3')).status).toBe(400);

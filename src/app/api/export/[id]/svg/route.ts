@@ -1,5 +1,4 @@
-import { loadDrawing } from '@/lib/export/drawing';
-import { exportFileName } from '@/lib/plan/svg';
+import { drawingFileName, loadDrawing } from '@/lib/export/drawing';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,7 +16,7 @@ export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
   return new Response(drawing.svg, {
     headers: {
       'content-type': 'image/svg+xml; charset=utf-8',
-      'content-disposition': `inline; filename="${exportFileName(drawing.project.name, 'svg')}"`,
+      'content-disposition': `inline; filename="${drawingFileName(drawing.project, 'svg')}"`,
       'cache-control': 'no-store',
     },
   });

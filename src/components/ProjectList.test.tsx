@@ -62,6 +62,20 @@ describe('ProjectList', () => {
     expect(screen.getAllByRole('img')).toHaveLength(2);
   });
 
+  it('shows a closet as its elevation, with a Closet badge', () => {
+    const closet = {
+      widthMm: 1830,
+      heightMm: 2440,
+      depthMm: 610,
+      opening: { style: 'bifold' as const, leftMm: 0, widthMm: 1830 },
+      components: [{ id: 'r', kind: 'rod' as const, xMm: 0, widthMm: 900, yMm: 1727 }],
+    };
+    render(<ProjectList projects={[{ ...summary(A, 'Hall', 1), kind: 'closet', closet }]} />);
+    const link = screen.getByRole('link', { name: /Hall/ });
+    expect(within(link).getByRole('img', { name: 'Elevation of Hall' })).not.toBeNull();
+    expect(within(link).getByText('Closet')).not.toBeNull();
+  });
+
   it('renames through a revision against the listed revision, then refreshes', async () => {
     fetchMock.mockResolvedValueOnce(json({ project: { ...base, name: 'Home' } }));
     render(<ProjectList projects={projects} />);

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useState } from 'react';
+import ClosetElevation from './ClosetElevation';
 import PlanThumbnail from './PlanThumbnail';
 import { describePlanChanges } from '@/lib/plan/changes';
 import { validatePatchOnProject } from '@/lib/plan/diff';
@@ -42,6 +43,12 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
     () => (preview.ok ? unionBounds(current.room.polygon, preview.value.room.polygon) : undefined),
     [current, preview]
   );
+  // Both closet drawings at one scale, so a resize shows.
+  const closetFrame = useMemo(() => {
+    const [a, b] = [current.closet, preview.ok ? preview.value.closet : undefined];
+    if (!a || !b) return undefined;
+    return { widthMm: Math.max(a.widthMm, b.widthMm), heightMm: Math.max(a.heightMm, b.heightMm) };
+  }, [current, preview]);
 
   async function apply() {
     if (inFlight.current) return;
@@ -92,16 +99,24 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <figure className="flex flex-col gap-1">
               <figcaption className="text-sm text-gray-600">Current</figcaption>
-              <PlanThumbnail room={current.room} items={current.items} bounds={bounds} label="Current plan" />
+              {current.closet && preview.value.closet ? (
+                <ClosetElevation closet={current.closet} frame={closetFrame} label="Current closet" />
+              ) : (
+                <PlanThumbnail room={current.room} items={current.items} bounds={bounds} label="Current plan" />
+              )}
             </figure>
             <figure className="flex flex-col gap-1">
               <figcaption className="text-sm text-gray-600">Proposed</figcaption>
-              <PlanThumbnail
-                room={preview.value.room}
-                items={preview.value.items}
-                bounds={bounds}
-                label="Proposed plan"
-              />
+              {current.closet && preview.value.closet ? (
+                <ClosetElevation closet={preview.value.closet} frame={closetFrame} label="Proposed closet" />
+              ) : (
+                <PlanThumbnail
+                  room={preview.value.room}
+                  items={preview.value.items}
+                  bounds={bounds}
+                  label="Proposed plan"
+                />
+              )}
             </figure>
           </div>
           {changes.length === 0 ? (

@@ -34,6 +34,14 @@ describe('GET /api/export/[id]/svg', () => {
     expect(body).toContain('>Dishwasher (600 mm)</text>');
   });
 
+  it('returns a closet as its front elevation', async () => {
+    const p = createProject(dataDir, { name: '***', kind: 'closet' });
+    const res = await get(p.id);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toBe('inline; filename="closet-elevation.svg"');
+    expect(await res.text()).toContain('Front elevation');
+  });
+
   it('404s an unknown project and 400s a bad id', async () => {
     expect((await get('00000000-0000-4000-8000-000000000000')).status).toBe(404);
     expect((await get('../etc')).status).toBe(400);

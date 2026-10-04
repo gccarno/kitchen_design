@@ -28,7 +28,7 @@ const r = (n: number) => Math.round(n * 10) / 10;
 const pts = (ps: Point[]) => ps.map(([x, y]) => `${r(x)},${r(y)}`).join(' ');
 
 /** A safe download name from the project name, e.g. "Our kitchen" → "our-kitchen". */
-export function exportFileName(name: string, ext: string): string {
+export function exportFileName(name: string, ext: string, fallback = 'kitchen-plan'): string {
   const slug = name
     .normalize('NFKD')
     .replace(/[^\w\s-]/g, '')
@@ -36,7 +36,7 @@ export function exportFileName(name: string, ext: string): string {
     .toLowerCase()
     .replace(/[\s_-]+/g, '-')
     .slice(0, 60);
-  return `${slug || 'kitchen-plan'}.${ext}`;
+  return `${slug || fallback}.${ext}`;
 }
 
 export function escapeXml(s: string): string {

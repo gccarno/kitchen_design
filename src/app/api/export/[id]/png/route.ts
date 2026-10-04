@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadDrawing, PNG_SCALES, svgToPng, type PngScale } from '@/lib/export/drawing';
-import { exportFileName } from '@/lib/plan/svg';
+import { drawingFileName, loadDrawing, PNG_SCALES, svgToPng, type PngScale } from '@/lib/export/drawing';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,7 +23,7 @@ export async function GET(req: Request, { params }: Ctx): Promise<Response> {
   return new Response(new Uint8Array(png), {
     headers: {
       'content-type': 'image/png',
-      'content-disposition': `inline; filename="${exportFileName(drawing.project.name, 'png').replace(/\.png$/, `${suffix}.png`)}"`,
+      'content-disposition': `inline; filename="${drawingFileName(drawing.project, 'png').replace(/\.png$/, `${suffix}.png`)}"`,
       'cache-control': 'no-store',
     },
   });
