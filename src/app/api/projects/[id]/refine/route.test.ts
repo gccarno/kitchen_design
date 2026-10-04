@@ -83,6 +83,18 @@ describe('POST /api/projects/[id]/refine', () => {
     expect(loadProject(dataDir, p.id).items[0]).toMatchObject({ catalogId: 'dishwasher-600', position: { x: 1500, y: 290 } });
   });
 
+  it('edits a closet project with closet commands', async () => {
+    const p = createProject(dataDir, { name: 'Hall', kind: 'closet' });
+    const provider = stub([{ commands: [{ type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1830 }], summary: 'Add a top shelf' }]);
+    providerFromEnv.mockReturnValue(provider);
+    const body = await (await post(p.id, { message: 'add a top shelf' })).json();
+    expect(body.summary).toBe('Add a top shelf');
+    expect(body.patch).toEqual([
+      { op: 'add', path: '/closet/components/0', value: expect.objectContaining({ kind: 'shelf', widthMm: 1830, yMm: 2134 }) },
+    ]);
+    expect(provider.users[0]).toContain('Closet "Hall": inside 1830 wide');
+  });
+
   it('passes history through to the prompt', async () => {
     const p = createProject(dataDir, { name: 'P' });
     const provider = stub([ADD_DW]);

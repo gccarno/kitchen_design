@@ -4,11 +4,13 @@ import {
   LLMNotConfiguredError,
   LLMRequestError,
   providerFromEnv,
+  refineCloset,
   refinePlan,
   RefinementError,
   type LLMProvider,
 } from '@/lib/llm';
 import { loadCatalog } from '@/lib/catalog/loader';
+import { projectKind } from '@/lib/plan/schemas';
 import { isValidProjectId, loadProject, projectExists, resolveDataDir } from '@/lib/storage/projects';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +32,8 @@ const RefineRequestSchema = z.object({
 /**
  * POST /api/projects/[id]/refine — JSON body { message, history? }.
  *
- * Turns a chat request into a proposed edit. Does NOT change the project:
+ * Turns a chat request into a proposed edit — plan commands for a kitchen,
+ * closet commands for a closet. Does NOT change the project:
  * returns `{ commands, patch, summary, reply, warnings, baseRevision }`;
  * the client shows the patch for review and commits it via POST .../revisions.
  * `patch` is empty when the model only replied (a question, or it couldn't).
@@ -65,13 +68,12 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
   }
 
   try {
-    const result = await refinePlan({
-      project: loadProject(dataDir, id),
-      catalog: loadCatalog(),
-      provider,
-      message: input.data.message,
-      history: input.data.history,
-    });
+    const project = loadProject(dataDir, id);
+    const { message, history } = input.data;
+    const result =
+      projectKind(project) === 'closet'
+        ? await refineCloset({ project, provider, message, history })
+        : await refinePlan({ project, catalog: loadCatalog(), provider, message, history });
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof RefinementError) {
