@@ -4,6 +4,7 @@
  * about walls and items, never JSON paths.
  */
 
+import { describeClosetChanges } from '../closet/changes';
 import { polygonAreaMm2, polygonBounds, type Point } from './geometry';
 import type { Opening, PlacedItem, Project, Room } from './schemas';
 import { wallLengthMm } from './validate';
@@ -18,6 +19,11 @@ export function describePlanChanges(before: Project, after: Project): PlanChange
   const out: PlanChange[] = [];
   if (before.name !== after.name) {
     out.push({ kind: 'changed', subject: 'name', text: `Rename "${before.name}" → "${after.name}"` });
+  }
+  // A closet's room is only its footprint, derived from the closet.
+  if (before.closet && after.closet) {
+    out.push(...describeClosetChanges(before.closet, after.closet));
+    return out;
   }
   out.push(...roomChanges(before.room, after.room));
   out.push(...itemChanges(before.items, after.items));
