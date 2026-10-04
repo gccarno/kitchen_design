@@ -43,7 +43,15 @@ describe('POST /api/projects', () => {
     expect(project.name).toBe('Kitchen');
   });
 
-  it.each([{}, { name: '' }, { name: '   ' }, { name: 42 }, 'not json'])('rejects %j with 400', async (body) => {
+  it('creates a closet project when asked', async () => {
+    const res = await post({ name: 'Hall closet', kind: 'closet' });
+    expect(res.status).toBe(201);
+    const { project } = (await res.json()) as { project: Project };
+    expect(project.kind).toBe('closet');
+    expect(project.closet?.components).toEqual([]);
+  });
+
+  it.each([{}, { name: '' }, { name: '   ' }, { name: 42 }, { name: 'x', kind: 'garage' }, 'not json'])('rejects %j with 400', async (body) => {
     expect((await post(body)).status).toBe(400);
   });
 });

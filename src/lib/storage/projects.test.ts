@@ -99,6 +99,27 @@ describe('project storage', () => {
       expect(validatePlan(p).valid).toBe(true);
     });
 
+    it('creates a kitchen by default, with no closet', () => {
+      const p = createProject(dataDir, { name: 'K' });
+      expect(p.kind).toBe('kitchen');
+      expect(p.closet).toBeUndefined();
+    });
+
+    it('creates a closet: an empty 1830 × 2440 × 610 closet whose room is its footprint', () => {
+      const p = createProject(dataDir, { name: 'Hall closet', kind: 'closet' });
+      expect(p.kind).toBe('closet');
+      expect(p.closet).toMatchObject({ widthMm: 1830, heightMm: 2440, depthMm: 610, components: [] });
+      expect(p.closet?.opening).toEqual({ style: 'bifold', leftMm: 0, widthMm: 1830 });
+      expect(p.room.polygon).toEqual([
+        [0, 0],
+        [1830, 0],
+        [1830, 610],
+        [0, 610],
+      ]);
+      expect(validatePlan(p).valid).toBe(true);
+      expect(loadProject(dataDir, p.id)).toEqual(p);
+    });
+
     it('rejects a non-UUID id override', () => {
       expect(() => createProject(dataDir, { id: '../escape', name: 'X' })).toThrow(InvalidProjectIdError);
     });

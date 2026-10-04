@@ -18,7 +18,8 @@ import {
   signedPolygonArea,
   type Point,
 } from './geometry';
-import type { Mount, PlacedItem, Project, Room } from './schemas';
+import { validateCloset } from '../closet/validate';
+import { projectKind, type Mount, type PlacedItem, type Project, type Room } from './schemas';
 import { inwardNormal } from './walls';
 
 export interface PlanValidationResult {
@@ -34,7 +35,14 @@ export function wallLengthMm(room: Room, wallIndex: number): number {
 }
 
 export function validatePlan(plan: Project): PlanValidationResult {
-  return validateRoom(plan.room, plan.items);
+  if (projectKind(plan) === 'closet') {
+    if (!plan.closet) return { valid: false, errors: ['closet project has no closet'], warnings: [] };
+    // The room is only the closet's footprint; the closet is what's designed.
+    return validateCloset(plan.closet);
+  }
+  const result = validateRoom(plan.room, plan.items);
+  if (plan.closet) return { ...result, valid: false, errors: [...result.errors, 'only closet projects can have a closet'] };
+  return result;
 }
 
 /** The checks behind `validatePlan`, for a candidate room (e.g. mid-edit) and the items in it. */

@@ -10,7 +10,8 @@ import {
   statSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { ProjectSchema, type Project } from '../plan/schemas';
+import { closetFootprint, newCloset } from '../closet/catalog';
+import { ProjectSchema, projectKind, type Project, type ProjectKind } from '../plan/schemas';
 
 /**
  * Resolved data directory. Defaults to `./data` at process start, can be
@@ -60,32 +61,39 @@ export function atomicWriteJson(target: string, value: unknown): void {
 /** Create a fresh project on disk and return it. */
 export function createProject(
   dataDir: string,
-  overrides: { id?: string; name: string }
+  overrides: { id?: string; name: string; kind?: ProjectKind }
 ): Project {
   const now = new Date().toISOString();
   const id = overrides.id ?? randomUUID();
   const dir = projectDir(dataDir, id);
+  const kind = overrides.kind ?? 'kitchen';
+  const closet = kind === 'closet' ? newCloset() : undefined;
   const project: Project = ProjectSchema.parse({
     id,
     name: overrides.name,
+    kind,
     units: 'mm',
     createdAt: now,
     updatedAt: now,
     revision: 0,
     photos: [],
     room: {
-      // Default 3m × 4m rectangle so the editor has something to draw on.
-      // The user replaces this once photos are extracted or the room is sketched.
-      polygon: [
-        [0, 0],
-        [3000, 0],
-        [3000, 4000],
-        [0, 4000],
-      ],
+      // Kitchens start as a 3m × 4m rectangle so the editor has something to
+      // draw on; the user replaces it once photos are extracted or the room
+      // is sketched. A closet's room is just its footprint.
+      polygon: closet
+        ? closetFootprint(closet)
+        : [
+            [0, 0],
+            [3000, 0],
+            [3000, 4000],
+            [0, 4000],
+          ],
       walls: Array.from({ length: 4 }, () => ({ id: randomUUID(), thicknessMm: 100 })),
       openings: [],
     },
     items: [],
+    ...(closet ? { closet } : {}),
     history: [],
   });
 
@@ -168,7 +176,7 @@ export async function deleteProject(dataDir: string, id: string): Promise<boolea
 }
 
 /** What the project list page shows: name, last change, and enough of the plan to draw a thumbnail. */
-export type ProjectSummary = Pick<Project, 'id' | 'name' | 'updatedAt' | 'revision' | 'room' | 'items'>;
+export type ProjectSummary = Pick<Project, 'id' | 'name' | 'kind' | 'updatedAt' | 'revision' | 'room' | 'items' | 'closet'>;
 
 /**
  * List all projects under `dataDir`. Skips directories whose `project.json`
@@ -190,10 +198,12 @@ export function listProjects(dataDir: string): ProjectSummary[] {
       out.push({
         id: project.id,
         name: project.name,
+        kind: projectKind(project),
         updatedAt: project.updatedAt,
         revision: project.revision,
         room: project.room,
         items: project.items,
+        ...(project.closet ? { closet: project.closet } : {}),
       });
     } catch {
       // Skip malformed projects — surfaced via logs, not errors.

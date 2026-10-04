@@ -108,6 +108,59 @@ const PlacedItemSchema = z.object({
   tag: z.string().optional(),
 });
 
+// --- Closets ---
+// A reach-in closet is drawn as a front elevation of its back wall: x runs
+// right from the left side wall, y runs up from the floor, both in mm.
+
+/** How the closet front opens. 'open' = no doors. */
+export const ClosetDoorStyleSchema = z.enum(['bifold', 'sliding', 'hinged', 'open']);
+export type ClosetDoorStyle = z.infer<typeof ClosetDoorStyleSchema>;
+
+export const ClosetComponentKindSchema = z.enum([
+  'shelf',
+  'rod',
+  'tower',
+  'drawers',
+  'shoe_shelf',
+  'basket',
+  'hooks',
+  'valet_rod',
+]);
+export type ClosetComponentKind = z.infer<typeof ClosetComponentKindSchema>;
+
+const ClosetComponentSchema = z.object({
+  id: z.string().min(1),
+  kind: ClosetComponentKindSchema,
+  /** Left edge, from the closet's left side wall. */
+  xMm: z.number(),
+  widthMm: z.number().positive(),
+  /** Height above the floor: of the rod/shelf/hooks itself, or of a box's bottom. */
+  yMm: z.number(),
+  /** Boxes only (tower, drawers, basket). */
+  heightMm: z.number().positive().optional(),
+  depthMm: z.number().positive().optional(),
+  /** Drawers in a drawer unit, or shelves in a tower. */
+  count: z.number().int().positive().optional(),
+});
+
+const ClosetSchema = z.object({
+  /** Interior size. */
+  widthMm: z.number().positive(),
+  heightMm: z.number().positive(),
+  depthMm: z.number().positive(),
+  /** The door opening in the closet front, measured like components. */
+  opening: z.object({
+    style: ClosetDoorStyleSchema,
+    leftMm: z.number().min(0),
+    widthMm: z.number().positive(),
+  }),
+  components: z.array(ClosetComponentSchema),
+});
+
+/** What a project designs. Absent (projects from before closets) means 'kitchen'. */
+export const ProjectKindSchema = z.enum(['kitchen', 'closet']);
+export type ProjectKind = z.infer<typeof ProjectKindSchema>;
+
 /** Longest revision summary the revisions endpoint accepts. */
 export const SUMMARY_MAX_LENGTH = 500;
 
@@ -130,6 +183,7 @@ const PlanRevisionSchema = z.object({
 export const ProjectSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
+  kind: ProjectKindSchema.optional(),
   units: Units,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
@@ -137,9 +191,17 @@ export const ProjectSchema = z.object({
   photos: z.array(PhotoSchema),
   room: RoomSchema,
   items: z.array(PlacedItemSchema),
+  /** Closet projects only (`validatePlan` checks it is there exactly then). */
+  closet: ClosetSchema.optional(),
   history: z.array(PlanRevisionSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;
+export type Closet = z.infer<typeof ClosetSchema>;
+export type ClosetComponent = z.infer<typeof ClosetComponentSchema>;
+
+export function projectKind(project: Pick<Project, 'kind'>): ProjectKind {
+  return project.kind ?? 'kitchen';
+}
 export type Room = z.infer<typeof RoomSchema>;
 export type Wall = z.infer<typeof WallSchema>;
 export type Opening = z.infer<typeof OpeningSchema>;

@@ -9,7 +9,7 @@
  * the minimum set of ops to transform before into after.
  *
  * `applyJsonPatch` is strict: it only accepts ops on editable paths
- * (`/name`, `/room/**`, `/items/**`), deep-clones the input, applies the ops
+ * (`/name`, `/room/**`, `/items/**`, `/closet/**`), deep-clones the input, applies the ops
  * via `fast-json-patch`, then re-validates against `ProjectSchema`. A
  * patch that produces an invalid project throws — the caller is expected
  * to surface this as a "could not apply" error, never silently corrupt state.
@@ -34,7 +34,7 @@ export type { JsonPatchOp } from './schemas';
 export const HISTORY_LIMIT = 200;
 
 /** Top-level fields a patch may touch. Everything else is server-managed. */
-const EDITABLE_ROOTS = ['/name', '/room', '/items'];
+const EDITABLE_ROOTS = ['/name', '/room', '/items', '/closet'];
 
 function isEditablePath(path: string): boolean {
   return EDITABLE_ROOTS.some((root) => path === root || path.startsWith(`${root}/`));

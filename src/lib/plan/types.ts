@@ -18,4 +18,9 @@ export type {
   ReferenceSide,
   Measurement,
   Mount,
+  ProjectKind,
+  Closet,
+  ClosetComponent,
+  ClosetComponentKind,
+  ClosetDoorStyle,
 } from './schemas';

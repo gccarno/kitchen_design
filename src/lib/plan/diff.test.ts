@@ -219,6 +219,26 @@ describe('patch-path allowlist', () => {
     expect(() => applyJsonPatch(newProject(), [{ op: 'replace', path, value }])).toThrow(/non-editable path/);
   });
 
+  it('rejects changing what kind of project it is', () => {
+    expect(() => applyJsonPatch(newProject(), [{ op: 'add', path: '/kind', value: 'closet' }])).toThrow(/non-editable path/);
+  });
+
+  it('allows /closet/**', () => {
+    const closet = {
+      widthMm: 1000,
+      heightMm: 2400,
+      depthMm: 600,
+      opening: { style: 'open', leftMm: 0, widthMm: 1000 },
+      components: [],
+    };
+    const p = applyJsonPatch({ ...newProject(), kind: 'closet', closet } as Project, [
+      { op: 'replace', path: '/closet/widthMm', value: 1200 },
+      { op: 'add', path: '/closet/components/-', value: { id: 'c', kind: 'rod', xMm: 0, widthMm: 900, yMm: 1700 } },
+    ]);
+    expect(p.closet?.widthMm).toBe(1200);
+    expect(p.closet?.components).toHaveLength(1);
+  });
+
   it('rejects move/copy whose source is outside the allowlist', () => {
     expect(() => applyJsonPatch(newProject(), [{ op: 'copy', from: '/id', path: '/name' }])).toThrow(
       /non-editable path/

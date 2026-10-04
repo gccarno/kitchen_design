@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import minimal from './__fixtures__/minimal.json';
 import bad from './__fixtures__/bad.json';
-import { ProjectSchema } from './schemas';
+import { ProjectSchema, projectKind } from './schemas';
 
 describe('ProjectSchema', () => {
   it('accepts a minimal valid project', () => {
@@ -78,6 +78,41 @@ describe('ProjectSchema', () => {
       referenceObject: { kind: 'tape_measure', side: 'long', knownSizeMm: 50, pixelBox: [0, 0, 1, 1] },
     };
     expect(() => ProjectSchema.parse({ ...minimal, photos: [photo] })).toThrow();
+  });
+
+  it('reads a project saved before project kinds existed as a kitchen', () => {
+    const parsed = ProjectSchema.parse(minimal);
+    expect(parsed.kind).toBeUndefined();
+    expect(projectKind(parsed)).toBe('kitchen');
+  });
+
+  it('accepts a closet project', () => {
+    const closet = {
+      widthMm: 1830,
+      heightMm: 2440,
+      depthMm: 610,
+      opening: { style: 'bifold', leftMm: 0, widthMm: 1830 },
+      components: [
+        { id: 'c1', kind: 'shelf', xMm: 0, widthMm: 1830, yMm: 2134, depthMm: 305 },
+        { id: 'c2', kind: 'drawers', xMm: 600, widthMm: 600, yMm: 0, heightMm: 900, count: 4 },
+      ],
+    };
+    const parsed = ProjectSchema.parse({ ...minimal, kind: 'closet', closet });
+    expect(projectKind(parsed)).toBe('closet');
+    expect(parsed.closet?.components).toHaveLength(2);
+  });
+
+  it('rejects an unknown closet component kind or door style', () => {
+    const closet = {
+      widthMm: 1000,
+      heightMm: 2400,
+      depthMm: 600,
+      opening: { style: 'bifold', leftMm: 0, widthMm: 1000 },
+      components: [{ id: 'c1', kind: 'trampoline', xMm: 0, widthMm: 100, yMm: 0 }],
+    };
+    expect(() => ProjectSchema.parse({ ...minimal, kind: 'closet', closet })).toThrow();
+    const badDoor = { ...closet, components: [], opening: { style: 'portal', leftMm: 0, widthMm: 1000 } };
+    expect(() => ProjectSchema.parse({ ...minimal, kind: 'closet', closet: badDoor })).toThrow();
   });
 
   it('accepts user measurements on the room', () => {

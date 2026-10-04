@@ -44,6 +44,33 @@ function item(id: string, x: number, y: number, extra: Partial<PlacedItem> = {})
   };
 }
 
+describe('validatePlan: project kind', () => {
+  const closet: NonNullable<Project['closet']> = {
+    widthMm: 1830,
+    heightMm: 2440,
+    depthMm: 610,
+    opening: { style: 'bifold', leftMm: 0, widthMm: 1830 },
+    components: [],
+  };
+
+  it('accepts a closet project with a closet', () => {
+    expect(validatePlan(newProject({ kind: 'closet', closet })).valid).toBe(true);
+  });
+
+  it('rejects a closet project without a closet', () => {
+    expect(validatePlan(newProject({ kind: 'closet' })).errors).toContain('closet project has no closet');
+  });
+
+  it('rejects closet data on a kitchen', () => {
+    expect(validatePlan(newProject({ closet })).errors).toContain('only closet projects can have a closet');
+  });
+
+  it('reports the closet’s own errors', () => {
+    const bad = { ...closet, opening: { ...closet.opening, widthMm: 5000 } };
+    expect(validatePlan(newProject({ kind: 'closet', closet: bad })).valid).toBe(false);
+  });
+});
+
 describe('validatePlan', () => {
   it('returns valid for a clean project', () => {
     const r = validatePlan(newProject());
