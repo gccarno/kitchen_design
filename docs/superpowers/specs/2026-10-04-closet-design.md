@@ -1,6 +1,6 @@
 # Closet Design: Reach-In Closet Elevation Editor (Design Spec)
 
-Date: 2026-10-04 · Status: approved design, awaiting spec review
+Date: 2026-10-04 · Status: implemented (Phase 6 in `docs/plan.md`). Deviation: the elevation editor is plain SVG, not react-konva.
 
 ## Goal
 Extend the kitchen planner so it can also design **reach-in closets**. A kitchen is a top-down plan problem. A reach-in closet is a front-elevation problem: rods, shelves, towers and drawers stacked on one wall behind a door opening. So closets get their own project type and their own elevation editor.

@@ -32,6 +32,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 19 — Place items on the plan — **milestone 2 reached** (manual editor with the catalog)
 - [x] Task 20 — Chat panel + refinement endpoint (verified against OpenRouter free models)
 - [ ] **Next: Task 21 — Layout proposals**
+- [x] Phase 6 — Closets (Tasks 27–34; see below and `docs/superpowers/specs/2026-10-04-closet-design.md`)
 
 ## Decisions (locked in with user)
 
@@ -714,6 +715,33 @@ The e2e test must mock the LLM HTTP call.
 > ✅ Done. `tests/e2e/happy-path.spec.ts` runs the whole journey in one test: new project → upload the synthetic `fixtures/kitchen-photo.jpg` → measured wall ("sink wall", 4000 mm) → "Get room from photos" → review and Apply → place a base cabinet → download the SVG and check it. The extract response is mocked in the browser (the e2e server has no LLM key); its patch is built with `planToJsonPatch` from the saved project. The real endpoint → provider path stays covered by `tests/integration/dev-server.test.ts`. Manual walkthrough: `docs/testing-guide.md`.
 
 Commit: `test: e2e happy path`.
+
+---
+
+## Phase 6 — Closets (tasks 27–34)
+
+Reach-in closets as a second project kind, designed on a front elevation. Design: `docs/superpowers/specs/2026-10-04-closet-design.md`. Code: `src/lib/closet/*`, `src/components/Closet*.tsx`, `src/lib/llm/closet.ts`.
+
+### Task 27: Project kind + closet schema
+> ✅ Done. `ProjectSchema` gets an optional `kind` (`'kitchen'` when absent, so old projects load unchanged) and a `closet` (size, door opening, components). `validatePlan` requires a closet exactly on closet projects. `/closet/**` joins the patch allowlist (`/kind` stays non-editable). `createProject` / `POST /api/projects` take `kind`; a closet starts 1830 × 2440 × 610 with a full-width bifold opening, and its room is its footprint.
+
+### Task 28: Closet catalog + validation
+> ✅ Done. `closet/catalog.ts`: eight generic component kinds with standard sizes. `closet/validate.ts`: errors (outside the closet, too deep, bad counts, opening past the side) and warnings (overlapping boxes, a shelf through a box, 950 mm garment drop below rods, 50 mm hanger clearance, drawers behind the doors' stack-back or across sliding-door halves, things hidden over 300 mm past the opening, shelves above 2200 mm, non-standard widths).
+
+### Task 29: Closet commands
+> ✅ Done. `closet/commands.ts`: `setClosetSize`, `setOpening`, `add/move/resize/removeComponent` (refs c1…), `renameProject` → patch; components are clamped inside the closet; a full-width opening follows width changes. `closet/changes.ts` describes closet edits for the diff preview.
+
+### Task 30: Elevation drawing + export
+> ✅ Done. `closet/drawing.ts` produces plain shapes shared by `closetToSvg` (dimensioned 1:50 export; PNG via the same rasterizer) and the `ClosetElevation` React SVG used by the project list (with a "Closet" badge) and the diff preview.
+
+### Task 31–32: Closet editor
+> ✅ Done. `ClosetEditor` (elevation, palette, selected-component details with exact sizes, size and doors form) and `ClosetElevationCanvas` (tap to place, drag to move with edge/grid snapping, side handles to resize). Plain SVG rather than Konva: the closet is small enough to need no pan/zoom, and SVG is testable in jsdom. Interaction math is pure in `closet/canvas.ts`.
+
+### Task 33: Closet chat
+> ✅ Done. `/refine` routes closet projects to `refineCloset` (`llm/closet.ts`): the closet as text (incl. where drawers clear the doors and current problems), a closet-design prompt with US standard heights, and the closet command compiler with the usual one retry.
+
+### Task 34: Naming + e2e
+> ✅ Done. The app is "Home Design". `tests/e2e/closet.spec.ts` covers create → place → drag → warnings → undo → export → list card, and size/doors → reviewed chat edit.
 
 ---
 
