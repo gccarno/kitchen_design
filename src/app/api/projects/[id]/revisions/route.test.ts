@@ -65,6 +65,8 @@ describe('POST /api/projects/[id]/revisions', () => {
   it.each([
     ['missing baseRevision', { patch: [], summary: 's' }],
     ['patch not an array', { baseRevision: 0, patch: {}, summary: 's' }],
+    ['empty patch', { baseRevision: 0, patch: [], summary: 's' }],
+    ['summary too long', { baseRevision: 0, patch: rename('x'), summary: 's'.repeat(501) }],
     ['bad op', { baseRevision: 0, patch: [{ op: 'explode', path: '/name' }], summary: 's' }],
     ['not JSON', 'nope'],
   ])('returns 400 for a malformed body (%s)', async (_label, body) => {

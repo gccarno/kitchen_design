@@ -163,6 +163,25 @@ describe('DiffPreview', () => {
     expect((screen.getByRole('button', { name: /apply/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('blocks Apply when the result would fail plan validation (e.g. an item left outside the room)', () => {
+    const withFridge: Project = {
+      ...current,
+      items: [{ id: 'f', catalogId: 'fridge-600', sizeMm: { w: 600, d: 650, h: 1850 }, position: { x: 2500, y: 3500 }, rotationDeg: 0 }],
+    };
+    const onApplied = vi.fn();
+    render(
+      <DiffPreview
+        projectId={ID}
+        current={withFridge}
+        proposal={llmProposal({ patch: planToJsonPatch(withFridge, { ...withFridge, room: newRoom }) })}
+        onApplied={onApplied}
+        onDiscard={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('alert').textContent).toMatch(/"fridge-600" is outside the room/);
+    expect((screen.getByRole('button', { name: /apply/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('says so when a proposal changes nothing', () => {
     setup(llmProposal({ patch: [] }));
     expect(screen.getByText(/no changes/i)).not.toBeNull();

@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import PlanThumbnail from './PlanThumbnail';
 import { describePlanChanges } from '@/lib/plan/changes';
 import { validatePatchOnProject } from '@/lib/plan/diff';
+import { validatePlan } from '@/lib/plan/validate';
 import { polygonBounds, type Bounds, type Point } from '@/lib/plan/geometry';
 import type { Project } from '@/lib/plan/schemas';
 import type { Proposal } from '@/lib/plan/proposal';
@@ -34,6 +35,8 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
   const inFlight = useRef(false);
 
   const preview = useMemo(() => validatePatchOnProject(current, proposal.patch), [current, proposal.patch]);
+  // The same check the server runs on commit, so Apply isn't offered for a change it would refuse.
+  const planErrors = useMemo(() => (preview.ok ? validatePlan(preview.value).errors : []), [preview]);
   const changes = useMemo(() => (preview.ok ? describePlanChanges(current, preview.value) : []), [current, preview]);
   const bounds = useMemo(
     () => (preview.ok ? unionBounds(current.room.polygon, preview.value.room.polygon) : undefined),
@@ -54,7 +57,12 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
     }
   }
 
-  const canApply = preview.ok && proposal.patch.length > 0 && status.state !== 'applying' && status.state !== 'stale';
+  const canApply =
+    preview.ok &&
+    planErrors.length === 0 &&
+    proposal.patch.length > 0 &&
+    status.state !== 'applying' &&
+    status.state !== 'stale';
 
   return (
     <section className="flex flex-col gap-4 rounded border p-4" aria-label="Review proposed change">
@@ -111,6 +119,16 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
         </>
       )}
 
+      {planErrors.length > 0 && (
+        <div role="alert" className="text-sm text-red-700">
+          <p>This change would leave the plan invalid, so it can’t be applied as-is:</p>
+          <ul className="list-disc pl-5">
+            {planErrors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {status.state === 'stale' && (
         <p role="alert" className="text-sm text-amber-700">
           The plan changed since this was proposed. Discard it and run it again.

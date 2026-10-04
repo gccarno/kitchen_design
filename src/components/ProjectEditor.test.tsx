@@ -171,12 +171,23 @@ describe('ProjectEditor', () => {
   it('reports a rejected canvas edit back to the canvas', async () => {
     render(<ProjectEditor initialProject={project} />);
     fetchMock.mockResolvedValueOnce(json({ error: 'edit would leave the plan invalid' }, 400));
+    const moved: Room = { ...project.room, polygon: [[50, 0], ...project.room.polygon.slice(1)] };
     let result: string | null = null;
     await act(async () => {
-      result = await editRoom(project.room, 'Move corner 1');
+      result = await editRoom(moved, 'Move corner 1');
     });
     expect(result).toMatch(/invalid/);
     expect(screen.getByText(/revision 0/i)).not.toBeNull();
+  });
+
+  it('does not save a canvas edit that changes nothing', async () => {
+    render(<ProjectEditor initialProject={project} />);
+    let result: string | null = 'unset';
+    await act(async () => {
+      result = await editRoom(project.room, 'Move corner 1');
+    });
+    expect(result).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('picking a catalog item arms placement on the canvas; picking it again cancels', () => {

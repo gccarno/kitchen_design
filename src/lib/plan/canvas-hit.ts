@@ -62,7 +62,16 @@ export function hitTest(room: Room, v: Viewport, screen: Point, tolerancePx: num
   return null;
 }
 
-const LEVEL_ORDER = { wall: 0, counter: 1, floor: 2 } as const;
+/** How far (screen px) a pointer must travel before a press becomes a drag: taps jitter, fingers more than mice. */
+export const DRAG_SLOP_PX = { mouse: 4, touch: 10 } as const;
+
+/** True once a press that began at `start` has moved far enough to count as a drag rather than a tap. */
+export function isDragGesture(start: Point, now: Point, pointerType: string): boolean {
+  const slop = pointerType === 'touch' ? DRAG_SLOP_PX.touch : DRAG_SLOP_PX.mouse;
+  return Math.hypot(now[0] - start[0], now[1] - start[1]) >= slop;
+}
+
+const LEVEL_ORDER ={ wall: 0, counter: 1, floor: 2 } as const;
 
 /**
  * Ids of the items whose footprint contains world point `p`, topmost first:

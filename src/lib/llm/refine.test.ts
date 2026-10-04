@@ -5,7 +5,7 @@ import { LLMResponseError } from './openai-compatible';
 import type { LLMProvider } from './provider';
 import { loadCatalog } from '../catalog/loader';
 import { commitRevision } from '../plan/diff';
-import { ProjectSchema, type Project } from '../plan/schemas';
+import { ProjectSchema, SUMMARY_MAX_LENGTH, type Project } from '../plan/schemas';
 
 const catalog = loadCatalog();
 
@@ -159,5 +159,14 @@ describe('refinePlan', () => {
   it('fills in a summary when the model leaves it empty', async () => {
     const r = await run(new StubProvider([{ commands: moveFridgeNorth.commands }]));
     expect(r.summary).toBe('Chat edit: move the fridge to the north wall');
+  });
+
+  it('clips long summaries so the revisions endpoint accepts them', async () => {
+    const long = await run(new StubProvider([{ ...moveFridgeNorth, summary: 'x'.repeat(800) }]));
+    expect(long.summary).toHaveLength(SUMMARY_MAX_LENGTH);
+    expect(long.summary.endsWith('…')).toBe(true);
+
+    const fromMessage = await run(new StubProvider([{ commands: moveFridgeNorth.commands }]), 'm'.repeat(1000));
+    expect(fromMessage.summary.length).toBeLessThanOrEqual(SUMMARY_MAX_LENGTH);
   });
 });

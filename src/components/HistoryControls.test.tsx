@@ -106,6 +106,18 @@ describe('HistoryControls', () => {
     expect(JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)).toMatchObject({ action: 'undo' });
   });
 
+  it('sends one request when Ctrl+Z repeats before the save returns', async () => {
+    let resolve!: (r: Response) => void;
+    fetchMock.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    render(<HistoryControls project={renamed} onSaved={vi.fn()} />);
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true, repeat: true });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolve(json({ project: undoRedo(renamed, 'undo', 1, at) }));
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('shows why an undo failed', async () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'stale', currentRevision: 5 }, 409));
     render(<HistoryControls project={renamed} onSaved={vi.fn()} />);

@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { newId } from '@/lib/id';
 import type { CatalogItem } from '@/lib/catalog/schema';
-import { hitTest, itemsAt } from '@/lib/plan/canvas-hit';
+import { hitTest, isDragGesture, itemsAt } from '@/lib/plan/canvas-hit';
 import { polygonBounds, snapToGrid, type Point } from '@/lib/plan/geometry';
 import {
   addOpening,
@@ -62,8 +62,10 @@ type Selection =
   | { kind: 'opening'; id: string }
   | { kind: 'item'; id: string }
   | null;
-type Drag = { pointerId: number; moved: boolean } & (
-  | { kind: 'corner'; index: number }
+/** `start`: screen point of the press; it only becomes a drag (`moved`) past the slop. */
+type Drag = { pointerId: number; moved: boolean; start: Point } & (
+  /** `grab`: corner minus the grab point, so the corner doesn't jump to the pointer. */
+  | { kind: 'corner'; index: number; grab: Point }
   | { kind: 'opening-end'; id: string; edge: 'start' | 'end' }
   /** `grabMm`: where along the opening it was grabbed, so it doesn't jump. */
   | { kind: 'opening-move'; id: string; grabMm: number }
@@ -226,6 +228,7 @@ export default function FloorPlanCanvas({
         drag.current = {
           pointerId: e.pointerId,
           moved: false,
+          start: at,
           kind: 'item',
           id,
           grab: [it.position.x - world[0], it.position.y - world[1]],
@@ -284,19 +287,22 @@ export default function FloorPlanCanvas({
 
     const hit = hitTest(room, v, at, tolerance);
     if (hit?.kind === 'vertex') {
-      drag.current = { pointerId: e.pointerId, moved: false, kind: 'corner', index: hit.index };
+      const corner = room.polygon[hit.index];
+      const world = screenToWorld(v, at);
+      const grab: Point = [corner[0] - world[0], corner[1] - world[1]];
+      drag.current = { pointerId: e.pointerId, moved: false, start: at, kind: 'corner', index: hit.index, grab };
       setSelected({ kind: 'corner', index: hit.index });
       return true;
     }
     if (hit?.kind === 'opening-end') {
-      drag.current = { pointerId: e.pointerId, moved: false, kind: 'opening-end', id: hit.id, edge: hit.edge };
+      drag.current = { pointerId: e.pointerId, moved: false, start: at, kind: 'opening-end', id: hit.id, edge: hit.edge };
       setSelected({ kind: 'opening', id: hit.id });
       return true;
     }
     if (hit?.kind === 'opening') {
       const o = room.openings.find((x) => x.id === hit.id)!;
       const grabMm = alongWallMm(room, wallIndexOf(room, o.wallId), screenToWorld(v, at)) - o.positionMm;
-      drag.current = { pointerId: e.pointerId, moved: false, kind: 'opening-move', id: hit.id, grabMm };
+      drag.current = { pointerId: e.pointerId, moved: false, start: at, kind: 'opening-move', id: hit.id, grabMm };
       setSelected({ kind: 'opening', id: hit.id });
       return true;
     }
@@ -313,8 +319,13 @@ export default function FloorPlanCanvas({
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const d = drag.current;
     if (d && d.pointerId === e.pointerId && viewport) {
-      const world = screenToWorld(viewport, local(e));
-      d.moved = true;
+      const at = local(e);
+      // A tap jitters a pixel or two; that must not move (and save) anything.
+      if (!d.moved) {
+        if (!isDragGesture(d.start, at, e.pointerType)) return;
+        d.moved = true;
+      }
+      const world = screenToWorld(viewport, at);
       if (d.kind === 'item') {
         const it = items.find((x) => x.id === d.id);
         if (!it) return;
@@ -331,7 +342,8 @@ export default function FloorPlanCanvas({
         return;
       }
       if (d.kind === 'corner') {
-        setDraft({ room: moveVertex(room, d.index, snap ? snapToGrid(world, SNAP_MM) : world), items });
+        const p: Point = [world[0] + d.grab[0], world[1] + d.grab[1]];
+        setDraft({ room: moveVertex(room, d.index, snap ? snapToGrid(p, SNAP_MM) : p), items });
         return;
       }
       const o = room.openings.find((x) => x.id === d.id);

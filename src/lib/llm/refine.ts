@@ -8,7 +8,7 @@
 import { newId } from '../id';
 import type { Catalog } from '../catalog/loader';
 import { CommandError, compileCommands, type Command } from '../plan/commands';
-import type { JsonPatchOp, Project } from '../plan/schemas';
+import { SUMMARY_MAX_LENGTH, type JsonPatchOp, type Project } from '../plan/schemas';
 import { validatePlan } from '../plan/validate';
 import { LLMResponseError } from './openai-compatible';
 import { describeCatalogForLLM, describePlanForLLM } from './plan-context';
@@ -68,7 +68,8 @@ export async function refinePlan(input: RefineInput): Promise<RefineResult> {
       return {
         commands: answer.commands,
         patch,
-        summary: answer.summary.trim() || (answer.commands.length ? `Chat edit: ${message}` : ''),
+        // Clipped: the revisions endpoint refuses longer summaries, so Apply would fail.
+        summary: clip(answer.summary.trim() || (answer.commands.length ? `Chat edit: ${message}` : ''), SUMMARY_MAX_LENGTH),
         reply: answer.reply.trim(),
         warnings: validatePlan(next).warnings.filter((w) => !before.has(w)),
         baseRevision: project.revision,
@@ -80,4 +81,8 @@ export async function refinePlan(input: RefineInput): Promise<RefineResult> {
     }
   }
   throw new RefinementError(issues);
+}
+
+function clip(s: string, max: number): string {
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }

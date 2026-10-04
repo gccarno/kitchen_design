@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isValidProjectId, projectExists, resolveDataDir, updateProject } from '@/lib/storage/projects';
 import { commitRevision, InvalidPatchError, StaleRevisionError } from '@/lib/plan/diff';
-import { JsonPatchOpSchema } from '@/lib/plan/schemas';
+import { JsonPatchOpSchema, SUMMARY_MAX_LENGTH } from '@/lib/plan/schemas';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,8 +11,9 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const CommitSchema = z.object({
   baseRevision: z.number().int().nonnegative(),
-  patch: z.array(JsonPatchOpSchema),
-  summary: z.string().max(500),
+  // An empty patch would only add a no-op entry to the undo history.
+  patch: z.array(JsonPatchOpSchema).min(1),
+  summary: z.string().max(SUMMARY_MAX_LENGTH),
   /** Who proposed the edit. The user has confirmed it either way. */
   source: z.enum(['user', 'llm']).default('user'),
 });

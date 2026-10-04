@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hitTest, itemsAt } from './canvas-hit';
+import { DRAG_SLOP_PX, hitTest, isDragGesture, itemsAt } from './canvas-hit';
 import type { PlacedItem } from './schemas';
 import type { Room } from './schemas';
 import type { Viewport } from './viewport';
@@ -69,6 +69,15 @@ describe('hitTest', () => {
       };
       expect(hitTest(atCorner, v, [50, 50], 12)).toEqual({ kind: 'vertex', index: 0 });
     });
+  });
+});
+
+describe('isDragGesture', () => {
+  it('treats small jitter as a tap, with more slack for fingers than for a mouse', () => {
+    expect(isDragGesture([100, 100], [101, 102], 'mouse')).toBe(false);
+    expect(isDragGesture([100, 100], [100 + DRAG_SLOP_PX.mouse, 100], 'mouse')).toBe(true);
+    expect(isDragGesture([100, 100], [106, 100], 'touch')).toBe(false);
+    expect(isDragGesture([100, 100], [100, 100 + DRAG_SLOP_PX.touch], 'touch')).toBe(true);
   });
 });
 
