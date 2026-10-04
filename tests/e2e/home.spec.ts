@@ -3,7 +3,7 @@ import { createProject } from './helpers';
 
 test('home page lists projects and creates one', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Kitchen Design' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Home Design' })).toBeVisible();
 
   const name = `Home test ${Date.now()}`;
   await page.getByLabel('New project name').fill(name);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ChatPanel from './ChatPanel';
 import ClosetElevationCanvas from './ClosetElevationCanvas';
 import HistoryControls from './HistoryControls';
@@ -39,6 +39,7 @@ export default function ClosetEditor({ project, onSaved, onProposal }: ClosetEdi
   const [placing, setPlacing] = useState<ClosetComponentKind | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const closetRef = useRef<HTMLElement>(null);
   const warnings = useMemo(() => validatePlan(project).warnings, [project]);
   const selectedIndex = closet.components.findIndex((c) => c.id === selectedId);
   const selected = selectedIndex >= 0 ? closet.components[selectedIndex] : undefined;
@@ -76,7 +77,7 @@ export default function ClosetEditor({ project, onSaved, onProposal }: ClosetEdi
 
   return (
     <>
-      <section className="flex flex-col gap-2">
+      <section ref={closetRef} className="flex scroll-mt-4 flex-col gap-2">
         <h2 className="text-lg font-semibold">Closet</h2>
         <HistoryControls project={project} onSaved={onSaved} />
         <ClosetElevationCanvas
@@ -153,6 +154,8 @@ export default function ClosetEditor({ project, onSaved, onProposal }: ClosetEdi
               onClick={() => {
                 setPlacing((p) => (p === kind ? null : kind));
                 setSelectedId(null);
+                // The closet is above the palette: bring it into view for the tap.
+                closetRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
               }}
             >
               {CLOSET_COMPONENTS[kind].name}

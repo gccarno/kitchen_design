@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Kitchen Design',
-  description: 'Design a kitchen with the help of an LLM.',
+  title: 'Home Design',
+  description: 'Design a kitchen or a closet with the help of an LLM.',
   // Installable on a phone: the manifest and icons live in /public.
   manifest: '/manifest.json',
   icons: { icon: '/icons/icon-192.png', apple: '/icons/apple-touch-icon.png' },
-  appleWebApp: { capable: true, title: 'Kitchen', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'Home Design', statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {

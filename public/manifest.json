@@ -1,7 +1,7 @@
 {
-  "name": "Kitchen Design",
-  "short_name": "Kitchen",
-  "description": "Photos and a tape measure in, an editable kitchen floor plan out.",
+  "name": "Home Design",
+  "short_name": "Home Design",
+  "description": "Plan a kitchen from photos and a tape measure, or lay out a closet.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -13,7 +13,7 @@ const manifest = JSON.parse(readFileSync(join(pub, 'manifest.json'), 'utf8')) as
 
 describe('PWA manifest', () => {
   it('is installable: name, start URL, standalone display', () => {
-    expect(manifest).toMatchObject({ name: 'Kitchen Design', start_url: '/', display: 'standalone' });
+    expect(manifest).toMatchObject({ name: 'Home Design', start_url: '/', display: 'standalone' });
   });
 
   it('has 192 and 512 px icons, plus a maskable one, and every icon file exists at the size it claims', async () => {

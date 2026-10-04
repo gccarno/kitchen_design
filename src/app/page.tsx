@@ -10,8 +10,8 @@ export default function Home() {
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-8 p-4 sm:p-8">
       <header className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold">Kitchen Design</h1>
-        <p className="text-gray-600">Photos and a tape measure in, an editable floor plan out.</p>
+        <h1 className="text-3xl font-semibold">Home Design</h1>
+        <p className="text-gray-600">Kitchens: photos and a tape measure in, an editable floor plan out. Closets: lay out rods, shelves and drawers on a front view.</p>
       </header>
 
       <NewProjectForm />

@@ -16,7 +16,7 @@ function find(id: string) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const project = find((await params).id);
-  return { title: project ? `${project.name} · Kitchen Design` : 'Project not found' };
+  return { title: project ? `${project.name} · Home Design` : 'Project not found' };
 }
 
 export default async function ProjectPage({ params }: Props) {
