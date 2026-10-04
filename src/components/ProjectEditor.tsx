@@ -57,7 +57,10 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
   // Direct edits on the canvas are committed straight away (no review step)
   // as user revisions, so they land in history for undo.
   async function editPlan(change: PlanChange, summary: string): Promise<string | null> {
-    const result = await submitRevision(project.id, proposalForPlan(project, change, summary));
+    const proposal = proposalForPlan(project, change, summary);
+    // E.g. a drag that snapped back to where it started: nothing to save.
+    if (proposal.patch.length === 0) return null;
+    const result = await submitRevision(project.id, proposal);
     if (result.ok) {
       saved(result.project);
       return null;

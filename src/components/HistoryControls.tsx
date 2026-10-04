@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { changeSummary, undoRedoState } from '@/lib/plan/history';
 import type { Project } from '@/lib/plan/schemas';
 import { submitUndo } from '@/lib/client/revisions';
@@ -15,19 +15,24 @@ const SHOWN = 20;
 export default function HistoryControls({ project, onSaved }: { project: Project; onSaved: (p: Project) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A ref, not `busy`: a second Ctrl+Z (or key repeat) can arrive before the
+  // re-render, and would otherwise send a second request on the same revision.
+  const inFlight = useRef(false);
   const { undo, redo } = undoRedoState(project.history);
 
   const run = useCallback(
     async (action: 'undo' | 'redo') => {
-      if (busy || !(action === 'undo' ? undo : redo)) return;
+      if (inFlight.current || !(action === 'undo' ? undo : redo)) return;
+      inFlight.current = true;
       setBusy(true);
       setError(null);
       const result = await submitUndo(project.id, action, project.revision);
+      inFlight.current = false;
       setBusy(false);
       if (result.ok) onSaved(result.project);
       else setError(result.stale ? 'the plan changed in another tab — reload the page' : result.error);
     },
-    [busy, undo, redo, project.id, project.revision, onSaved]
+    [undo, redo, project.id, project.revision, onSaved]
   );
 
   useEffect(() => {

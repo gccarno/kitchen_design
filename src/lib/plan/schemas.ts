@@ -108,6 +108,9 @@ const PlacedItemSchema = z.object({
   tag: z.string().optional(),
 });
 
+/** Longest revision summary the revisions endpoint accepts. */
+export const SUMMARY_MAX_LENGTH = 500;
+
 // One entry in the undo stack.
 const PlanRevisionSchema = z.object({
   revision: z.number().int().nonnegative(),
