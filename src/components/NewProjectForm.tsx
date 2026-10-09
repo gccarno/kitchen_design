@@ -14,14 +14,19 @@ export default function NewProjectForm() {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (busy || !name.trim()) return;
+    if (!name.trim()) return;
+    await submit({ name: name.trim(), kind });
+  }
+
+  async function submit(request: { name: string; kind: ProjectKind; sample?: boolean }) {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), kind }),
+        body: JSON.stringify(request),
       });
       const body = (await res.json().catch(() => ({}))) as { project?: { id: string }; error?: string };
       if (!res.ok || !body.project) throw new Error(body.error ?? `could not create project (${res.status})`);
@@ -69,6 +74,14 @@ export default function NewProjectForm() {
       </label>
       <button type="submit" className="rounded bg-black px-4 py-2 text-white disabled:opacity-40" disabled={busy || !name.trim()}>
         {busy ? 'Creating…' : 'Create project'}
+      </button>
+      <button
+        type="button"
+        className="rounded border px-4 py-2 disabled:opacity-40"
+        disabled={busy}
+        onClick={() => submit({ name: kind === 'closet' ? 'Sample cleaning closet' : 'Sample kitchen', kind, sample: true })}
+      >
+        {kind === 'closet' ? 'Try a sample cleaning closet' : 'Try a sample kitchen'}
       </button>
       {error && (
         <p role="alert" className="w-full text-sm text-red-700">

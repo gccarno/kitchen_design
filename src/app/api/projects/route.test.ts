@@ -51,6 +51,27 @@ describe('POST /api/projects', () => {
     expect(project.closet?.components).toEqual([]);
   });
 
+  it('creates a furnished sample kitchen when asked', async () => {
+    const res = await post({ name: 'Sample kitchen', sample: true });
+    expect(res.status).toBe(201);
+    const { project } = (await res.json()) as { project: Project };
+    expect(project.kind).toBe('kitchen');
+    expect(project.items.length).toBeGreaterThan(5);
+    expect(loadProject(dataDir, project.id)).toEqual(project);
+    expect(validatePlan(project).warnings).toEqual([]);
+  });
+
+  it('creates a furnished sample cleaning closet when asked', async () => {
+    const res = await post({ name: 'Sample cleaning closet', kind: 'closet', sample: true });
+    expect(res.status).toBe(201);
+    const { project } = (await res.json()) as { project: Project };
+    expect(project.kind).toBe('closet');
+    expect(project.closet?.widthMm).toBe(1219);
+    expect(project.closet?.components.length).toBeGreaterThan(3);
+    expect(loadProject(dataDir, project.id)).toEqual(project);
+    expect(validatePlan(project).warnings).toEqual([]);
+  });
+
   it.each([{}, { name: '' }, { name: '   ' }, { name: 42 }, { name: 'x', kind: 'garage' }, 'not json'])('rejects %j with 400', async (body) => {
     expect((await post(body)).status).toBe(400);
   });
