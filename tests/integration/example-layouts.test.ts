@@ -440,9 +440,14 @@ describe('example kitchens', () => {
 
 interface ClosetExample {
   name: string;
+  /** The first revision. */
   commands: ClosetCommand[];
+  /** Later revisions: more commands, or an undo of the last one. */
+  then?: Array<ClosetCommand[] | 'undo'>;
   /** Component kinds that must end up in the closet, sorted. */
   kinds: string[];
+  finalName?: string;
+  knownWarnings?: string[];
 }
 
 const CLOSETS: ClosetExample[] = [
@@ -504,16 +509,197 @@ const CLOSETS: ClosetExample[] = [
   },
 ];
 
-describe('example closets', () => {
-  it.each(CLOSETS)('$name', async ({ name, commands, kinds }) => {
-    const created = await create(name, 'closet');
-    const built = compileClosetCommands(created, commands, randomUUID).project;
-    const saved = await commit(created, built, `Fit out the ${name.toLowerCase()}`);
+const MORE_CLOSETS: ClosetExample[] = [
+  {
+    // 10' of sliding doors: double hang, drawers with a valet rod, a shelf tower, long hang and shoes.
+    name: 'Wall-to-wall sliding closet',
+    commands: [
+      { type: 'setClosetSize', widthMm: 3048, heightMm: 2438, depthMm: 610 },
+      { type: 'setOpening', style: 'sliding' },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 3048, yMm: 2134 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 900, yMm: 2057 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 900, yMm: 1067 },
+      // Drawers kept inside the left door's half.
+      { type: 'addComponent', kind: 'drawers', xMm: 900, widthMm: 600, heightMm: 1000, count: 6 },
+      { type: 'addComponent', kind: 'valet_rod', xMm: 1450, yMm: 1524 },
+      { type: 'addComponent', kind: 'tower', xMm: 1500, widthMm: 400, count: 6 },
+      { type: 'addComponent', kind: 'rod', xMm: 1900, widthMm: 1148, yMm: 1727 },
+      { type: 'addComponent', kind: 'shoe_shelf', xMm: 1900, widthMm: 1148 },
+    ],
+    kinds: ['drawers', 'rod', 'rod', 'rod', 'shelf', 'shoe_shelf', 'tower', 'valet_rod'],
+  },
+  {
+    // No doors at all: hooks for coats and bags, two shoe shelves, baskets for hats and gloves.
+    name: 'Open mudroom nook',
+    commands: [
+      { type: 'setClosetSize', widthMm: 1219, heightMm: 2438, depthMm: 457 },
+      { type: 'setOpening', style: 'open' },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1219, yMm: 1829 },
+      { type: 'addComponent', kind: 'hooks', xMm: 0, widthMm: 1219 },
+      { type: 'addComponent', kind: 'shoe_shelf', xMm: 0, widthMm: 1219, yMm: 406 },
+      { type: 'addComponent', kind: 'shoe_shelf', xMm: 0, widthMm: 1219 },
+      { type: 'addComponent', kind: 'basket', xMm: 76, widthMm: 457, yMm: 1880 },
+      { type: 'addComponent', kind: 'basket', xMm: 686, widthMm: 457, yMm: 1880 },
+    ],
+    kinds: ['basket', 'basket', 'hooks', 'shelf', 'shoe_shelf', 'shoe_shelf'],
+  },
+  {
+    // A 3' pantry behind one door: six deep shelves and a floor bin, then tidied up.
+    name: 'Pantry closet',
+    commands: [
+      { type: 'setClosetSize', widthMm: 914, heightMm: 2438, depthMm: 610 },
+      { type: 'setOpening', style: 'hinged' },
+      ...[457, 813, 1168, 1524, 1880, 2134].map((yMm): ClosetCommand => ({ type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 914, yMm, depthMm: 406 })),
+      { type: 'addComponent', kind: 'basket', xMm: 228, widthMm: 457, yMm: 0, depthMm: 406 },
+    ],
+    then: [
+      [
+        // The top shelf gets shallower so tins at the back stay visible; the bin moves left.
+        { type: 'resizeComponent', component: 'c6', depthMm: 305 },
+        { type: 'moveComponent', component: 'c7', xMm: 76 },
+        { type: 'renameProject', name: 'Walk-up pantry' },
+      ],
+    ],
+    finalName: 'Walk-up pantry',
+    kinds: ['basket', 'shelf', 'shelf', 'shelf', 'shelf', 'shelf', 'shelf'],
+  },
+  {
+    // 2' wide: hooks for brooms and mops, the floor left for the vacuum, two shelves and a basket up top.
+    name: 'Broom closet',
+    commands: [
+      { type: 'setClosetSize', widthMm: 610, heightMm: 2438, depthMm: 610 },
+      { type: 'setOpening', style: 'hinged' },
+      { type: 'addComponent', kind: 'hooks', xMm: 0, widthMm: 610 },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 610, yMm: 1829 },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 610, yMm: 2134 },
+      { type: 'addComponent', kind: 'basket', xMm: 76, widthMm: 457, yMm: 1880 },
+    ],
+    kinds: ['basket', 'hooks', 'shelf', 'shelf'],
+  },
+  {
+    // 8' bifold shared by two: double hang at each end, drawers and a shelf in the middle.
+    name: "Couple's reach-in closet",
+    commands: [
+      { type: 'setClosetSize', widthMm: 2438, heightMm: 2438, depthMm: 610 },
+      { type: 'setOpening', style: 'bifold' },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 2438, yMm: 2134 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 838, yMm: 2057 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 838, yMm: 1067 },
+      { type: 'addComponent', kind: 'drawers', xMm: 838, widthMm: 762, count: 5 },
+      { type: 'addComponent', kind: 'shelf', xMm: 838, widthMm: 762, yMm: 1219 },
+      { type: 'addComponent', kind: 'rod', xMm: 1600, widthMm: 838, yMm: 2057 },
+      { type: 'addComponent', kind: 'rod', xMm: 1600, widthMm: 838, yMm: 1067 },
+    ],
+    then: [[{ type: 'renameProject', name: 'His and hers closet' }]],
+    finalName: 'His and hers closet',
+    kinds: ['drawers', 'rod', 'rod', 'rod', 'rod', 'shelf', 'shelf'],
+  },
+  {
+    // Sliding doors, 18" deep: a tall tower in the middle, baskets in each door's half, shelves either side.
+    name: 'Sliding-door linen closet',
+    commands: [
+      { type: 'setClosetSize', widthMm: 1830, heightMm: 2438, depthMm: 457 },
+      { type: 'setOpening', style: 'sliding' },
+      { type: 'addComponent', kind: 'tower', xMm: 615, widthMm: 600, count: 8 },
+      ...[100, 1273].flatMap((xMm) => [0, 300, 600].map((yMm): ClosetCommand => ({ type: 'addComponent', kind: 'basket', xMm, widthMm: 457, yMm }))),
+      ...[0, 1215].flatMap((xMm) => [1067, 1473, 1829].map((yMm): ClosetCommand => ({ type: 'addComponent', kind: 'shelf', xMm, widthMm: 615, yMm }))),
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1830, yMm: 2134 },
+    ],
+    kinds: ['basket', 'basket', 'basket', 'basket', 'basket', 'basket', 'shelf', 'shelf', 'shelf', 'shelf', 'shelf', 'shelf', 'shelf', 'tower'],
+  },
+  {
+    // Fitted for a toddler, then rearranged for a teenager: move, resize, remove and add.
+    name: 'Kid’s closet that grows up',
+    commands: [
+      { type: 'setClosetSize', widthMm: 1524, heightMm: 2438, depthMm: 610 },
+      { type: 'setOpening', style: 'bifold' },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1524, yMm: 1829 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 900, yMm: 1067 },
+      { type: 'addComponent', kind: 'drawers', xMm: 900, widthMm: 524, heightMm: 686, count: 3 },
+      { type: 'addComponent', kind: 'hooks', xMm: 900, widthMm: 524, yMm: 1219 },
+    ],
+    then: [
+      [
+        // c1 shelf, c2 rod, c3 drawers, c4 hooks.
+        { type: 'moveComponent', component: 'c1', yMm: 2134 },
+        { type: 'moveComponent', component: 'c2', yMm: 2057 },
+        { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 900, yMm: 1067 },
+        { type: 'resizeComponent', component: 'c3', heightMm: 914, count: 4 },
+        { type: 'removeComponent', component: 'c4' },
+        { type: 'addComponent', kind: 'valet_rod', xMm: 1374, yMm: 1524 },
+        { type: 'renameProject', name: 'Teen closet' },
+      ],
+    ],
+    finalName: 'Teen closet',
+    kinds: ['drawers', 'rod', 'rod', 'shelf', 'valet_rod'],
+  },
+  {
+    // Fitted at the default 6', then remeasured at 7' and 26" deep; a bad move is undone.
+    name: 'Remeasured closet',
+    commands: [
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1830, yMm: 2134 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 1830, yMm: 2057 },
+    ],
+    then: [
+      [
+        { type: 'setClosetSize', widthMm: 2134, depthMm: 660 },
+        { type: 'resizeComponent', component: 'c1', widthMm: 2134 },
+        { type: 'resizeComponent', component: 'c2', widthMm: 2134 },
+        { type: 'addComponent', kind: 'drawers', xMm: 762, widthMm: 610 },
+      ],
+      // Sliding the drawers into the corner puts them behind the bifold door…
+      [{ type: 'moveComponent', component: 'c3', xMm: 0 }],
+      // …so that's undone.
+      'undo',
+    ],
+    kinds: ['drawers', 'rod', 'shelf'],
+  },
+  {
+    // A wardrobe whose doors are narrower than the inside: everything within reach of the opening.
+    name: 'Wardrobe with offset doors',
+    commands: [
+      { type: 'setClosetSize', widthMm: 1524, heightMm: 2438, depthMm: 610 },
+      { type: 'setOpening', style: 'hinged', leftMm: 152, widthMm: 1219 },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1524, yMm: 2134 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 762, yMm: 1727 },
+      { type: 'addComponent', kind: 'shoe_shelf', xMm: 0, widthMm: 762 },
+      { type: 'addComponent', kind: 'drawers', xMm: 812, widthMm: 508, count: 4 },
+      { type: 'addComponent', kind: 'shelf', xMm: 762, widthMm: 762, yMm: 1371 },
+      { type: 'addComponent', kind: 'hooks', xMm: 1321, widthMm: 203 },
+    ],
+    kinds: ['drawers', 'hooks', 'rod', 'shelf', 'shelf', 'shoe_shelf'],
+  },
+  {
+    // 9' ceiling: a twelve-shelf tower and a storage shelf up high, which needs a step stool.
+    name: 'High-ceiling closet',
+    commands: [
+      { type: 'setClosetSize', heightMm: 2743 },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1830, yMm: 2438 },
+      { type: 'addComponent', kind: 'shelf', xMm: 0, widthMm: 1373, yMm: 2134 },
+      { type: 'addComponent', kind: 'rod', xMm: 0, widthMm: 1373, yMm: 2057 },
+      { type: 'addComponent', kind: 'tower', xMm: 1373, widthMm: 457, heightMm: 2438, count: 12 },
+    ],
+    kinds: ['rod', 'shelf', 'shelf', 'tower'],
+    knownWarnings: ['Shelf c1 is 2438 mm up: you’ll need a step stool'],
+  },
+];
 
+describe('example closets', () => {
+  it.each([...CLOSETS, ...MORE_CLOSETS])('$name', async ({ name, commands, then = [], kinds, finalName, knownWarnings }) => {
+    const created = await create(name, 'closet');
+    let saved = await commit(created, compileClosetCommands(created, commands, randomUUID).project, `Fit out the ${name.toLowerCase()}`);
     expect(saved.revision).toBe(1);
+
+    for (const [k, step] of then.entries()) {
+      const before = saved;
+      saved = step === 'undo' ? await undo(saved) : await commit(saved, compileClosetCommands(saved, step, randomUUID).project, `Step ${k + 2}`);
+      expect(saved.revision).toBe(before.revision + 1);
+    }
+
     expect(saved.closet!.components.map((c) => c.kind).sort()).toEqual(kinds);
     expect(saved.room.polygon).toEqual(rect(saved.closet!.widthMm, saved.closet!.depthMm));
-    expectClean(saved);
+    expect(saved.name).toBe(finalName ?? name);
+    expectClean(saved, knownWarnings);
   });
 
   it('the built-in sample cleaning closet', async () => {
