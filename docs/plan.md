@@ -33,7 +33,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 20 — Chat panel + refinement endpoint (verified against OpenRouter free models)
 - [ ] **Next: Task 21 — Layout proposals**
 - [x] Phase 6 — Closets (Tasks 27–34; see below and `docs/superpowers/specs/2026-10-04-closet-design.md`)
-- [ ] Phase 7 — Example layouts and the two layout bugs they found (Tasks 35–39; see below)
+- [x] Phase 7 — Example layouts and the layout bugs they found (Tasks 35–39; see below)
 
 ## Decisions (locked in with user)
 
@@ -751,18 +751,30 @@ Reach-in closets as a second project kind, designed on a front elevation. Design
 `tests/integration/example-layouts.test.ts` builds example kitchens and closets through the real create and revisions routes and expects each to reload valid with **no warnings**. Building the first seven surfaced two bugs; this phase fixes them and widens the gallery to exercise every command, opening style, component kind and most catalog items.
 
 ### Task 35: Runs keep side clearance
+> ✅ Done.
+
 `packRun` packs pieces back to back, so a fridge (50 mm side clearance) in a run lands tight against its neighbour and always warns, and so does a run that starts in a corner. Fix: a piece with `clearanceMm.sides` reserves that gap on both sides (against walls, neighbours and existing items); existing items with side clearance are padded the same way. Unit tests in `runs.test.ts`; the galley example goes back to a fridge inside the run.
 
 ### Task 36: Seats don't block tables and islands
+> ✅ Done.
+
 A table's or island's front/side clearance is where its chairs and stools go, but `validatePlan` counts them as obstructions, so any seated table warns. Fix: for an item tagged `table` or `island`, items tagged `chair` or `stool` don't block its clearance zones (walls and other furniture still do; seats still block cabinets). Unit tests in `validate.test.ts`.
 
 ### Task 37: Ten more example kitchens
+> ✅ Done — studio, long narrow, open plan for six, island with breakfast bar, a six-wall L-shaped room, a remodel (remove/move/pass-through, a mistake undone), entertainer's, an L with a corner cabinet, thick-walled cottage, rotated prep island. 51 of the 64 catalog items are used (every kind; only some size variants aren't). Building them found two more bugs, fixed:
+> - **x/y placement snapped to walls.** `addItem`/`moveItem` with x/y went through the canvas drop snapping (within depth + 300 mm of a wall → flush against it), so a table 1.2 m from a wall, or a chair beside a table, was moved and turned. Commands now place free-standing items exactly at x/y (`positionItem(…, { free: true })`); wall-mounted items still go to the nearest wall.
+> - **Corner cabinets warned in every L.** The corner base's 900 mm straight-ahead clearance pointed at the other run. Items tagged `corner` now skip that check; the runs beside it cover its access.
+
 Diverse rooms (L-shaped room, long narrow, square, big open plan, small studio, thick walls…), all three run anchors, both fridge depths and the 600 fridge, every range/hood/dishwasher/microwave/sink, the three islands, every table with seating, base/wall/tall/corner/filler cabinets, deep bases and tall uppers; follow-up revisions with `moveItem`, `rotateItem`, `removeItem`, `removeOpening`, `setWallThickness`, `renameProject`; and an undo.
 
 ### Task 38: Ten more example closets
+> ✅ Done — wall-to-wall sliding, open mudroom nook, pantry, broom closet, couple's 8' reach-in, sliding linen with tower, kid's closet refitted for a teen, remeasured closet (a mistake undone), wardrobe with offset doors, 9' high-ceiling closet. All built cleanly on the first try; the high-ceiling closet's step-stool warning is expected and asserted.
+
 Every door style (bifold, sliding, hinged, open) with offset openings, every component kind (shelf, rod, tower, drawers, shoe shelf, basket, hooks, valet rod) with counts and custom sizes, sizes from a 2' broom closet to a 10' wall, and follow-up revisions with `moveComponent`, `resizeComponent`, `removeComponent`, `setClosetSize`, `renameProject`.
 
 ### Task 39: Record results
+> ✅ Done. 28 example tests (13 kitchens, 14 closets, the sample cleaning closet), all clean. `EXAMPLES_DATA_DIR=./data npx vitest run tests/integration/example-layouts.test.ts` writes them into the app's data to browse. Known gaps, not fixed: chairs don't need room behind them to pull out; an island's back (seating side) has no clearance at all.
+
 Layouts that can't be built cleanly are noted here with the reason, not forced through.
 
 ---
