@@ -165,13 +165,13 @@ describe('compileCommands', () => {
   describe('addRun', () => {
     it('builds an L-shape on two walls without overlaps, the second run clearing the corner', () => {
       const { project: next } = run(project(), [
-        { type: 'addRun', wall: 'w1', items: ['fridge-standard-910', 'base-600x560x720', 'sink-base-800', 'dishwasher-600'] },
+        { type: 'addRun', wall: 'w1', items: ['fridge-standard-910', 'base-450x560x720', 'sink-base-800', 'dishwasher-600'] },
         { type: 'addRun', wall: 'w2', items: ['base-600x560x720', 'range-760', 'base-600x560x720'] },
         { type: 'addRun', wall: 'w1', items: ['wall-600x320x720', 'wall-800x320x720'], from: 'end' },
       ]);
       expect(next.items.map((it) => it.catalogId)).toEqual([
         'fridge-standard-910',
-        'base-600x560x720',
+        'base-450x560x720',
         'sink-base-800',
         'dishwasher-600',
         'base-600x560x720',
@@ -180,13 +180,14 @@ describe('compileCommands', () => {
         'wall-600x320x720',
         'wall-800x320x720',
       ]);
-      // w1 packs from the NW corner; the fridge is flush against it.
-      expect(next.items[0]).toMatchObject({ position: { x: 455, y: 445 }, rotationDeg: 0 });
+      // w1 packs from the NW corner; the fridge keeps its 50 mm side gap from it and from the next cabinet.
+      expect(next.items[0]).toMatchObject({ position: { x: 505, y: 445 }, rotationDeg: 0 });
+      expect(next.items[1].position.x).toBe(1235);
       // w2's run starts after the dishwasher's 580 mm depth in the NE corner.
       expect(next.items[4]).toMatchObject({ position: { x: 2720, y: 880 }, rotationDeg: 90 });
       // Wall cabinets pack from the NE end of w1, above the base cabinets.
       expect(next.items[8].position.x).toBe(2600);
-      expect(validatePlan(next).warnings.filter((w) => /overlap/.test(w))).toEqual([]);
+      expect(validatePlan(next).warnings.filter((w) => /overlap|at its sides/.test(w))).toEqual([]);
     });
 
     it('keeps a run clear of doors', () => {

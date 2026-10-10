@@ -3,7 +3,8 @@
  * cabinets. The LLM names the wall and the items in order; this does the
  * geometry, keeping clear of doors, windows (for wall cabinets and tall
  * items), items already on the wall, and runs on the neighbouring walls.
- * Pure functions.
+ * Floor items that need space at their sides (a fridge's 50 mm) keep it
+ * from walls and other floor items. Pure functions.
  */
 
 import { rotatedRectFootprint, type Point } from './geometry';
@@ -29,6 +30,7 @@ export interface RunPiece {
   catalogId: string;
   sizeMm: { w: number; d: number; h: number };
   mount: Mount;
+  clearanceMm?: { front: number; sides: number };
 }
 
 export type RunFrom = 'start' | 'end' | 'centre';
@@ -40,6 +42,10 @@ interface Obstacle {
   depth: number;
   band: Band;
   label: string;
+  /** A floor item: it blocks the floor space other items need at their sides. */
+  floor: boolean;
+  /** Floor space it needs clear at each side. */
+  sides: number;
 }
 
 const EPS = 0.5;
@@ -71,7 +77,7 @@ export function packRun(
   const wallId = room.walls[wallIndex].id;
   const obstacles: Obstacle[] = room.openings
     .filter((o) => o.wallId === wallId)
-    .map((o) => ({ from: o.positionMm, to: o.positionMm + o.widthMm, depth: 0, band: openingBand(o), label: label.opening(o) }));
+    .map((o) => ({ from: o.positionMm, to: o.positionMm + o.widthMm, depth: 0, band: openingBand(o), label: label.opening(o), floor: false, sides: 0 }));
   for (const it of items) {
     const corners = rotatedRectFootprint([it.position.x, it.position.y], it.sizeMm.w, it.sizeMm.d, it.rotationDeg);
     const alongs = corners.map(along);
@@ -85,16 +91,24 @@ export function packRun(
       depth: Math.max(0, Math.min(...perps)),
       band: bandOf(it.mount, it.sizeMm.h),
       label: label.item(it),
+      floor: (it.mount ?? 'floor') === 'floor',
+      sides: it.clearanceMm?.sides ?? 0,
     });
   }
 
   const existing = [...obstacles];
   const total = pieces.reduce((s, p) => s + p.sizeMm.w, 0);
+  /** Floor space `p` needs clear at each side. */
+  const sidesOf = (p: RunPiece) => (p.mount === 'floor' ? (p.clearanceMm?.sides ?? 0) : 0);
   const inTheWay = (p: RunPiece) => {
     const band = bandOf(p.mount, p.sizeMm.h);
     return obstacles.filter((o) => o.depth < p.sizeMm.d - EPS && clash(o.band, band));
   };
-  const overlapping = (list: Obstacle[], s: number, e: number) => list.filter((o) => o.from < e - EPS && o.to > s + EPS);
+  /** How far apart `p` and `o` must stay: either one's side gap, where floor space is at stake. */
+  const gap = (p: RunPiece, o: Obstacle) => (o.floor ? sidesOf(p) : 0) + (p.mount === 'floor' ? o.sides : 0);
+  /** Obstacles in `list` that `p`, spanning s–e, comes too close to. */
+  const overlapping = (p: RunPiece, list: Obstacle[], s: number, e: number) =>
+    list.filter((o) => o.from - gap(p, o) < e - EPS && o.to + gap(p, o) > s + EPS);
   const fail = (p: RunPiece): never => {
     // Report against what was there before this run, so the model can resize the whole run.
     const band = bandOf(p.mount, p.sizeMm.h);
@@ -122,7 +136,15 @@ export function packRun(
   const place = (k: number, s: number) => {
     const p = pieces[k];
     centres[k] = s + p.sizeMm.w / 2;
-    obstacles.push({ from: s, to: s + p.sizeMm.w, depth: 0, band: bandOf(p.mount, p.sizeMm.h), label: p.catalogId });
+    obstacles.push({
+      from: s,
+      to: s + p.sizeMm.w,
+      depth: 0,
+      band: bandOf(p.mount, p.sizeMm.h),
+      label: p.catalogId,
+      floor: p.mount === 'floor',
+      sides: sidesOf(p),
+    });
   };
 
   if (from === 'end') {
@@ -130,21 +152,25 @@ export function packRun(
     for (let k = pieces.length - 1; k >= 0; k--) {
       const p = pieces[k];
       const blockers = inTheWay(p);
-      for (let hit = overlapping(blockers, end - p.sizeMm.w, end); hit.length; hit = overlapping(blockers, end - p.sizeMm.w, end)) {
-        end = Math.min(...hit.map((o) => o.from));
+      end = Math.min(end, len - sidesOf(p));
+      for (let hit = overlapping(p, blockers, end - p.sizeMm.w, end); hit.length; hit = overlapping(p, blockers, end - p.sizeMm.w, end)) {
+        end = Math.min(...hit.map((o) => o.from - gap(p, o)));
       }
-      if (end - p.sizeMm.w < -EPS) fail(p);
+      if (end - p.sizeMm.w < sidesOf(p) - EPS) fail(p);
       place(k, end - p.sizeMm.w);
       end -= p.sizeMm.w;
     }
   } else {
-    let start = from === 'centre' ? Math.max(0, (len - total) / 2) : 0;
+    // Centring counts the gap each piece keeps at both its sides.
+    const gaps = pieces.reduce((s, p) => s + 2 * sidesOf(p), 0);
+    let start = from === 'centre' ? Math.max(0, (len - total - gaps) / 2 + sidesOf(pieces[0])) : 0;
     pieces.forEach((p, k) => {
       const blockers = inTheWay(p);
-      for (let hit = overlapping(blockers, start, start + p.sizeMm.w); hit.length; hit = overlapping(blockers, start, start + p.sizeMm.w)) {
-        start = Math.max(...hit.map((o) => o.to));
+      start = Math.max(start, sidesOf(p));
+      for (let hit = overlapping(p, blockers, start, start + p.sizeMm.w); hit.length; hit = overlapping(p, blockers, start, start + p.sizeMm.w)) {
+        start = Math.max(...hit.map((o) => o.to + gap(p, o)));
       }
-      if (start + p.sizeMm.w > len + EPS) fail(p);
+      if (start + p.sizeMm.w > len - sidesOf(p) + EPS) fail(p);
       place(k, start);
       start += p.sizeMm.w;
     });

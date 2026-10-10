@@ -92,10 +92,8 @@ const KITCHENS: KitchenExample[] = [
     commands: [
       { type: 'addOpening', wall: 'w4', kind: 'door', alongMm: 1200 },
       { type: 'addOpening', wall: 'w2', kind: 'window', alongMm: 1200, widthMm: 900 },
-      // Cleanup side. The fridge goes on its own, not in the run: a run packs it
-      // tight against its neighbour, losing its 50 mm side gap.
-      { type: 'addItem', catalogId: 'fridge-counter-depth-910', wall: 'w1', alongMm: 505 },
-      { type: 'addRun', wall: 'w1', items: ['sink-base-900', 'dishwasher-600', 'base-600x560x720'], from: 'end' },
+      // Cleanup side; the run keeps the fridge's 50 mm side gaps.
+      { type: 'addRun', wall: 'w1', items: ['fridge-counter-depth-910', 'sink-base-900', 'dishwasher-600', 'base-600x560x720'], from: 'start' },
       { type: 'addRun', wall: 'w1', items: ['wall-600x320x720', 'wall-900x320x720', 'wall-600x320x720'], from: 'end' },
       // Cooking side: range between counters, hood over it, short of the door.
       { type: 'addRun', wall: 'w3', items: ['base-900x560x720', 'range-760', 'base-900x560x720'], from: 'start' },

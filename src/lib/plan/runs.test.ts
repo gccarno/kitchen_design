@@ -21,6 +21,8 @@ const base600: RunPiece = { catalogId: 'base-600', sizeMm: { w: 600, d: 560, h: 
 const base800: RunPiece = { ...base600, catalogId: 'base-800', sizeMm: { w: 800, d: 560, h: 720 } };
 const fridge: RunPiece = { catalogId: 'fridge', sizeMm: { w: 910, d: 700, h: 1780 }, mount: 'floor' };
 const wallCab: RunPiece = { catalogId: 'wall-600', sizeMm: { w: 600, d: 320, h: 720 }, mount: 'wall' };
+/** A fridge that needs 50 mm at each side, as the catalog's do. */
+const gapFridge: RunPiece = { ...fridge, catalogId: 'gap-fridge', clearanceMm: { front: 1000, sides: 50 } };
 
 const label = { item: (it: PlacedItem) => it.id, opening: (o: Opening) => `${o.kind} ${o.id}` };
 const pack = (r: Room, items: PlacedItem[], wall: number, pieces: RunPiece[], from: 'start' | 'end' | 'centre' = 'start') =>
@@ -33,6 +35,7 @@ function onNorth(id: string, along: number, piece: RunPiece): PlacedItem {
     catalogId: piece.catalogId,
     sizeMm: piece.sizeMm,
     ...(piece.mount !== 'floor' ? { mount: piece.mount } : {}),
+    ...(piece.clearanceMm ? { clearanceMm: piece.clearanceMm } : {}),
     position: { x: along, y: piece.sizeMm.d / 2 },
     rotationDeg: 0,
   };
@@ -101,5 +104,38 @@ describe('packRun', () => {
     expect(() => pack(r, [onNorth('i2', 2400, base600)], 0, [base800, base800, base800])).toThrow(
       /add up to 2400 mm but base-800 \(800 mm\) does not fit on this 3000 mm wall: free space is 0–1000 mm and 1800–2100 mm and 2700–3000 mm \(1600 mm in total, at most 1000 mm in one piece\); in the way: door d at 1000–1800 mm, i2 at 2100–2700 mm\./
     );
+  });
+
+  describe('side clearance', () => {
+    it('keeps a fridge its side gap from the corner and from its neighbour', () => {
+      // Fridge 50–960, then 50 mm clear, then the base cabinet 1010–1610.
+      expect(pack(room(), [], 0, [gapFridge, base600])).toEqual([505, 1310]);
+    });
+
+    it('keeps the gap on both sides in the middle of a run', () => {
+      // Base 0–600, fridge 650–1560, base 1610–2210.
+      expect(pack(room(), [], 0, [base600, gapFridge, base600])).toEqual([300, 1105, 1910]);
+    });
+
+    it('keeps the gap packing from the end and when centred', () => {
+      // Fridge 2040–2950, base 1390–1990.
+      expect(pack(room(), [], 0, [base600, gapFridge], 'end')).toEqual([1690, 2495]);
+      expect(pack(room(), [], 0, [gapFridge], 'centre')).toEqual([1500]);
+    });
+
+    it('keeps clear of the gap of a fridge already on the wall', () => {
+      const items = [onNorth('f', 505, gapFridge)]; // 50–960, needs 960–1010 clear
+      expect(pack(room(), items, 0, [base600])).toEqual([1310]);
+    });
+
+    it('lets wall cabinets sit right next to a fridge: only floor space needs the gap', () => {
+      const items = [onNorth('f', 505, gapFridge)];
+      expect(pack(room(), items, 0, [wallCab])).toEqual([1260]);
+    });
+
+    it('fails when the gaps do not fit', () => {
+      const narrow = { ...room(), polygon: [[0, 0], [950, 0], [950, 4000], [0, 4000]] } as Room;
+      expect(() => pack(narrow, [], 0, [gapFridge])).toThrow(/does not fit/);
+    });
   });
 });
