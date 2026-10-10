@@ -330,6 +330,18 @@ describe('validatePlan', () => {
       expect(validatePlan(newProject({ items: [plain, item('x', 1500, 1400)] })).warnings).toEqual([]);
     });
 
+    it('lets the other arm of an L stand in front of a corner cabinet', () => {
+      // Corner base in the top-left corner; a base cabinet on the left wall just below it.
+      const corner = item('corner', 450, 450, {
+        catalogId: 'corner-base-900x900x720',
+        sizeMm: { w: 900, d: 900, h: 720 },
+        clearanceMm: { front: 900, sides: 0 },
+        tag: 'corner',
+      });
+      const arm = item('arm', 280, 1200, { rotationDeg: 90 });
+      expect(validatePlan(newProject({ items: [corner, arm] })).warnings).toEqual([]);
+    });
+
     describe('seating', () => {
       // A table for four in the middle of the room: 900–2100 × 1600–2400, 750 mm clear all round.
       const table = item('table', 1500, 2000, {

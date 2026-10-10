@@ -159,7 +159,9 @@ export function validateRoom(room: Room, items: PlacedItem[] = []): PlanValidati
     const c = it.clearanceMm;
     if (!c || poly.length < 3) continue;
     const { w, d } = it.sizeMm;
-    if (c.front > 0) {
+    // A corner cabinet opens into the inside corner and is reached from the floor in front of
+    // the two runs beside it, which their own clearances cover; straight ahead is the other run.
+    if (c.front > 0 && it.tag !== 'corner') {
       const front = zone(it, [0, d / 2 + c.front / 2], w, c.front);
       const other = blocker(front, it);
       if (other) warnings.push(`not enough room in front of ${label(it)}: ${label(other)} is in the way`);
