@@ -329,6 +329,44 @@ describe('validatePlan', () => {
       const plain = { ...goodFridge(), clearanceMm: undefined };
       expect(validatePlan(newProject({ items: [plain, item('x', 1500, 1400)] })).warnings).toEqual([]);
     });
+
+    describe('seating', () => {
+      // A table for four in the middle of the room: 900–2100 × 1600–2400, 750 mm clear all round.
+      const table = item('table', 1500, 2000, {
+        catalogId: 'table-dining-4',
+        sizeMm: { w: 1200, d: 800, h: 750 },
+        clearanceMm: { front: 750, sides: 750 },
+        tag: 'table',
+      });
+      const chair = (id: string, x: number, y: number, rotationDeg = 0): PlacedItem =>
+        item(id, x, y, { catalogId: 'chair-dining', sizeMm: { w: 450, d: 500, h: 900 }, tag: 'chair', rotationDeg });
+
+      it('lets chairs stand in a table’s clearance, front and ends', () => {
+        const chairs = [chair('c1', 1200, 2660), chair('c2', 1800, 2660), chair('c3', 640, 2000, 90), chair('c4', 2360, 2000, 270)];
+        expect(validatePlan(newProject({ items: [table, ...chairs] })).warnings).toEqual([]);
+      });
+
+      it('lets stools stand at the ends of an island', () => {
+        const island = item('island', 1500, 2000, {
+          catalogId: 'island-900',
+          sizeMm: { w: 900, d: 900, h: 900 },
+          clearanceMm: { front: 1000, sides: 1000 },
+          tag: 'island',
+        });
+        const stool = item('s1', 2160, 2000, { catalogId: 'stool-counter-650', sizeMm: { w: 400, d: 400, h: 650 }, tag: 'stool' });
+        expect(validatePlan(newProject({ items: [island, stool] })).warnings).toEqual([]);
+      });
+
+      it('still warns about other furniture in a table’s clearance', () => {
+        const r = validatePlan(newProject({ items: [table, item('cab', 1500, 2700)] }));
+        expect(r.warnings).toEqual(['not enough room in front of "table-dining-4": "base-600" is in the way']);
+      });
+
+      it('still warns about a chair in front of a cabinet or appliance', () => {
+        const r = validatePlan(newProject({ items: [goodFridge(), chair('c1', 1500, 1300)] }));
+        expect(r.warnings).toEqual(['not enough room in front of "fridge-standard-910": "chair-dining" is in the way']);
+      });
+    });
   });
 
   describe('door swing', () => {

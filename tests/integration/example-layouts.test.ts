@@ -102,7 +102,7 @@ const KITCHENS: KitchenExample[] = [
     has: ['fridge-counter-depth-910', 'sink-base-900', 'dishwasher-600', 'range-760', 'range-hood-760'],
   },
   {
-    // A single wall of cabinets and a table for two.
+    // A single wall of cabinets and a table for four.
     name: 'One-wall kitchen with dining table',
     room: rect(4200, 3600),
     commands: [
@@ -113,10 +113,12 @@ const KITCHENS: KitchenExample[] = [
       { type: 'addRun', wall: 'w1', items: ['base-450x560x720', 'sink-base-800', 'dishwasher-600', 'range-600', 'base-450x560x720'], from: 'end' },
       { type: 'addItem', catalogId: 'range-hood-760', wall: 'w1', alongMm: 3450 },
       { type: 'addItem', catalogId: 'wall-450x320x720', wall: 'w1', alongMm: 2825 },
-      // Chairs on the table's back side only: the validator wants its front and ends clear.
+      // A table for four: chairs on both long sides.
       { type: 'addItem', catalogId: 'table-dining-4', x: 1600, y: 2450 },
       { type: 'addItem', catalogId: 'chair-dining', x: 1300, y: 1800, rotationDeg: 180 },
       { type: 'addItem', catalogId: 'chair-dining', x: 1900, y: 1800, rotationDeg: 180 },
+      { type: 'addItem', catalogId: 'chair-dining', x: 1300, y: 3100 },
+      { type: 'addItem', catalogId: 'chair-dining', x: 1900, y: 3100 },
     ],
     has: ['fridge-counter-depth-910', 'sink-base-800', 'range-600', 'table-dining-4', 'chair-dining'],
   },

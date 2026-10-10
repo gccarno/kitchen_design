@@ -147,9 +147,12 @@ export function validateRoom(room: Room, items: PlacedItem[] = []): PlanValidati
 
   // --- Clearances (floor space only: wall-mounted items don't block it) ---
   const floorItems = placed.filter((p) => p.mount === 'floor');
+  // A table's or island's clearance is where its chairs and stools go, so seats don't block it.
+  const seated = (it: PlacedItem) => it.tag === 'table' || it.tag === 'island';
+  const seat = (it: PlacedItem) => it.tag === 'chair' || it.tag === 'stool';
   /** The first floor item (other than `self`) overlapping `zone`. */
   const blocker = (zone: Point[], self: PlacedItem) =>
-    floorItems.find((p) => p.item !== self && convexPolygonsOverlap(zone, p.poly))?.item;
+    floorItems.find((p) => p.item !== self && !(seated(self) && seat(p.item)) && convexPolygonsOverlap(zone, p.poly))?.item;
   const outsideRoom = (zone: Point[]) => poly.length >= 3 && !zone.every((c) => insideOrOnPerimeter(c, poly));
 
   for (const { item: it } of placed) {
