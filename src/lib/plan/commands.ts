@@ -136,7 +136,7 @@ export function compileCommands(
             return positionItem(room, cat.sizeMm, cat.mount, at, { wallIndex: i });
           }
           if (cmd.x !== undefined && cmd.y !== undefined) {
-            return positionItem(room, cat.sizeMm, cat.mount, [cmd.x, cmd.y], { rotationDeg: cmd.rotationDeg ?? 0 });
+            return positionItem(room, cat.sizeMm, cat.mount, [cmd.x, cmd.y], { rotationDeg: cmd.rotationDeg ?? 0, free: true });
           }
           return fail('needs a wall (and optionally alongMm) or x and y');
         });
@@ -172,7 +172,7 @@ export function compileCommands(
             });
           }
           if (cmd.x !== undefined && cmd.y !== undefined) {
-            return positionItem(room, it.sizeMm, it.mount ?? 'floor', [cmd.x, cmd.y], { rotationDeg: it.rotationDeg });
+            return positionItem(room, it.sizeMm, it.mount ?? 'floor', [cmd.x, cmd.y], { rotationDeg: it.rotationDeg, free: true });
           }
           return fail('needs a wall (and optionally alongMm) or x and y');
         });

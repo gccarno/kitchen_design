@@ -78,6 +78,21 @@ describe('compileCommands', () => {
     expect(next.items[0]).toMatchObject({ position: { x: 1500, y: 2000 }, rotationDeg: 0 });
   });
 
+  it('places a free-standing item exactly at x/y even close to a wall', () => {
+    // 300 mm from the bottom wall: a drop there would snap flush against it.
+    const { project: next } = run(project(), [
+      { type: 'addItem', catalogId: 'table-dining-4', x: 1500, y: 3300, rotationDeg: 90 },
+      { type: 'addItem', catalogId: 'chair-dining', x: 400, y: 2000, rotationDeg: 90 },
+    ]);
+    expect(next.items[0]).toMatchObject({ position: { x: 1500, y: 3300 }, rotationDeg: 90 });
+    expect(next.items[1]).toMatchObject({ position: { x: 400, y: 2000 }, rotationDeg: 90 });
+  });
+
+  it('still puts a wall-mounted item given x/y against the nearest wall', () => {
+    const { project: next } = run(project(), [{ type: 'addItem', catalogId: 'wall-600x320x720', x: 1500, y: 300 }]);
+    expect(next.items[0]).toMatchObject({ position: { x: 1500, y: 160 }, rotationDeg: 0 });
+  });
+
   it('moves an item to another wall, keeping its position along the room', () => {
     // Bottom wall w3 runs (3000,4000) → (0,4000).
     const { project: next } = run(project({ items: [dishwasher] }), [{ type: 'moveItem', item: 'i1', wall: 'w3' }]);
@@ -88,6 +103,11 @@ describe('compileCommands', () => {
     const rotated = { ...dishwasher, rotationDeg: 45 };
     const { project: next } = run(project({ items: [rotated] }), [{ type: 'moveItem', item: 'i1', x: 1500, y: 2000 }]);
     expect(next.items[0]).toMatchObject({ position: { x: 1500, y: 2000 }, rotationDeg: 45 });
+  });
+
+  it('moves an item to x/y close to a wall without snapping it there', () => {
+    const { project: next } = run(project({ items: [dishwasher] }), [{ type: 'moveItem', item: 'i1', x: 1500, y: 3500 }]);
+    expect(next.items[0]).toMatchObject({ position: { x: 1500, y: 3500 }, rotationDeg: 0 });
   });
 
   it('rotates (normalised to 0–359°) and removes items', () => {

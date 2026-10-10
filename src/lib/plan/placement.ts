@@ -29,7 +29,8 @@ export function positionItem(
   size: { w: number; d: number },
   mount: Mount,
   at: Point,
-  opts: { snapMm?: number; rotationDeg?: number; wallIndex?: number } = {}
+  /** `free`: put it exactly at `at`, never snapped to a wall (wall-mounted items still are). */
+  opts: { snapMm?: number; rotationDeg?: number; wallIndex?: number; free?: boolean } = {}
 ): ItemPose {
   const step = opts.snapMm ?? 0;
   // A forced wall (e.g. "against the north wall") skips the nearest-wall search.
@@ -37,9 +38,10 @@ export function positionItem(
     opts.wallIndex === undefined
       ? nearestWallPoint(room, at)
       : { wallIndex: opts.wallIndex, alongMm: alongWallMm(room, opts.wallIndex, at), distanceMm: 0 };
+  const snapToWall = opts.free && mount !== 'wall' ? false : near.distanceMm <= size.d + WALL_SNAP_MM;
   let pose: ItemPose;
 
-  if (near.distanceMm <= size.d + WALL_SNAP_MM) {
+  if (snapToWall) {
     const i = near.wallIndex;
     const n = room.polygon.length;
     const [a, b] = [room.polygon[i], room.polygon[(i + 1) % n]];
