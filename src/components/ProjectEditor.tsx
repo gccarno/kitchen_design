@@ -6,6 +6,7 @@ import CatalogSidebar from './CatalogSidebar';
 import ChatPanel from './ChatPanel';
 import ClosetEditor from './ClosetEditor';
 import DiffPreview from './DiffPreview';
+import EstimatePanel from './EstimatePanel';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
 import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
@@ -13,12 +14,12 @@ import HistoryControls from './HistoryControls';
 import LayoutCheckPanel from './LayoutCheckPanel';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
-import { proposalForPlan, proposalForRoom } from '@/lib/plan/proposal';
+import { proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
 import { checkLayout } from '@/lib/plan/layout-check';
 import { validatePlan } from '@/lib/plan/validate';
 import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
-import type { Project } from '@/lib/plan/schemas';
+import type { Pricing, Project } from '@/lib/plan/schemas';
 import { submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
 
@@ -73,6 +74,18 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
     return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
   }
 
+  // Price edits save straight away too, the same way.
+  async function savePricing(pricing: Pricing | undefined, summary: string): Promise<string | null> {
+    const proposal = proposalForPricing(project, pricing, summary);
+    if (proposal.patch.length === 0) return null;
+    const result = await submitRevision(project.id, proposal);
+    if (result.ok) {
+      saved(result.project);
+      return null;
+    }
+    return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
+  }
+
   const bounds = polygonBounds(project.room.polygon as Point[]);
   const areaM2 = polygonAreaMm2(project.room.polygon as Point[]) / 1e6;
 
@@ -112,7 +125,12 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
       )}
 
       {project.closet ? (
-        <ClosetEditor project={{ ...project, closet: project.closet }} onSaved={saved} onProposal={propose} />
+        <ClosetEditor
+          project={{ ...project, closet: project.closet }}
+          onSaved={saved}
+          onProposal={propose}
+          estimate={<EstimatePanel project={project} onSave={savePricing} />}
+        />
       ) : (
         <>
           <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2">
@@ -158,6 +176,11 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
               onPick={pickFromCatalog}
               selectedId={placingItem?.id ?? null}
             />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Estimate</h2>
+            <EstimatePanel project={project} onSave={savePricing} />
           </section>
 
           <section className="flex flex-col gap-3">

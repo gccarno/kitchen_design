@@ -83,6 +83,8 @@ describe('ProjectEditor', () => {
     expect(screen.queryByRole('heading', { name: 'Photos' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Catalog' })).toBeNull();
     expect(screen.getByRole('link', { name: 'SVG' })).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Estimate' })).not.toBeNull();
+    expect(screen.getByLabelText('Hardware each')).not.toBeNull();
   });
 
   it('offers the plan as a drawing to download', () => {
@@ -184,6 +186,26 @@ describe('ProjectEditor', () => {
     expect(result).toBeNull();
     expect(screen.getByText(/revision 1/i)).not.toBeNull();
     expect(screen.queryByRole('region', { name: /review proposed change/i })).toBeNull();
+  });
+
+  it('saves a price change in the estimate straight away as a user revision', async () => {
+    const range: PlacedItem = { id: 'r', catalogId: 'range-760', sizeMm: { w: 760, d: 650, h: 900 }, position: { x: 380, y: 325 }, rotationDeg: 0 };
+    render(<ProjectEditor initialProject={{ ...project, items: [range] }} />);
+    const pricing = { currency: 'USD', unitPrices: { 'range-760': 1200 } };
+    fetchMock.mockImplementationOnce(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string)).toMatchObject({
+        baseRevision: 0,
+        source: 'user',
+        summary: 'Set the price of Range (760 mm / 30") to $1,200.00',
+        patch: [{ op: 'add', path: '/pricing', value: pricing }],
+      });
+      return json({ project: { ...project, items: [range], pricing, revision: 1 } });
+    });
+    const input = screen.getByLabelText('Unit price: Range (760 mm / 30")');
+    fireEvent.change(input, { target: { value: '1200' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(screen.getByText(/revision 1/i)).not.toBeNull());
+    expect(screen.getByRole('button', { name: 'Reset the price of Range (760 mm / 30")' })).not.toBeNull();
   });
 
   it('reports a rejected canvas edit back to the canvas', async () => {
