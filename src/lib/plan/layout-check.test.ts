@@ -111,3 +111,100 @@ describe('checkLayout', () => {
     expect(checkLayout(kitchen([item(undefined, 900, 560, 1500, 280), wallSink])).every((r) => r.status === 'n/a')).toBe(true);
   });
 });
+
+describe('counter beside', () => {
+  it('walks through counter neighbours and stops at an appliance', () => {
+    const items = run([['range', 760, 650], ['base', 600], ['sink', 900], ['dishwasher', 600], ['base', 450], ['fridge', 910, 700, 1780], ['base', 600]]);
+    expect(counterBeside(items[2], items)).toEqual([600, 1050]);
+  });
+
+  it('counts across a fridge-sized side gap but not a 200 mm one', () => {
+    const spaced = run([['fridge', 910, 700, 1780], ['base', 600]], 0, 50);
+    expect(counterBeside(spaced[0], spaced)).toEqual([0, 600]);
+    const apart = run([['sink', 900], ['base', 600]], 0, 200);
+    expect(counterBeside(apart[0], apart)).toEqual([0, 0]);
+  });
+
+  it('gives the same lengths for a run turned 90° along the left wall, and for rotation 360', () => {
+    const items = run([['base', 600], ['sink', 900], ['base', 450]]);
+    // Rotate the run about the origin by 90° (CCW), then shift it inside the room.
+    const turned = items.map((it) => ({ ...it, rotationDeg: 90, position: { x: -it.position.y + 560, y: it.position.x } }));
+    // The run's +x now points down the wall (+y), so the 600 is still on the −x side.
+    expect(counterBeside(turned[1], turned)).toEqual([600, 450]);
+    const mixed = items.map((it, i) => (i === 0 ? { ...it, rotationDeg: 360 } : it));
+    expect(counterBeside(mixed[1], mixed)).toEqual([600, 450]);
+  });
+
+  it('counts a deeper corner cabinet whose back is in line with the run', () => {
+    const corner = item('corner', 900, 900, 450, 450);
+    const rest = run([['sink', 900], ['base', 450]], 900);
+    expect(counterBeside(rest[0], [corner, ...rest])).toEqual([900, 450]);
+  });
+});
+
+describe('landing space', () => {
+  it('sink: 600 one side and 450 the other passes; 300 one side fails', () => {
+    expect(status(run([['base', 600], ['sink', 900], ['dishwasher', 450]]), 'sink-landing')).toBe('pass');
+    expect(status(run([['base', 300], ['sink', 900], ['base', 900]]), 'sink-landing')).toBe('fail');
+  });
+
+  it('range: needs counter on both sides; a range at the end of a run fails', () => {
+    expect(status(run([['base', 300], ['range', 760, 650], ['base', 450]]), 'range-landing')).toBe('pass');
+    const end = checkLayout(kitchen(run([['range', 760, 650], ['base', 900]])));
+    expect(rule(end, 'range-landing')).toMatchObject({
+      status: 'fail',
+      detail: '0 mm and 900 mm beside "range-760" (needs 380 mm and 300 mm)',
+    });
+  });
+
+  it('passes when any one of several sinks has the space', () => {
+    const items = [...run([['sink', 900]]), ...run([['base', 600], ['sink', 900], ['base', 600]], 2000)];
+    expect(status(items, 'sink-landing')).toBe('pass');
+  });
+
+  it('fridge: counter beside it, or an island in front of it', () => {
+    expect(status(run([['fridge', 910, 700, 1780], ['base', 450]], 0, 50), 'fridge-landing')).toBe('pass');
+    expect(status(run([['fridge', 910, 700, 1780], ['tall', 600, 560, 2100]]), 'fridge-landing')).toBe('fail');
+    const f = run([['fridge', 910, 700, 1780]]);
+    expect(status([...f, item('island', 1200, 900, 455, 700 + 500 + 450)], 'fridge-landing')).toBe('pass');
+    expect(status([...f, item('island', 1200, 900, 455, 700 + 1500 + 450)], 'fridge-landing')).toBe('fail');
+  });
+
+  it('does not apply without the appliance', () => {
+    expect(status(run([['base', 600]]), 'sink-landing')).toBe('n/a');
+  });
+});
+
+describe('dishwasher next to the sink', () => {
+  it('passes when beside the sink, fails 1200 mm away, n/a without one', () => {
+    expect(status(run([['sink', 900], ['dishwasher', 600]]), 'dishwasher-sink')).toBe('pass');
+    expect(status(run([['sink', 900], ['base', 1200], ['dishwasher', 600]]), 'dishwasher-sink')).toBe('fail');
+    expect(status(run([['sink', 900]]), 'dishwasher-sink')).toBe('n/a');
+  });
+});
+
+describe('work aisle', () => {
+  /** A base run on the top wall and a facing one whose fronts are `gap` apart. */
+  const galley = (gap: number) => [...run([['base', 600], ['sink', 900]]), item('base', 1500, 560, 750, 560 + gap + 280, 180)];
+
+  it('fails facing counters 1000 mm apart and passes at 1200 mm', () => {
+    expect(status(galley(1000), 'work-aisle')).toBe('fail');
+    expect(rule(checkLayout(kitchen(galley(1000))), 'work-aisle').detail).toMatch(/^1000 mm from/);
+    expect(status(galley(1200), 'work-aisle')).toBe('pass');
+  });
+
+  it('passes a single run with nothing across from it', () => {
+    expect(rule(checkLayout(kitchen(run([['base', 600], ['sink', 900]]))), 'work-aisle').detail).toBe('no counters face each other');
+  });
+
+  it('counts an island across from the run', () => {
+    expect(status([...run([['sink', 900]]), item('island', 1800, 900, 450, 560 + 900 + 450)], 'work-aisle')).toBe('fail');
+  });
+});
+
+describe('counter frontage', () => {
+  it('adds up counter widths, as information', () => {
+    const r = rule(checkLayout(kitchen(run([['base', 1200], ['sink', 900], ['dishwasher', 600], ['range', 760, 650]]))), 'counter-frontage');
+    expect(r).toMatchObject({ status: 'fail', info: true, detail: '2700 mm of counter (guideline 3350 mm)' });
+  });
+});

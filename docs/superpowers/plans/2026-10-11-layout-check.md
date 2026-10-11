@@ -16,7 +16,7 @@
 - Only floor items count (`mount` unset or `'floor'`), and only items with a `tag`.
 - Closet projects return `[]`.
 - Existing warnings (`validatePlan`) stay unchanged.
-- Guideline numbers: triangle legs 1200–2700, total 4000–7900, sink landing 600 + 450, range landing 300 + 380, fridge landing 380 (or an island within 1200 in front), dishwasher ≤900 from the sink, aisle ≥1067, frontage ≥3350 (info).
+- Guideline numbers: triangle legs 1200–2700, total 4000–7900, sink landing 600 + 450, range landing 380 + 300, fridge landing 380 (or an island within 1200 in front), dishwasher ≤900 from the sink, aisle ≥1067, frontage ≥3350 (info).
 - Side neighbours: same rotation within 1°, fronts **or backs** lined up within 50 mm, and a gap of ≤100 mm between them. The gap allowance is wider than the spec's original 10 mm because runs keep a fridge's 50 mm side gap and the sample kitchen leaves 80 mm. The spec is updated to match.
 
 ## Review Focus
@@ -80,7 +80,7 @@ export const GUIDE = {
   totalMin: 4000,
   totalMax: 7900,
   sinkLanding: [600, 450],
-  rangeLanding: [300, 380],
+  rangeLanding: [380, 300],
   fridgeLanding: 380,
   fridgeIsland: 1200,
   dishwasher: 900,

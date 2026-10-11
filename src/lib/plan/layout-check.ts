@@ -30,7 +30,8 @@ export const GUIDE = {
   totalMin: 4000,
   totalMax: 7900,
   sinkLanding: [600, 450],
-  rangeLanding: [300, 380],
+  /** Landing: [one side, the other side], larger first. */
+  rangeLanding: [380, 300],
   fridgeLanding: 380,
   fridgeIsland: 1200,
   dishwasher: 900,
