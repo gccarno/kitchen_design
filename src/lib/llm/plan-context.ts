@@ -7,6 +7,7 @@
 import type { Catalog } from '../catalog/loader';
 import { nearestWallPoint } from '../plan/openings';
 import { rotateAround, type Point } from '../plan/geometry';
+import { checkLayout } from '../plan/layout-check';
 import type { Project } from '../plan/schemas';
 import { wallLengthMm } from '../plan/validate';
 import { inwardNormal } from '../plan/walls';
@@ -63,6 +64,13 @@ export function describePlanForLLM(project: Project, catalog: Catalog): string {
     if (it.mount && it.mount !== 'floor') line += `, ${it.mount}-mounted`;
     lines.push(line);
   });
+
+  // So "fix the layout check" has something to act on.
+  const failures = checkLayout(project).filter((rule) => rule.status === 'fail' && !rule.info);
+  if (failures.length > 0) {
+    lines.push('', 'Layout check failures (kitchen planning guidelines the plan misses):');
+    for (const rule of failures) lines.push(`- ${rule.title}: ${rule.detail}`);
+  }
 
   return lines.join('\n');
 }

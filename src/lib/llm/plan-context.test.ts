@@ -65,6 +65,19 @@ describe('describePlanForLLM', () => {
     expect(text).not.toMatch(/i2.*against/);
   });
 
+  it('adds the layout check failures, and leaves them out when nothing fails', () => {
+    // A sink jammed against a wall with nothing beside it.
+    const failing: Project = {
+      ...project,
+      items: [{ id: 's', catalogId: 'sink-base-900', tag: 'sink', sizeMm: { w: 900, d: 560, h: 870 }, position: { x: 450, y: 280 }, rotationDeg: 0 }],
+    };
+    expect(describePlanForLLM(failing, catalog)).toMatch(
+      /Layout check failures[^\n]*:\n- Counter beside the sink: 0 mm and 0 mm beside "sink-base-900"/
+    );
+    // The fixture's items have no tags, so nothing is checked and nothing fails.
+    expect(text).not.toContain('Layout check failures');
+  });
+
   it('says so when there are no items or openings', () => {
     const empty = describePlanForLLM({ ...project, items: [], room: { ...project.room, openings: [] } }, catalog);
     expect(empty).toMatch(/Openings:\n\(none\)/);
