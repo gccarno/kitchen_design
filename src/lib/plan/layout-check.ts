@@ -74,7 +74,9 @@ export function checkLayout(project: Project): LayoutRule[] {
 
 /**
  * Counter length beside `it` on each side — [−x, +x] in its own frame —
- * walking through side neighbours until something that isn't counter.
+ * walking through side neighbours until something that isn't counter. A
+ * corner cabinet joins the runs on both its walls; the counter turns there,
+ * so the walk counts it and stops.
  */
 export function counterBeside(it: PlacedItem, floor: PlacedItem[]): [number, number] {
   const walk = (dir: 1 | -1) => {
@@ -83,8 +85,9 @@ export function counterBeside(it: PlacedItem, floor: PlacedItem[]): [number, num
     const seen = new Set([it]);
     for (;;) {
       const next = floor.find((o) => !seen.has(o) && sideNeighbour(current, o, dir));
-      if (!next || !COUNTER.has(next.tag ?? '')) return total;
-      total += next.sizeMm.w;
+      if (!next || !COUNTER.has(next.tag ?? '')) return Math.round(total);
+      total += extent(footprint(next), axis(current)).size;
+      if (next.tag === 'corner') return Math.round(total);
       seen.add(next);
       current = next;
     }
@@ -262,17 +265,27 @@ function angleDiff(a: number, b: number): number {
   return Math.abs(((((a - b) % 360) + 540) % 360) - 180);
 }
 
-/** `b` stands beside `a` on side `dir` of `a`'s frame, in the same run. */
+/**
+ * `b` stands beside `a` on side `dir` of `a`'s frame, in the same run. A
+ * corner cabinet (square, facing either run) may have any rotation.
+ */
 function sideNeighbour(a: PlacedItem, b: PlacedItem, dir: 1 | -1): boolean {
-  if (angleDiff(a.rotationDeg, b.rotationDeg) > ROTATION_DEG) return false;
+  if (b.tag !== 'corner' && angleDiff(a.rotationDeg, b.rotationDeg) > ROTATION_DEG) return false;
   const [u, n] = [axis(a), normal(a)];
-  const [ca, cb] = [centre(a), centre(b)];
-  const [da, db] = [a.sizeMm.d / 2, b.sizeMm.d / 2];
-  const fronts = Math.abs(dot(cb, n) + db - (dot(ca, n) + da));
-  const backs = Math.abs(dot(cb, n) - db - (dot(ca, n) - da));
+  const ca = centre(a);
+  const [along, across] = [extent(footprint(b), u), extent(footprint(b), n)];
+  const fronts = Math.abs(across.max - (dot(ca, n) + a.sizeMm.d / 2));
+  const backs = Math.abs(across.min - (dot(ca, n) - a.sizeMm.d / 2));
   if (Math.min(fronts, backs) > ALIGN_MM) return false;
-  const gap = dir * (dot(cb, u) - dot(ca, u)) - (a.sizeMm.w + b.sizeMm.w) / 2;
+  const gap = dir > 0 ? along.min - (dot(ca, u) + a.sizeMm.w / 2) : dot(ca, u) - a.sizeMm.w / 2 - along.max;
   return gap >= -ALIGN_MM && gap <= GAP_MM;
+}
+
+/** A polygon's span along a unit vector. */
+function extent(poly: Point[], dir: Point): { min: number; max: number; size: number } {
+  const ds = poly.map((p) => dot(p, dir));
+  const [min, max] = [Math.min(...ds), Math.max(...ds)];
+  return { min, max, size: max - min };
 }
 
 /** A rectangle `depth` deep straight out of the item's front, `inset` narrower at each side. */

@@ -51,11 +51,16 @@ NKBA guidelines converted to mm. A rule is `n/a` when the items it needs aren't 
 Walk outward from X, in each direction separately, through its side neighbours. Items A and B are side neighbours when all of the following hold:
 
 - both are floor items;
-- their rotations match within 1°;
-- their front faces lie on the same line within 50 mm;
-- the gap between them along that line is ≤10 mm.
+- their rotations match within 1°, unless B is a corner cabinet;
+- their front faces, or their back faces, lie on the same line within 50 mm;
+- the gap between them along that line is ≤100 mm.
 
 Neighbours tagged `base`, `corner`, `dishwasher`, `filler` or `sink` add their width. Any other neighbour (`range`, `fridge`, `tall`, …) ends the walk. X's own width isn't counted. The result is a pair of lengths, `[left, right]`.
+
+Changed during implementation:
+- **Backs as well as fronts.** Runs sit against a wall, so backs line up even when depths differ, for example a 900 mm corner cabinet or a deep fridge.
+- **A gap of up to 100 mm.** Runs keep a fridge's 50 mm side gap and the sample kitchen leaves 80 mm. That's clearance, not a break in the counter.
+- **Corner cabinets.** A corner cabinet faces the other run of an L, so any rotation is accepted. It counts toward the length, and the walk stops there because the counter turns the corner.
 
 ## UI: `src/components/LayoutCheckPanel.tsx` (new)
 

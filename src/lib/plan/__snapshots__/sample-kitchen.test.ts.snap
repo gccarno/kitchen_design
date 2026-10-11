@@ -1,0 +1,15 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildSampleKitchen > runs every layout check, the work triangle included 1`] = `
+{
+  "counter-frontage": "pass: 4200 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "pass: 1950 mm beside "fridge-counter-depth-910"",
+  "range-landing": "pass: 1950 mm and 450 mm beside "range-760" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 0 mm and 1050 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 986 mm, sink ↔ range 1880 mm, range ↔ fridge 2865 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5732 mm (4000 mm to 7900 mm)",
+  "work-aisle": "fail: 1050 mm from "sink-base-900" to "island-1800x900" (needs 1067 mm)",
+}
+`;

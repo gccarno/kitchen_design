@@ -1,0 +1,183 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`example kitchens > 'Entertainer\\'s kitchen' 1`] = `
+{
+  "counter-frontage": "pass: 7200 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "fail: 0 mm beside "fridge-600" (needs 380 mm, or an island within 1200 mm in front)",
+  "range-landing": "pass: 4200 mm and 600 mm beside "range-900" (needs 380 mm and 300 mm)",
+  "sink-landing": "pass: 1500 mm and 1800 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 5231 mm, sink ↔ range 2700 mm, range ↔ fridge 2633 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "fail: 10564 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: 1290 mm from "base-900x610x720" to "island-2400x1000" (needs 1067 mm)",
+}
+`;
+
+exports[`example kitchens > 'Family kitchen with big island' 1`] = `
+{
+  "counter-frontage": "pass: 6300 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "pass: island in front of "fridge-standard-910"",
+  "range-landing": "pass: 3300 mm and 600 mm beside "range-900" (needs 380 mm and 300 mm)",
+  "sink-landing": "pass: 1200 mm and 1200 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 4174 mm, sink ↔ range 2100 mm, range ↔ fridge 2798 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "fail: 9072 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: 1150 mm from "range-900" to "island-2400x1000" (needs 1067 mm)",
+}
+`;
+
+exports[`example kitchens > 'Galley kitchen' 1`] = `
+{
+  "counter-frontage": "pass: 3900 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "pass: 2100 mm beside "fridge-counter-depth-910"",
+  "range-landing": "pass: 900 mm and 900 mm beside "range-760" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 0 mm and 1200 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 956 mm, sink ↔ range 1972 mm, range ↔ fridge 2504 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5433 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: 1170 mm from "dishwasher-600" to "range-760" (needs 1067 mm)",
+}
+`;
+
+exports[`example kitchens > 'Island kitchen with breakfast bar' 1`] = `
+{
+  "counter-frontage": "pass: 4400 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-800" (at most 900 mm)",
+  "fridge-landing": "pass: 2200 mm beside "fridge-counter-depth-910"",
+  "range-landing": "pass: 2200 mm and 400 mm beside "range-760" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 400 mm and 1000 mm beside "sink-base-800" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 1306 mm, sink ↔ range 1780 mm, range ↔ fridge 3085 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 6171 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: 1250 mm from "sink-base-800" to "island-1800x900" (needs 1067 mm)",
+}
+`;
+
+exports[`example kitchens > 'Kitchen in an L-shaped room' 1`] = `
+{
+  "counter-frontage": "fail: 2200 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-450" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "pass: 1750 mm beside "fridge-standard-910"",
+  "range-landing": "pass: 1750 mm and 450 mm beside "range-600" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 400 mm and 450 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "pass: fridge ↔ sink 1363 mm, sink ↔ range 1200 mm, range ↔ fridge 2559 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5122 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: no counters face each other",
+}
+`;
+
+exports[`example kitchens > 'L-shaped kitchen with corner cabinet' 1`] = `
+{
+  "counter-frontage": "pass: 3450 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "pass: 1950 mm beside "fridge-standard-910"",
+  "range-landing": "fail: 0 mm and 1500 mm beside "range-760" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 0 mm and 1050 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 2010 mm, sink ↔ range 1963 mm, range ↔ fridge 3480 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 7453 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: no counters face each other",
+}
+`;
+
+exports[`example kitchens > 'Long narrow kitchen' 1`] = `
+{
+  "counter-frontage": "fail: 2400 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "pass: 450 mm beside "fridge-standard-910"",
+  "range-landing": "pass: 450 mm and 1950 mm beside "range-760" (needs 380 mm and 300 mm)",
+  "sink-landing": "pass: 450 mm and 600 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "pass: fridge ↔ sink 2619 mm, sink ↔ range 1280 mm, range ↔ fridge 1340 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5240 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: no counters face each other",
+}
+`;
+
+exports[`example kitchens > 'One-wall kitchen with dining table' 1`] = `
+{
+  "counter-frontage": "fail: 2300 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-800" (at most 900 mm)",
+  "fridge-landing": "fail: 0 mm beside "fridge-counter-depth-910" (needs 380 mm, or an island within 1200 mm in front)",
+  "range-landing": "pass: 1850 mm and 450 mm beside "range-600" (needs 380 mm and 300 mm)",
+  "sink-landing": "pass: 450 mm and 600 mm beside "sink-base-800" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 1646 mm, sink ↔ range 1300 mm, range ↔ fridge 2945 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5891 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: no counters face each other",
+}
+`;
+
+exports[`example kitchens > 'Open-plan kitchen with dining for six' 1`] = `
+{
+  "counter-frontage": "fail: 3300 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "fail: 0 mm beside "fridge-standard-910" (needs 380 mm, or an island within 1200 mm in front)",
+  "range-landing": "pass: 2600 mm and 700 mm beside "range-900" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 300 mm and 1400 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 4148 mm, sink ↔ range 2300 mm, range ↔ fridge 1849 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "fail: 8297 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: no counters face each other",
+}
+`;
+
+exports[`example kitchens > 'Remodel: one-wall to galley' 1`] = `
+{
+  "counter-frontage": "fail: 2300 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-800" (at most 900 mm)",
+  "fridge-landing": "pass: 900 mm beside "fridge-standard-910"",
+  "range-landing": "fail: 1400 mm and 0 mm beside "range-760" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 0 mm and 600 mm beside "sink-base-800" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "pass: fridge ↔ sink 1932 mm, sink ↔ range 1380 mm, range ↔ fridge 2652 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5965 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: 1110 mm from "sink-base-800" to "fridge-standard-910" (needs 1067 mm)",
+}
+`;
+
+exports[`example kitchens > 'Square kitchen with prep island' 1`] = `
+{
+  "counter-frontage": "fail: 3300 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+  "fridge-landing": "pass: 2100 mm beside "fridge-counter-depth-910"",
+  "range-landing": "fail: 2100 mm and 0 mm beside "range-600" (needs 380 mm and 300 mm)",
+  "sink-landing": "pass: 600 mm and 600 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 1556 mm, sink ↔ range 1350 mm, range ↔ fridge 2905 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5811 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: 1200 mm from "sink-base-900" to "island-1200x900" (needs 1067 mm)",
+}
+`;
+
+exports[`example kitchens > 'Studio kitchenette' 1`] = `
+{
+  "counter-frontage": "fail: 1650 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-450" to "sink-base-800" (at most 900 mm)",
+  "fridge-landing": "pass: 1650 mm beside "fridge-600"",
+  "range-landing": "fail: 1650 mm and 0 mm beside "range-600" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 400 mm and 450 mm beside "sink-base-800" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 1150 mm, sink ↔ range 1150 mm, range ↔ fridge 2300 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 4600 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: no counters face each other",
+}
+`;
+
+exports[`example kitchens > 'Thick-walled cottage kitchen' 1`] = `
+{
+  "counter-frontage": "fail: 2000 mm of counter (guideline 3350 mm)",
+  "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-800" (at most 900 mm)",
+  "fridge-landing": "fail: 0 mm beside "fridge-600" (needs 380 mm, or an island within 1200 mm in front)",
+  "range-landing": "pass: 300 mm and 1700 mm beside "range-760" (needs 380 mm and 300 mm)",
+  "sink-landing": "fail: 300 mm and 600 mm beside "sink-base-800" (needs 600 mm and 450 mm)",
+  "triangle-clear": "pass: nothing in the way",
+  "triangle-legs": "fail: fridge ↔ sink 2527 mm, sink ↔ range 1080 mm, range ↔ fridge 1607 mm (each 1200 mm to 2700 mm)",
+  "triangle-total": "pass: 5215 mm (4000 mm to 7900 mm)",
+  "work-aisle": "pass: no counters face each other",
+}
+`;

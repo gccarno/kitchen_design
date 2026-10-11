@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { loadCatalog } from '../catalog/loader';
+import { checkLayout } from './layout-check';
 import { validatePlan } from './validate';
 import { buildSampleKitchen } from './sample-kitchen';
 import type { Project } from './schemas';
@@ -45,6 +46,13 @@ describe('buildSampleKitchen', () => {
     for (const id of ['sink-base-900', 'range-760', 'dishwasher-600', 'fridge-counter-depth-910', 'range-hood-760', 'island-1800x900']) {
       expect(ids).toContain(id);
     }
+  });
+
+  it('runs every layout check, the work triangle included', () => {
+    const layout = checkLayout(sample);
+    expect(layout).toHaveLength(9);
+    expect(layout.filter((r) => r.id.startsWith('triangle-')).map((r) => r.status)).not.toContain('n/a');
+    expect(Object.fromEntries(layout.map((r) => [r.id, `${r.status}: ${r.detail}`]))).toMatchSnapshot();
   });
 
   it('has a door and a window', () => {

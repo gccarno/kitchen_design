@@ -140,6 +140,16 @@ describe('counter beside', () => {
     const rest = run([['sink', 900], ['base', 450]], 900);
     expect(counterBeside(rest[0], [corner, ...rest])).toEqual([900, 450]);
   });
+
+  it('counts a corner cabinet beside the run on the other wall of an L, and stops there', () => {
+    // Corner in the top-left; a range on the left wall (facing +x) just below it, a base below that.
+    const corner = item('corner', 900, 900, 450, 450);
+    const beyond = item('base', 600, 560, 1200, 280); // on the top wall: past the corner, not counted
+    const rangeOnLeft = item('range', 760, 650, 325, 900 + 380, 270);
+    const baseOnLeft = item('base', 600, 560, 280, 900 + 760 + 300, 270);
+    // rotation 270: the item's +x points to −y (up the wall), so the corner is on its +x side.
+    expect(counterBeside(rangeOnLeft, [corner, beyond, rangeOnLeft, baseOnLeft])).toEqual([600, 900]);
+  });
 });
 
 describe('landing space', () => {

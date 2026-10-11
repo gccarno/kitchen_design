@@ -20,6 +20,7 @@ import { compileClosetCommands, type ClosetCommand } from '@/lib/closet/commands
 import { compileCommands, type Command } from '@/lib/plan/commands';
 import type { Point } from '@/lib/plan/geometry';
 import { planToJsonPatch } from '@/lib/plan/diff';
+import { checkLayout } from '@/lib/plan/layout-check';
 import type { Project } from '@/lib/plan/schemas';
 import { validatePlan } from '@/lib/plan/validate';
 import { loadProject } from '@/lib/storage/projects';
@@ -432,6 +433,14 @@ describe('example kitchens', () => {
     for (const id of has) expect(ids).toContain(id);
     expect(saved.name).toBe(finalName ?? name);
     expectClean(saved, knownWarnings);
+
+    // The layout check: every rule runs, the triangle whenever all three are there; results recorded.
+    const layout = checkLayout(saved);
+    const tags = new Set(saved.items.map((it) => it.tag));
+    if (tags.has('fridge') && tags.has('sink') && tags.has('range')) {
+      expect(layout.find((r) => r.id === 'triangle-legs')!.status).not.toBe('n/a');
+    }
+    expect(Object.fromEntries(layout.map((r) => [r.id, `${r.status}: ${r.detail}`]))).toMatchSnapshot();
   });
 });
 

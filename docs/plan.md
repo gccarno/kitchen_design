@@ -34,6 +34,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [ ] **Next: Task 21 — Layout proposals**
 - [x] Phase 6 — Closets (Tasks 27–34; see below and `docs/superpowers/specs/2026-10-04-closet-design.md`)
 - [x] Phase 7 — Example layouts and the layout bugs they found (Tasks 35–39; see below)
+- [x] Phase 8 — Layout check against NKBA guidelines (Tasks 40–45; see below)
 
 ## Decisions (locked in with user)
 
@@ -776,6 +777,18 @@ Every door style (bifold, sliding, hinged, open) with offset openings, every com
 > ✅ Done. 28 example tests (13 kitchens, 14 closets, the sample cleaning closet), all clean. `EXAMPLES_DATA_DIR=./data npx vitest run tests/integration/example-layouts.test.ts` writes them into the app's data to browse. Known gaps, not fixed: chairs don't need room behind them to pull out; an island's back (seating side) has no clearance at all.
 
 Layouts that can't be built cleanly are noted here with the reason, not forced through.
+
+---
+
+## Phase 8 — Layout check (tasks 40–45)
+
+Sub-project 1 of 4 from the 2026-10-10 feature review (then: parts list and cost, kitchen wall elevations, design options and a spec sheet). Spec: `docs/superpowers/specs/2026-10-10-layout-check-design.md`; task-by-task plan: `docs/superpowers/plans/2026-10-11-layout-check.md`.
+
+> ✅ Done. `checkLayout` (`src/lib/plan/layout-check.ts`) checks a kitchen against nine NKBA rules — work triangle sides, total and obstructions; counter beside the sink, range and fridge; dishwasher within 900 mm of the sink; work aisle ≥ 1067 mm; total counter frontage (information only). `LayoutCheckPanel` shows them under the plan warnings ("Layout check — X of Y passed", fails first, lengths in the project's units), and `describePlanForLLM` lists the failures so the chat can fix them.
+
+Found while recording the example kitchens: a corner cabinet faces the other run of an L, so it was never counted beside the range on the far wall. Corner cabinets now join either run (and end the walk, since the counter turns there). Snapshots of every example kitchen's results, and the sample kitchen's, are kept in `__snapshots__` so a change in a rule can't flip them silently. Most example kitchens fail one or two rules — usually a fridge right beside the sink, or a one-wall triangle that's too long — which is what the guidelines say about those layouts, not a bug.
+
+Known gaps: which side a fridge opens isn't modelled (counter on either side counts); two-cook aisles (1220 mm) and seating/walkway rules aren't checked.
 
 ---
 
