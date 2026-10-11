@@ -10,9 +10,11 @@ import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
 import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
 import HistoryControls from './HistoryControls';
+import LayoutCheckPanel from './LayoutCheckPanel';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForPlan, proposalForRoom } from '@/lib/plan/proposal';
+import { checkLayout } from '@/lib/plan/layout-check';
 import { validatePlan } from '@/lib/plan/validate';
 import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
@@ -50,6 +52,7 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
     [project.items, catalog]
   );
   const warnings = useMemo(() => validatePlan(project).warnings, [project]);
+  const layout = useMemo(() => checkLayout(project), [project]);
 
   function pickFromCatalog(item: CatalogItem) {
     setPlacingItem((current) => (current?.id === item.id ? null : item));
@@ -138,6 +141,7 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
                 </ul>
               </div>
             )}
+            <LayoutCheckPanel rules={layout} units={project.units} />
           </section>
 
           <section className="flex flex-col gap-3">
