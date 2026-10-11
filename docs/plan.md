@@ -35,6 +35,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Phase 6 — Closets (Tasks 27–34; see below and `docs/superpowers/specs/2026-10-04-closet-design.md`)
 - [x] Phase 7 — Example layouts and the layout bugs they found (Tasks 35–39; see below)
 - [x] Phase 8 — Layout check against NKBA guidelines (Tasks 40–45; see below)
+- [x] Phase 9 — Parts list and cost estimate (Tasks 46–51; see below)
 
 ## Decisions (locked in with user)
 
@@ -789,6 +790,16 @@ Sub-project 1 of 4 from the 2026-10-10 feature review (then: parts list and cost
 Found while recording the example kitchens: a corner cabinet faces the other run of an L, so it was never counted beside the range on the far wall. Corner cabinets now join either run (and end the walk, since the counter turns there). Snapshots of every example kitchen's results, and the sample kitchen's, are kept in `__snapshots__` so a change in a rule can't flip them silently. Most example kitchens fail one or two rules — usually a fridge right beside the sink, or a one-wall triangle that's too long — which is what the guidelines say about those layouts, not a bug.
 
 Known gaps: which side a fridge opens isn't modelled (counter on either side counts); two-cook aisles (1220 mm) and seating/walkway rules aren't checked.
+
+---
+
+## Phase 9 — Parts list and cost estimate (tasks 46–51)
+
+Sub-project 2 of 4 from the 2026-10-10 feature review. Spec: `docs/superpowers/specs/2026-10-11-estimate-design.md`; task-by-task plan: `docs/superpowers/plans/2026-10-11-estimate.md`.
+
+> ✅ Done. `buildEstimate` (`src/lib/estimate/estimate.ts`) turns a kitchen into one line per catalog item plus a countertop line (bases, sinks, dishwashers and fillers with a 25 mm overhang; corners and islands at their footprint; m², or ft² in inch projects), and a closet into one line per kind of part (per metre, per drawer or each) plus brackets. Installation is a percentage of the parts and tax a percentage of both. Default prices (`prices.ts`) are generic ballpark USD numbers; any unit price, the rates and the currency can be changed per project. They're stored in the optional `Project.pricing` and edited through `/pricing` patches, so a price change is a revision like any other and undo works. `EstimatePanel` shows the list in both editors, and `GET /api/export/[id]/csv` downloads it (linked as "CSV" beside the drawings).
+
+Known gaps: prices are not looked up from any retailer; quantities can't be overridden; no discounts or per-item labour.
 
 ---
 

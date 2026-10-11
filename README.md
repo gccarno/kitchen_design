@@ -1,8 +1,10 @@
 # Kitchen Design App
 
-Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON and SVG/PNG.
+Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON, SVG/PNG, and a CSV parts list.
 
 A **layout check** scores the kitchen against the NKBA planning guidelines — work triangle, counter beside the sink, range and fridge, dishwasher next to the sink, aisle width — and the chat can fix what fails ("fix the layout check").
+
+An **estimate** prices the parts list — cabinets, appliances, countertop, closet parts and brackets, plus installation and tax — from rough default prices you can change per project, and exports it as CSV.
 
 It also designs **reach-in closets**: pick "Closet" for a new project and lay out rods, shelves, shelf towers, drawer units, shoe shelves, baskets, hooks and valet rods on a front view of the closet, set its size and doors (bifold, sliding, hinged or open), and get warnings about clothes hitting things, drawers the doors block, and shelves out of reach. The chat works for closets too ("double hang on the left, drawers in the middle").
 
@@ -14,6 +16,7 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (6 phases), 
 **Phase 2 — Photo capture & extraction:** in progress. Tasks 9–13 done — milestone 1: photos + measurements (or a hand sketch) → reviewed, saved room. Phase 3 in progress: Tasks 14–16 (canvas, outline editing, doors and windows) done; Tasks 17–18 (catalog: 24 appliances/fixtures/furniture + 40 generated cabinets) done; Task 19 done — milestone 2: a manual kitchen editor (outline, doors/windows, catalog items with wall snapping and clearance warnings). Phase 4 in progress: Task 20 done — ask for changes in plain words ("move the fridge to the north wall"); every edit is reviewed before it's applied.
 **Phase 6 — Closets:** done (Tasks 27–34) — reach-in closet projects with a front-elevation editor, closet warnings, chat, export, and list thumbnails.
 **Phase 8 — Layout check:** done (Tasks 40–45) — NKBA guideline checklist for kitchens, also fed to the chat.
+**Phase 9 — Estimate:** done (Tasks 46–51) — priced parts list for kitchens and closets, editable prices with undo, CSV export.
 
 ## Stack
 
