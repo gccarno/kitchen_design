@@ -239,6 +239,30 @@ describe('patch-path allowlist', () => {
     expect(p.closet?.components).toHaveLength(1);
   });
 
+  it('allows /pricing, and its inverse removes it again', () => {
+    const pricing = { currency: 'EUR', unitPrices: { 'range-760': 1200 }, installPct: 25 };
+    const before = newProject();
+    const after = commitRevision(before, [{ op: 'add', path: '/pricing', value: pricing }], {
+      baseRevision: 0,
+      source: 'user',
+      summary: 'price',
+    });
+    expect(after.pricing).toEqual(pricing);
+    const undone = applyJsonPatch(after, after.history[0].inverse);
+    expect(undone.pricing).toBeUndefined();
+  });
+
+  it('rejects a negative price, a percentage over 100, and a currency that is not 3 capital letters', () => {
+    for (const pricing of [
+      { currency: 'USD', unitPrices: { x: -1 } },
+      { currency: 'USD', unitPrices: {}, taxPct: 101 },
+      { currency: 'EU', unitPrices: {} },
+      { currency: 'usd', unitPrices: {} },
+    ]) {
+      expect(() => applyJsonPatch(newProject(), [{ op: 'add', path: '/pricing', value: pricing }])).toThrow();
+    }
+  });
+
   it('rejects move/copy whose source is outside the allowlist', () => {
     expect(() => applyJsonPatch(newProject(), [{ op: 'copy', from: '/id', path: '/name' }])).toThrow(
       /non-editable path/

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { proposalFromExtraction, proposalForPlan, proposalForRoom } from './proposal';
+import { proposalFromExtraction, proposalForPlan, proposalForPricing, proposalForRoom } from './proposal';
 import { commitRevision } from './diff';
 import { ProjectSchema, type Room } from './schemas';
 
@@ -35,6 +35,20 @@ const room: Room = {
   walls: ['w', 'x', 'y', 'z'].map((id) => ({ id, thicknessMm: 100 })),
   openings: [],
 };
+
+describe('proposalForPricing', () => {
+  it('adds, changes and removes the pricing as a user proposal', () => {
+    const pricing = { currency: 'USD', unitPrices: { 'range-760': 900 } };
+    const add = proposalForPricing(project, pricing, 'Set the price');
+    expect(add).toMatchObject({ baseRevision: 4, source: 'user', summary: 'Set the price' });
+    expect(add.patch).toEqual([{ op: 'add', path: '/pricing', value: pricing }]);
+    const withPricing = { ...project, pricing };
+    expect(proposalForPricing(withPricing, { ...pricing, taxPct: 8 }, 's').patch).toEqual([
+      { op: 'add', path: '/pricing/taxPct', value: 8 },
+    ]);
+    expect(proposalForPricing(withPricing, undefined, 's').patch).toEqual([{ op: 'remove', path: '/pricing' }]);
+  });
+});
 
 describe('proposalForRoom', () => {
   it('builds a user proposal whose patch commits to exactly that room', () => {

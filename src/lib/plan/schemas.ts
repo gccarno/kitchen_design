@@ -157,6 +157,22 @@ const ClosetSchema = z.object({
   components: z.array(ClosetComponentSchema),
 });
 
+// --- Pricing ---
+// Overrides for the parts list and estimate; anything left out uses the
+// defaults in `estimate/prices.ts`.
+const percent = z.number().min(0).max(100);
+const PricingSchema = z.object({
+  /** ISO 4217 code, e.g. 'USD'. */
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  /** Unit prices by line key: a catalog id, or `closet:<kind>`. */
+  unitPrices: z.record(z.string(), z.number().nonnegative()),
+  countertopPerM2: z.number().nonnegative().optional(),
+  installPct: percent.optional(),
+  taxPct: percent.optional(),
+  hardwareEach: z.number().nonnegative().optional(),
+});
+export type Pricing = z.infer<typeof PricingSchema>;
+
 /** What a project designs. Absent (projects from before closets) means 'kitchen'. */
 export const ProjectKindSchema = z.enum(['kitchen', 'closet']);
 export type ProjectKind = z.infer<typeof ProjectKindSchema>;
@@ -193,6 +209,8 @@ export const ProjectSchema = z.object({
   items: z.array(PlacedItemSchema),
   /** Closet projects only (`validatePlan` checks it is there exactly then). */
   closet: ClosetSchema.optional(),
+  /** Price overrides for the estimate; absent means the defaults. */
+  pricing: PricingSchema.optional(),
   history: z.array(PlanRevisionSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;
