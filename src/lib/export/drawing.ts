@@ -21,15 +21,22 @@ export function drawingFileName(project: Project, ext: string): string {
   return exportFileName(project.name, ext, projectKind(project) === 'closet' ? 'closet-elevation' : 'kitchen-plan');
 }
 
+/** The project to export, or a 400 (bad id) / 404 (unknown project) response. */
+export function loadExportProject(id: string): { project: Project } | { error: NextResponse } {
+  if (!isValidProjectId(id)) return { error: NextResponse.json({ error: 'invalid project id' }, { status: 400 }) };
+  const dataDir = resolveDataDir();
+  if (!projectExists(dataDir, id)) return { error: NextResponse.json({ error: 'project not found' }, { status: 404 }) };
+  return { project: loadProject(dataDir, id) };
+}
+
 /**
  * The project and its drawing, or an error response: a kitchen's plan (items
  * labelled with catalog names), or a closet's front elevation.
  */
 export function loadDrawing(id: string): { project: Project; svg: string } | { error: NextResponse } {
-  if (!isValidProjectId(id)) return { error: NextResponse.json({ error: 'invalid project id' }, { status: 400 }) };
-  const dataDir = resolveDataDir();
-  if (!projectExists(dataDir, id)) return { error: NextResponse.json({ error: 'project not found' }, { status: 404 }) };
-  const project = loadProject(dataDir, id);
+  const loaded = loadExportProject(id);
+  if ('error' in loaded) return loaded;
+  const { project } = loaded;
   if (projectKind(project) === 'closet') return { project, svg: closetToSvg(project) };
   const catalog = loadCatalog();
   const labels = Object.fromEntries(project.items.map((it) => [it.id, catalog.byId.get(it.catalogId)?.name ?? it.catalogId]));

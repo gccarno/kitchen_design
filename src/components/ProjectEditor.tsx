@@ -109,6 +109,10 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
           <a className="text-blue-700 underline" href={`/api/export/${project.id}/png?scale=2&rev=${project.revision}`} download>
             PNG (2×)
           </a>
+          <span className="text-gray-500">Parts list:</span>
+          <a className="text-blue-700 underline" href={`/api/export/${project.id}/csv?rev=${project.revision}`} download>
+            CSV
+          </a>
         </div>
       </header>
 

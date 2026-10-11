@@ -93,6 +93,7 @@ describe('ProjectEditor', () => {
     expect(href('SVG')).toBe(`/api/export/${ID}/svg?rev=0`);
     expect(href('PNG')).toBe(`/api/export/${ID}/png?scale=1&rev=0`);
     expect(href('PNG (2×)')).toBe(`/api/export/${ID}/png?scale=2&rev=0`);
+    expect(href('CSV')).toBe(`/api/export/${ID}/csv?rev=0`);
     expect(screen.getByRole('link', { name: 'SVG' }).hasAttribute('download')).toBe(true);
   });
 
