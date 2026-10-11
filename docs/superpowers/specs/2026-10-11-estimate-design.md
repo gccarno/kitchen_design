@@ -81,7 +81,7 @@ export function buildEstimate(project: Project, catalog: Catalog): Estimate;
 
 **Kitchen**
 - There's one line per distinct `catalogId` among the placed items, in order of first placement. The quantity is the count, the unit is `each`, and the label is the catalog name. An unknown catalog id uses the id as its label and is priced at 0.
-- **Countertop line:** it covers floor items tagged `base`, `corner`, `sink`, `dishwasher`, `filler` or `island`. Area = Σ w × (d + 25), except corners and islands, which count w × d. The unit is m² in mm projects and ft² in inch projects. The price is `countertopPerM2`, converted to per ft² for inch projects (÷ 10.7639). The line is left out when there's nothing to put a counter on.
+- **Countertop line:** it covers floor items tagged `base`, `corner`, `sink`, `dishwasher`, `filler` or `island`. Area = Σ w × (d + 25), except corners and islands, which count w × d. The unit is m² in mm projects and ft² in inch projects, and the quantity is rounded to 0.01 so the line total matches the quantity shown. The price is `countertopPerM2`, converted to per ft² for inch projects (÷ 10.7639). The line is left out when there's nothing to put a counter on.
 - The countertop rate is edited as the per-m² rate, and the panel shows the per-ft² equivalent in inch projects.
 
 **Closet**
@@ -89,7 +89,7 @@ export function buildEstimate(project: Project, catalog: Catalog): Estimate;
   - Per-metre kinds: the quantity is the summed width ÷ 1000, rounded to 0.01 m.
   - Drawers: the quantity is the summed `count`, using the default when it isn't set.
   - The rest: the quantity is the number of components.
-- **Hardware line:** 2 per rod, and for each shelf and shoe shelf 2 plus `floor(width / 800)`. It's priced at `hardwareEach` with the unit `each`, and left out when the count is 0.
+- **Hardware line** ("Hardware (brackets)"): 2 per rod, and for each shelf and shoe shelf 2 plus `floor(width / 800)`. It's priced at `hardwareEach` with the unit `each`, and left out when the count is 0.
 
 **Totals**
 - Line total = quantity × unit price.
