@@ -8,27 +8,16 @@
 import { escapeXml, SVG_SCALE } from '../plan/svg';
 import { formatLength } from '../plan/viewport';
 import type { Project } from '../plan/schemas';
-import { closetDrawing, INK, type Shape } from './drawing';
+import { closetDrawing, INK } from './drawing';
+import { shapeToSvg } from '../drawing/shapes';
+
+export { shapeToSvg };
 
 const FONT = 'Helvetica, Arial, sans-serif';
 const TEXT_MM = 90;
 const r = (n: number) => Math.round(n * 10) / 10;
 
 const DOOR_NAME = { bifold: 'Bifold doors', sliding: 'Sliding doors', hinged: 'Hinged doors', open: 'No doors' } as const;
-
-export function shapeToSvg(s: Shape): string {
-  const dash = 'dash' in s && s.dash ? ` stroke-dasharray="${s.dash.join(' ')}"` : '';
-  switch (s.type) {
-    case 'rect':
-      return `<rect x="${r(s.x)}" y="${r(s.y)}" width="${r(s.w)}" height="${r(s.h)}" fill="${s.fill}"${s.stroke ? ` stroke="${s.stroke}" stroke-width="${s.strokeWidth ?? 1}"` : ''}${dash}/>`;
-    case 'line':
-      return `<line x1="${r(s.x1)}" y1="${r(s.y1)}" x2="${r(s.x2)}" y2="${r(s.y2)}" stroke="${s.stroke}" stroke-width="${s.strokeWidth}"${dash}/>`;
-    case 'circle':
-      return `<circle cx="${r(s.cx)}" cy="${r(s.cy)}" r="${r(s.r)}" fill="${s.fill}"${s.stroke ? ` stroke="${s.stroke}" stroke-width="${s.strokeWidth ?? 1}"` : ''}/>`;
-    case 'text':
-      return `<text x="${r(s.x)}" y="${r(s.y)}" font-size="${r(s.size)}" text-anchor="${s.anchor}" dominant-baseline="middle" fill="${s.fill}">${escapeXml(s.text)}</text>`;
-  }
-}
 
 export function closetToSvg(project: Project, opts: { date?: string } = {}): string {
   const closet = project.closet;

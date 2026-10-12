@@ -8,15 +8,11 @@
 import type { Closet, ClosetComponent } from '../plan/schemas';
 import { CLOSET_COMPONENTS, componentRef, topOf } from './catalog';
 import { DOOR_STACK_MM, HANG_DROP_MM } from './validate';
+import { INK, type Shape } from '../drawing/shapes';
 
-export type Shape = { componentId?: string } & (
-  | { type: 'rect'; x: number; y: number; w: number; h: number; fill: string; stroke?: string; strokeWidth?: number; dash?: number[] }
-  | { type: 'line'; x1: number; y1: number; x2: number; y2: number; stroke: string; strokeWidth: number; dash?: number[] }
-  | { type: 'circle'; cx: number; cy: number; r: number; fill: string; stroke?: string; strokeWidth?: number }
-  | { type: 'text'; x: number; y: number; text: string; size: number; anchor: 'start' | 'middle' | 'end'; fill: string }
-);
+export { INK, type Shape };
 
-export const INK = '#111827';
+
 const WOOD = '#f3e8d2';
 const WOOD_EDGE = '#8a6a3b';
 const METAL = '#4b5563';

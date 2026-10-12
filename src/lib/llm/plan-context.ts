@@ -7,19 +7,15 @@
 import type { Catalog } from '../catalog/loader';
 import { nearestWallPoint } from '../plan/openings';
 import { rotateAround, type Point } from '../plan/geometry';
+import { compass } from '../plan/compass';
 import { checkLayout } from '../plan/layout-check';
 import type { Project } from '../plan/schemas';
 import { wallLengthMm } from '../plan/validate';
 import { inwardNormal } from '../plan/walls';
 
-const NAMES = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
-const r = (n: number) => Math.round(n);
+export { compass };
 
-/** Compass name of a direction vector in plan coordinates (x east, y south). */
-export function compass([dx, dy]: Point): string {
-  const deg = (Math.atan2(dx, -dy) * 180) / Math.PI; // 0 = north, 90 = east
-  return NAMES[((Math.round(deg / 45) % 8) + 8) % 8];
-}
+const r = (n: number) => Math.round(n);
 
 export function describePlanForLLM(project: Project, catalog: Catalog): string {
   const { room } = project;
