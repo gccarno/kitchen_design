@@ -297,4 +297,17 @@ describe('ProjectEditor', () => {
     expect(within(review).getByText('Rename the project to Galley')).not.toBeNull();
     expect(within(review).getByText(/Rename "Our kitchen" → "Galley"/)).not.toBeNull();
   });
+
+  it('shows wall elevations and their downloads once something is against a wall', () => {
+    const { unmount } = render(<ProjectEditor initialProject={project} />);
+    expect(screen.getByRole('heading', { name: 'Wall elevations' })).not.toBeNull();
+    expect(screen.queryByRole('link', { name: 'Elevations as SVG' })).toBeNull();
+    unmount();
+    useEditorStore.setState({ project: null, proposal: null });
+    const dw: PlacedItem = { id: 'dw', catalogId: 'dishwasher-600', tag: 'dishwasher', sizeMm: { w: 600, d: 580, h: 850 }, position: { x: 1250, y: 290 }, rotationDeg: 0 };
+    render(<ProjectEditor initialProject={{ ...project, items: [dw] }} />);
+    expect(screen.getByRole('img', { name: 'Elevation of Wall 1 — north, 3000 mm' })).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Elevations as SVG' }).getAttribute('href')).toBe(`/api/export/${ID}/elevations/svg?rev=0`);
+    expect(screen.getByRole('link', { name: 'Elevations as PNG' }).getAttribute('href')).toBe(`/api/export/${ID}/elevations/png?scale=1&rev=0`);
+  });
 });

@@ -11,11 +11,13 @@ import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
 import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
 import HistoryControls from './HistoryControls';
+import KitchenElevations from './KitchenElevations';
 import LayoutCheckPanel from './LayoutCheckPanel';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
 import { checkLayout } from '@/lib/plan/layout-check';
+import { wallElevations } from '@/lib/plan/elevation';
 import { validatePlan } from '@/lib/plan/validate';
 import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
@@ -54,6 +56,7 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
   );
   const warnings = useMemo(() => validatePlan(project).warnings, [project]);
   const layout = useMemo(() => checkLayout(project), [project]);
+  const elevations = useMemo(() => (project.closet ? [] : wallElevations(project, catalog)), [project, catalog]);
 
   function pickFromCatalog(item: CatalogItem) {
     setPlacingItem((current) => (current?.id === item.id ? null : item));
@@ -113,6 +116,17 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
           <a className="text-blue-700 underline" href={`/api/export/${project.id}/csv?rev=${project.revision}`} download>
             CSV
           </a>
+          {elevations.length > 0 && (
+            <>
+              <span className="text-gray-500">Elevations:</span>
+              <a className="text-blue-700 underline" aria-label="Elevations as SVG" href={`/api/export/${project.id}/elevations/svg?rev=${project.revision}`} download>
+                SVG
+              </a>
+              <a className="text-blue-700 underline" aria-label="Elevations as PNG" href={`/api/export/${project.id}/elevations/png?scale=1&rev=${project.revision}`} download>
+                PNG
+              </a>
+            </>
+          )}
         </div>
       </header>
 
@@ -164,6 +178,11 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
               </div>
             )}
             <LayoutCheckPanel rules={layout} units={project.units} />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Wall elevations</h2>
+            <KitchenElevations elevations={elevations} units={project.units} />
           </section>
 
           <section className="flex flex-col gap-3">
