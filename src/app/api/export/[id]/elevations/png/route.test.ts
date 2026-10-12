@@ -36,6 +36,15 @@ describe('GET /api/export/[id]/elevations/png', () => {
   it('400s a bad scale and 404s a kitchen with nothing on a wall', async () => {
     const p = createProject(dataDir, { name: 'x' });
     expect((await get(p.id, '3')).status).toBe(400);
-    expect((await get(p.id)).status).toBe(404);
+    const empty = await get(p.id);
+    expect(empty.status).toBe(404);
+    expect((await empty.json()).error).toBe('nothing is against a wall yet');
+  });
+
+  it('404s a closet with the reason', async () => {
+    const c = createProject(dataDir, { name: 'c', kind: 'closet' });
+    const res = await get(c.id);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('closets have a front elevation, not wall elevations');
   });
 });

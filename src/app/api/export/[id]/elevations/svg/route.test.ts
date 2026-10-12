@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createProject, loadProject, saveProject } from '@/lib/storage/projects';
+import { elevationsFileName } from '@/lib/export/drawing';
 import { GET } from './route';
 
 const get = (id: string) => GET(new Request(`http://localhost/api/export/${id}/elevations/svg`), { params: Promise.resolve({ id }) });
@@ -27,6 +28,11 @@ describe('GET /api/export/[id]/elevations/svg', () => {
     expect(res.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8');
     expect(res.headers.get('content-disposition')).toBe('inline; filename="our-kitchen-elevations.svg"');
     expect(await res.text()).toContain('>Dishwasher</text>');
+  });
+
+  it('names the download kitchen-elevations when the project name slugifies to nothing', async () => {
+    const p = createProject(dataDir, { name: '***' });
+    expect(elevationsFileName(loadProject(dataDir, p.id), 'svg')).toBe('kitchen-elevations.svg');
   });
 
   it('404s a kitchen with nothing on a wall, a closet, and an unknown project; 400s a bad id', async () => {

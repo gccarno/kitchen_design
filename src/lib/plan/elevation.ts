@@ -7,7 +7,6 @@
 import type { Catalog } from '../catalog/loader';
 import { compass } from './compass';
 import { rotateAround, rotatedRectFootprint, type Point } from './geometry';
-import { wallIndexOf } from './openings';
 import { projectKind, type OpeningKind, type PlacedItem, type Project } from './schemas';
 import { formatLength } from './viewport';
 import { inwardNormal } from './walls';
@@ -97,6 +96,7 @@ export function wallElevations(project: Project, catalog: Catalog): WallElevatio
   const { room } = project;
   const poly = room.polygon as Point[];
   const out: WallElevation[] = [];
+  const wallIndex = new Map(room.walls.map((w, i) => [w.id, i]));
 
   poly.forEach((a, i) => {
     const b = poly[(i + 1) % poly.length];
@@ -139,14 +139,14 @@ export function wallElevations(project: Project, catalog: Catalog): WallElevatio
         ...(it.tag ? { tag: it.tag } : {}),
         ...height,
         x: x0,
-        w: x1 - x0,
+        w: round2(x1 - x0),
       });
     }
     if (pieces.length === 0) return;
     pieces.sort((p, q) => p.x - q.x || p.y - q.y);
 
     const openings: ElevationOpening[] = room.openings
-      .filter((o) => wallIndexOf(room, o.wallId) === i)
+      .filter((o) => wallIndex.get(o.wallId) === i)
       .map((o) => ({
         openingId: o.id,
         kind: o.kind,
@@ -174,10 +174,11 @@ export function wallElevations(project: Project, catalog: Catalog): WallElevatio
 function counterRuns(pieces: ElevationPiece[]): { x: number; w: number }[] {
   const under = pieces.filter((p) => p.kind === 'base' || p.tag === 'dishwasher').sort((p, q) => p.x - q.x);
   const runs: { x: number; end: number }[] = [];
+  // A range, fridge or tall item is not in `under`, so it leaves a gap wider than the join and breaks the run.
   for (const p of under) {
     const last = runs[runs.length - 1];
     if (last && p.x - last.end <= COUNTER_JOIN_MM) last.end = Math.max(last.end, p.x + p.w);
     else runs.push({ x: p.x, end: p.x + p.w });
   }
-  return runs.map((r) => ({ x: r.x, w: r.end - r.x }));
+  return runs.map((r) => ({ x: r.x, w: round2(r.end - r.x) }));
 }

@@ -3,6 +3,7 @@ import { loadCatalog } from '../catalog/loader';
 import { rotateAround, type Point } from './geometry';
 import { ProjectSchema, type Opening, type PlacedItem, type Project } from './schemas';
 import { wallElevations, type WallElevation } from './elevation';
+import { doorCount } from './elevation-drawing';
 
 const catalog = loadCatalog();
 const CW: Point[] = [[0, 0], [4000, 0], [4000, 3000], [0, 3000]]; // walls: north, east, south, west
@@ -40,6 +41,21 @@ function kitchen(items: PlacedItem[], polygon: Point[] = CW, openings: Omit<Open
 const wall = (es: WallElevation[], label: RegExp) => es.find((e) => label.test(e.label))!;
 
 describe('wallElevations — which items', () => {
+  it('rounds a piece width to whole hundredths, so a 600 mm base at a fractional position is exactly 600', () => {
+    const [e] = wallElevations(kitchen([north('base-600x560x720', 961.1)]), catalog);
+    expect(e.pieces[0].x).toBe(961.1);
+    expect(e.pieces[0].w).toBe(600);
+    expect(doorCount(e.pieces[0])).toEqual({ across: 2, stacked: false });
+  });
+
+  it('ignores an opening whose wall does not exist', () => {
+    const project = kitchen([north('base-600x560x720', 300)], CW, [{ wallId: 'w0', kind: 'door', positionMm: 100, widthMm: 800, heightMm: 2000 }]);
+    project.room.openings.push({ ...project.room.openings[0], id: 'ghost', wallId: 'nope' });
+    let es: WallElevation[] = [];
+    expect(() => { es = wallElevations(project, catalog); }).not.toThrow();
+    expect(es[0].openings.map((o) => o.openingId)).toEqual(['o0']);
+  });
+
   it('draws an item backed against a wall, seen from inside, with its label and the default ceiling', () => {
     const [e, ...rest] = wallElevations(kitchen([north('base-600x560x720', 300)]), catalog);
     expect(rest).toEqual([]); // walls with nothing on them are skipped
