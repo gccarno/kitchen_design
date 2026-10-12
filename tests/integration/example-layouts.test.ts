@@ -20,6 +20,7 @@ import { compileClosetCommands, type ClosetCommand } from '@/lib/closet/commands
 import { compileCommands, type Command } from '@/lib/plan/commands';
 import type { Point } from '@/lib/plan/geometry';
 import { planToJsonPatch } from '@/lib/plan/diff';
+import { wallElevations } from '@/lib/plan/elevation';
 import { checkLayout } from '@/lib/plan/layout-check';
 import type { Project } from '@/lib/plan/schemas';
 import { validatePlan } from '@/lib/plan/validate';
@@ -441,6 +442,17 @@ describe('example kitchens', () => {
       expect(layout.find((r) => r.id === 'triangle-legs')!.status).not.toBe('n/a');
     }
     expect(Object.fromEntries(layout.map((r) => [r.id, `${r.status}: ${r.detail}`]))).toMatchSnapshot();
+
+    // Wall elevations: what is drawn on each wall, recorded.
+    const r = Math.round;
+    expect(
+      wallElevations(saved, catalog).map(
+        (e) =>
+          `${e.label}: ${e.pieces.map((p) => `${p.name} ${r(p.x)}+${r(p.w)}@${p.y}`).join(', ')}` +
+          ` | counter ${e.counters.map((c) => `${r(c.x)}+${r(c.w)}`).join(', ')}` +
+          ` | openings ${e.openings.map((o) => `${o.kind} ${r(o.x)}+${r(o.w)}`).join(', ')}`
+      )
+    ).toMatchSnapshot();
   });
 });
 

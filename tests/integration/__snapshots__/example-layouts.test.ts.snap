@@ -14,6 +14,13 @@ exports[`example kitchens > 'Entertainer\\'s kitchen' 1`] = `
 }
 `;
 
+exports[`example kitchens > 'Entertainer\\'s kitchen' 2`] = `
+[
+  "Wall 1 — north, 7400 mm: Base cabinet 600 mm (deep, 610) 0+600@0, Base cabinet 900 mm (deep, 610) 600+900@0, Sink base cabinet (900 mm) 1500+900@0, Dishwasher (600 mm) 2400+600@0, Base cabinet 1200 mm (deep, 610) 3000+1200@0, Wall cabinet 900 mm (tall, 900) 3150+900@1450, Microwave, countertop 3350+500@900, Range (900 mm) 4200+900@0, Range hood (900 mm) 4200+900@1600, Base cabinet 600 mm (deep, 610) 5100+600@0, Wall cabinet 600 mm (tall, 900) 5100+600@1450 | counter 0+4200, 5100+600 | openings window 1500+900",
+  "Wall 2 — east, 5600 mm: Tall cabinet (pantry) 400 mm 0+400@0, Tall cabinet (pantry) 600 mm 400+600@0, Refrigerator, slim (600 mm) 1050+600@0 | counter  | openings ",
+]
+`;
+
 exports[`example kitchens > 'Family kitchen with big island' 1`] = `
 {
   "counter-frontage": "pass: 6300 mm of counter (guideline 3350 mm)",
@@ -26,6 +33,13 @@ exports[`example kitchens > 'Family kitchen with big island' 1`] = `
   "triangle-total": "fail: 9072 mm (4000 mm to 7900 mm)",
   "work-aisle": "pass: 1150 mm from "range-900" to "island-2400x1000" (needs 1067 mm)",
 }
+`;
+
+exports[`example kitchens > 'Family kitchen with big island' 2`] = `
+[
+  "Wall 1 — north, 5400 mm: Base cabinet 600 mm (deep, 610) 0+600@0, Base cabinet 600 mm (deep, 610) 600+600@0, Sink base cabinet (900 mm) 1200+900@0, Dishwasher (600 mm) 2100+600@0, Base cabinet 600 mm (deep, 610) 2700+600@0, Wall cabinet 600 mm (tall, 900) 2700+600@1450, Range (900 mm) 3300+900@0, Range hood (900 mm) 3300+900@1600, Base cabinet 600 mm (deep, 610) 4200+600@0, Wall cabinet 600 mm (tall, 900) 4200+600@1450 | counter 0+3300, 4200+600 | openings window 1200+900",
+  "Wall 2 — east, 4600 mm: Refrigerator, French door (910 mm) 2395+910@0, Tall cabinet (pantry) 600 mm 3400+600@0, Tall cabinet (pantry) 600 mm 4000+600@0 | counter  | openings ",
+]
 `;
 
 exports[`example kitchens > 'Galley kitchen' 1`] = `
@@ -42,6 +56,13 @@ exports[`example kitchens > 'Galley kitchen' 1`] = `
 }
 `;
 
+exports[`example kitchens > 'Galley kitchen' 2`] = `
+[
+  "Wall 1 — north, 3600 mm: Refrigerator, counter-depth (910 mm) 50+910@0, Sink base cabinet (900 mm) 1010+900@0, Wall cabinet 600 mm 1500+600@1450, Dishwasher (600 mm) 1910+600@0, Wall cabinet 900 mm 2100+900@1450, Base cabinet 600 mm 2510+600@0, Wall cabinet 600 mm 3000+600@1450 | counter 1010+2100 | openings ",
+  "Wall 3 — south, 3600 mm: Base cabinet 900 mm 0+900@0, Range (760 mm / 30") 900+760@0, Range hood (760 mm) 900+760@1600, Base cabinet 900 mm 1660+900@0 | counter 0+900, 1660+900 | openings ",
+]
+`;
+
 exports[`example kitchens > 'Island kitchen with breakfast bar' 1`] = `
 {
   "counter-frontage": "pass: 4400 mm of counter (guideline 3350 mm)",
@@ -54,6 +75,12 @@ exports[`example kitchens > 'Island kitchen with breakfast bar' 1`] = `
   "triangle-total": "pass: 6171 mm (4000 mm to 7900 mm)",
   "work-aisle": "pass: 1250 mm from "sink-base-800" to "island-1800x900" (needs 1067 mm)",
 }
+`;
+
+exports[`example kitchens > 'Island kitchen with breakfast bar' 2`] = `
+[
+  "Wall 1 — north, 4800 mm: Refrigerator, counter-depth (910 mm) 265+910@0, Microwave, countertop 1175+500@900, Base cabinet 400 mm 1225+400@0, Sink base cabinet (800 mm) 1625+800@0, Dishwasher (600 mm) 2425+600@0, Wall cabinet 450 mm (tall, 900) 2975+450@1450, Base cabinet 400 mm 3025+400@0, Range (760 mm / 30") 3425+760@0, Range hood (760 mm) 3425+760@1600, Base cabinet 400 mm 4185+400@0 | counter 1225+2200, 4185+400 | openings window 1625+800",
+]
 `;
 
 exports[`example kitchens > 'Kitchen in an L-shaped room' 1`] = `
@@ -70,6 +97,12 @@ exports[`example kitchens > 'Kitchen in an L-shaped room' 1`] = `
 }
 `;
 
+exports[`example kitchens > 'Kitchen in an L-shaped room' 2`] = `
+[
+  "Wall 1 — north, 4400 mm: Tall cabinet (pantry) 450 mm 0+450@0, Refrigerator, French door (910 mm) 500+910@0, Wall cabinet 450 mm 1410+450@1450, Base cabinet 400 mm 1460+400@0, Sink base cabinet (900 mm) 1860+900@0, Dishwasher, slim (450 mm) 2760+450@0, Range hood (760 mm) 3130+760@1600, Range (600 mm) 3210+600@0, Base cabinet 450 mm 3810+450@0 | counter 1460+1750, 3810+450 | openings window 1910+800",
+]
+`;
+
 exports[`example kitchens > 'L-shaped kitchen with corner cabinet' 1`] = `
 {
   "counter-frontage": "pass: 3450 mm of counter (guideline 3350 mm)",
@@ -82,6 +115,13 @@ exports[`example kitchens > 'L-shaped kitchen with corner cabinet' 1`] = `
   "triangle-total": "pass: 7453 mm (4000 mm to 7900 mm)",
   "work-aisle": "pass: no counters face each other",
 }
+`;
+
+exports[`example kitchens > 'L-shaped kitchen with corner cabinet' 2`] = `
+[
+  "Wall 1 — north, 4000 mm: Corner base cabinet 900 × 900 mm 0+900@0, Corner wall cabinet 600 × 600 mm 0+600@1450, Sink base cabinet (900 mm) 1040+900@0, Dishwasher (600 mm) 1940+600@0, Base cabinet 450 mm 2540+450@0, Refrigerator, French door (910 mm) 3040+910@0 | counter 0+900, 1040+1950 | openings ",
+  "Wall 4 — west, 3600 mm: Range (760 mm / 30") 1340+760@0, Base cabinet 600 mm 2100+600@0, Corner base cabinet 900 × 900 mm 2700+900@0, Corner wall cabinet 600 × 600 mm 3000+600@1450 | counter 2100+1500 | openings ",
+]
 `;
 
 exports[`example kitchens > 'Long narrow kitchen' 1`] = `
@@ -98,6 +138,12 @@ exports[`example kitchens > 'Long narrow kitchen' 1`] = `
 }
 `;
 
+exports[`example kitchens > 'Long narrow kitchen' 2`] = `
+[
+  "Wall 1 — north, 5200 mm: Tall cabinet (pantry) 400 mm 0+400@0, Tall cabinet (pantry) 500 mm 400+500@0, Refrigerator, French door (910 mm) 950+910@0, Base cabinet 450 mm 1910+450@0, Range (760 mm / 30") 2360+760@0, Microwave, over-the-range (760 mm) 2360+760@1450, Base cabinet 450 mm 3120+450@0, Sink base cabinet (900 mm) 3570+900@0, Wall cabinet 900 mm (tall, 900) 3700+900@1450, Dishwasher (600 mm) 4470+600@0, Wall cabinet 600 mm (tall, 900) 4600+600@1450 | counter 1910+450, 3120+1950 | openings ",
+]
+`;
+
 exports[`example kitchens > 'One-wall kitchen with dining table' 1`] = `
 {
   "counter-frontage": "fail: 2300 mm of counter (guideline 3350 mm)",
@@ -110,6 +156,12 @@ exports[`example kitchens > 'One-wall kitchen with dining table' 1`] = `
   "triangle-total": "pass: 5891 mm (4000 mm to 7900 mm)",
   "work-aisle": "pass: no counters face each other",
 }
+`;
+
+exports[`example kitchens > 'One-wall kitchen with dining table' 2`] = `
+[
+  "Wall 1 — north, 4200 mm: Refrigerator, counter-depth (910 mm) 50+910@0, Base cabinet 450 mm 1300+450@0, Sink base cabinet (800 mm) 1750+800@0, Dishwasher (600 mm) 2550+600@0, Wall cabinet 450 mm 2600+450@1450, Range hood (760 mm) 3070+760@1600, Range (600 mm) 3150+600@0, Base cabinet 450 mm 3750+450@0 | counter 1300+1850, 3750+450 | openings window 1700+900",
+]
 `;
 
 exports[`example kitchens > 'Open-plan kitchen with dining for six' 1`] = `
@@ -126,6 +178,12 @@ exports[`example kitchens > 'Open-plan kitchen with dining for six' 1`] = `
 }
 `;
 
+exports[`example kitchens > 'Open-plan kitchen with dining for six' 2`] = `
+[
+  "Wall 1 — north, 6000 mm: Base cabinet 300 mm (deep, 610) 0+300@0, Sink base cabinet (900 mm) 300+900@0, Dishwasher (600 mm) 1200+600@0, Base cabinet 800 mm (deep, 610) 1800+800@0, Wall cabinet 800 mm 1800+800@1450, Range (900 mm) 2600+900@0, Range hood (900 mm) 2600+900@1600, Base cabinet 600 mm (deep, 610) 3500+600@0, Wall cabinet 600 mm 3500+600@1450, Filler strip, base 100 mm 4100+100@0, Filler strip, wall 50 mm 4100+50@1450, Refrigerator, French door (910 mm) 4440+910@0, Tall cabinet (pantry) 600 mm 5400+600@0 | counter 0+2600, 3500+700 | openings window 600+900",
+]
+`;
+
 exports[`example kitchens > 'Remodel: one-wall to galley' 1`] = `
 {
   "counter-frontage": "fail: 2300 mm of counter (guideline 3350 mm)",
@@ -138,6 +196,13 @@ exports[`example kitchens > 'Remodel: one-wall to galley' 1`] = `
   "triangle-total": "pass: 5965 mm (4000 mm to 7900 mm)",
   "work-aisle": "pass: 1110 mm from "sink-base-800" to "fridge-standard-910" (needs 1067 mm)",
 }
+`;
+
+exports[`example kitchens > 'Remodel: one-wall to galley' 2`] = `
+[
+  "Wall 1 — north, 3800 mm: Sink base cabinet (800 mm) 1640+800@0, Dishwasher (600 mm) 2440+600@0, Range (760 mm / 30") 3040+760@0 | counter 1640+1400 | openings ",
+  "Wall 3 — south, 3800 mm: Refrigerator, French door (910 mm) 1845+910@0, Base cabinet 450 mm 2805+450@0, Base cabinet 450 mm 3255+450@0 | counter 2805+900 | openings pass_through 400+1200",
+]
 `;
 
 exports[`example kitchens > 'Square kitchen with prep island' 1`] = `
@@ -154,6 +219,12 @@ exports[`example kitchens > 'Square kitchen with prep island' 1`] = `
 }
 `;
 
+exports[`example kitchens > 'Square kitchen with prep island' 2`] = `
+[
+  "Wall 1 — north, 4000 mm: Refrigerator, counter-depth (910 mm) 340+910@0, Base cabinet 600 mm 1300+600@0, Sink base cabinet (900 mm) 1900+900@0, Dishwasher (600 mm) 2800+600@0, Range (600 mm) 3400+600@0 | counter 1300+2100 | openings ",
+]
+`;
+
 exports[`example kitchens > 'Studio kitchenette' 1`] = `
 {
   "counter-frontage": "fail: 1650 mm of counter (guideline 3350 mm)",
@@ -168,6 +239,12 @@ exports[`example kitchens > 'Studio kitchenette' 1`] = `
 }
 `;
 
+exports[`example kitchens > 'Studio kitchenette' 2`] = `
+[
+  "Wall 1 — north, 3400 mm: Refrigerator, slim (600 mm) 275+600@0, Microwave, countertop 755+500@900, Wall cabinet 400 mm 805+400@1450, Base cabinet 400 mm 925+400@0, Sink base cabinet (800 mm) 1325+800@0, Dishwasher, slim (450 mm) 2125+450@0, Range hood (760 mm) 2295+760@1600, Range (600 mm) 2575+600@0 | counter 925+1650 | openings ",
+]
+`;
+
 exports[`example kitchens > 'Thick-walled cottage kitchen' 1`] = `
 {
   "counter-frontage": "fail: 2000 mm of counter (guideline 3350 mm)",
@@ -180,4 +257,11 @@ exports[`example kitchens > 'Thick-walled cottage kitchen' 1`] = `
   "triangle-total": "pass: 5215 mm (4000 mm to 7900 mm)",
   "work-aisle": "pass: no counters face each other",
 }
+`;
+
+exports[`example kitchens > 'Thick-walled cottage kitchen' 2`] = `
+[
+  "Wall 1 — north, 3600 mm: Corner wall cabinet 600 × 600 mm 0+600@1450, Filler strip, wall 75 mm 600+75@1450, Base cabinet 300 mm 840+300@0, Range (760 mm / 30") 1140+760@0, Range hood (760 mm) 1140+760@1600, Base cabinet 300 mm 1900+300@0, Sink base cabinet (800 mm) 2200+800@0, Dishwasher (600 mm) 3000+600@0 | counter 840+300, 1900+1700 | openings window 1600+800",
+  "Wall 4 — west, 3200 mm: Refrigerator, slim (600 mm) 1500+600@0, Corner wall cabinet 600 × 600 mm 2600+600@1450 | counter  | openings ",
+]
 `;

@@ -36,6 +36,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Phase 7 — Example layouts and the layout bugs they found (Tasks 35–39; see below)
 - [x] Phase 8 — Layout check against NKBA guidelines (Tasks 40–45; see below)
 - [x] Phase 9 — Parts list and cost estimate (Tasks 46–51; see below)
+- [x] Phase 10 — Kitchen wall elevations (Tasks 52–57; see below)
 
 ## Decisions (locked in with user)
 
@@ -800,6 +801,20 @@ Sub-project 2 of 4 from the 2026-10-10 feature review. Spec: `docs/superpowers/s
 > ✅ Done. `buildEstimate` (`src/lib/estimate/estimate.ts`) turns a kitchen into one line per catalog item plus a countertop line (bases, sinks, dishwashers and fillers with a 25 mm overhang; corners and islands at their footprint; m², or ft² in inch projects), and a closet into one line per kind of part (per metre, per drawer or each) plus brackets. Installation is a percentage of the parts and tax a percentage of both. Default prices (`prices.ts`) are generic ballpark USD numbers; any unit price, the rates and the currency can be changed per project. They're stored in the optional `Project.pricing` and edited through `/pricing` patches, so a price change is a revision like any other and undo works. `EstimatePanel` shows the list in both editors, and `GET /api/export/[id]/csv` downloads it (linked as "CSV" beside the drawings).
 
 Known gaps: prices are not looked up from any retailer; quantities can't be overridden; no discounts or per-item labour.
+
+---
+
+## Phase 10 — Kitchen wall elevations (tasks 52–57)
+
+Sub-project 3 of 4 from the 2026-10-10 feature review. Spec: `docs/superpowers/specs/2026-10-11-elevations-design.md`; task-by-task plan: `docs/superpowers/plans/2026-10-11-elevations.md`.
+
+> ✅ Done. `wallElevations` (`src/lib/plan/elevation.ts`) works out, for each wall with something on it, which items are against it, their standard heights, the countertop runs and the doors and windows. `elevationDrawing` draws it (plinths, doors and drawers, named appliances, countertop, dimensions), and `KitchenElevations` shows it in the editor under "Wall elevations" with a wall picker. `GET /api/export/[id]/elevations/svg` and `.../png` download every wall stacked at 1:50, linked in the header as "Elevations as SVG" and "Elevations as PNG". The drawing shapes moved to `src/lib/drawing/shapes.ts`, shared with the closets.
+
+Refinements made along the way: an appliance name that doesn't fit falls back to its short name (before the first " (" or ","); width dimensions are drawn for floor pieces (below the floor) and wall pieces (above the ceiling), and none for counter-top appliances.
+
+The example kitchens' elevations are recorded in `__snapshots__` (one line per wall: pieces with position, width and height, countertop runs and openings), so a change to the membership rule or the heights table shows up. Each kitchen's runs appear on the walls they were built against, with countertops over the base runs.
+
+Known gaps: heights are standard values, not stored per item, and there's no ceiling height; items on neighbouring walls aren't drawn in section; islands and free-standing furniture aren't drawn.
 
 ---
 

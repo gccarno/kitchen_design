@@ -86,10 +86,10 @@ export function wallElevations(project: Project, catalog: Catalog): WallElevatio
   - **Openings:** a window is a white rectangle with a dashed outline and a centre mullion. A door is a white rectangle with a thin diagonal (swing hint). A pass-through is a white rectangle.
   - **Pieces:** a filled rectangle with an outline, and the plinth as a darker strip at the bottom.
     - **Fronts:** `base` w < 600 gets 1 door. `base` w ≥ 600 gets 2 doors. `sink` gets 2 doors. `filler` gets none. `corner` gets 1 door. Drawer bases aren't modelled, so plain bases get doors. `wall` gets 1 door when w < 600 and 2 otherwise. `tall` gets 2 stacked doors split at 2/3 of the height.
-    - **Appliances** are an outline with the catalog name centred. Text that won't fit the width is left out.
+    - **Appliances** are an outline with the catalog name centred. Text that won't fit the width falls back to the short name (before the first " (" or ","), and is left out only if that doesn't fit either.
   - **Countertop:** a dark strip 860–900 over each counter run.
   - **Dimensions:**
-    - Each piece's width on a line under the floor. Pieces with a bottom of 1450 or more get theirs above the ceiling instead.
+    - Each piece's width: floor pieces get theirs on a line under the floor, and wall pieces (bottom of 1450 or more) on a line above the ceiling. Counter-top appliances get none.
     - The wall length on a second line under the floor.
     - On the left: the counter height (900) and, when there are wall cabinets, their bottom (1450) and top.
     - All of them use `formatLength` in the project's units.
@@ -110,7 +110,7 @@ export function wallElevations(project: Project, catalog: Catalog): WallElevatio
 - **`GET /api/export/[id]/elevations/svg`** returns `image/svg+xml`, with the filename `<slug>-elevations.svg` (fallback `kitchen-elevations`).
 - **`GET /api/export/[id]/elevations/png?scale=1|2`** goes through `svgToPng`, like the plan's PNG route, including its scale check.
 - **Errors:** 400 for an invalid id, and a bad scale for PNG. 404 for an unknown project, a closet project, or a kitchen with no elevations, with a JSON error saying which.
-- **Header links:** an "Elevations:" row with SVG and PNG links (with `?rev=`). It's shown only for kitchens with at least one elevation.
+- **Header links:** an "Elevations:" row with SVG and PNG links (with `?rev=`), labelled "Elevations as SVG" and "Elevations as PNG" so they don't clash with the plan's "SVG" link. It's shown only for kitchens with at least one elevation.
 
 ## Tests
 
