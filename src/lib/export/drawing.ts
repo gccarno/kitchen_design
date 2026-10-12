@@ -7,6 +7,8 @@ import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { loadCatalog } from '../catalog/loader';
 import { closetToSvg } from '../closet/svg';
+import { wallElevations } from '../plan/elevation';
+import { elevationsToSvg } from '../plan/elevation-svg';
 import { projectKind, type Project } from '../plan/schemas';
 import { exportFileName, planToSvg, SVG_SCALE } from '../plan/svg';
 import { isValidProjectId, loadProject, projectExists, resolveDataDir } from '../storage/projects';
@@ -51,4 +53,24 @@ export function loadDrawing(id: string): { project: Project; svg: string } | { e
 export function svgToPng(svg: string, scale: PngScale): Promise<Buffer> {
   const density = ((25.4 * SVG_SCALE) / PNG_MM_PER_PX) * scale;
   return sharp(Buffer.from(svg), { density }).flatten({ background: '#ffffff' }).png().toBuffer();
+}
+
+/** A download name for the elevations, e.g. "our-kitchen-elevations.svg". */
+export function elevationsFileName(project: Project, ext: string): string {
+  return exportFileName(project.name, ext, 'kitchen').replace(new RegExp(`\\.${ext}$`), `-elevations.${ext}`);
+}
+
+/** The kitchen and its wall elevations as SVG, or an error response (400, or 404 with the reason). */
+export function loadElevations(id: string): { project: Project; svg: string } | { error: NextResponse } {
+  const loaded = loadExportProject(id);
+  if ('error' in loaded) return loaded;
+  const { project } = loaded;
+  if (projectKind(project) === 'closet') {
+    return { error: NextResponse.json({ error: 'closets have a front elevation, not wall elevations' }, { status: 404 }) };
+  }
+  const catalog = loadCatalog();
+  if (wallElevations(project, catalog).length === 0) {
+    return { error: NextResponse.json({ error: 'nothing is against a wall yet' }, { status: 404 }) };
+  }
+  return { project, svg: elevationsToSvg(project, catalog) };
 }
