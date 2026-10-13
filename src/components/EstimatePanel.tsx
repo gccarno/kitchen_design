@@ -3,22 +3,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { loadCatalog } from '@/lib/catalog/loader';
 import { buildEstimate, type EstimateLine } from '@/lib/estimate/estimate';
+import { moneyFormat } from '@/lib/estimate/money';
 import { DEFAULT_CURRENCY, DEFAULT_RATES } from '@/lib/estimate/prices';
 import { projectKind, type Pricing, type Project } from '@/lib/plan/schemas';
+
+export { moneyFormat };
 
 interface EstimatePanelProps {
   project: Project;
   /** Save new prices (`undefined`: back to the defaults); resolves to an error message, or null. */
   onSave: (pricing: Pricing | undefined, summary: string) => Promise<string | null>;
-}
-
-/** A currency formatter that never throws: an unknown code falls back to USD. */
-export function moneyFormat(currency: string): Intl.NumberFormat {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency });
-  } catch {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: DEFAULT_CURRENCY });
-  }
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;

@@ -10,6 +10,7 @@
 import { convexPolygonsOverlap, distance, pointToSegmentDistance, rotateAround, rotatedRectFootprint, type Point } from './geometry';
 import { TALL_ITEM_MM } from './runs';
 import { projectKind, type PlacedItem, type Project } from './schemas';
+import { formatLength } from './viewport';
 
 export type RuleStatus = 'pass' | 'fail' | 'n/a';
 
@@ -21,6 +22,24 @@ export interface LayoutRule {
   detail: string;
   /** Shown, but never counted as a failure. */
   info?: boolean;
+}
+
+/** Fails first, then passes, then information, then what doesn't apply yet. */
+const displayOrder = (r: LayoutRule) => (r.status === 'n/a' ? 3 : r.info ? 2 : r.status === 'fail' ? 0 : 1);
+
+/** How many counted rules pass (information and n/a rules aren't counted), and the rules in display order. */
+export function layoutSummary(rules: LayoutRule[]): { passed: number; counted: number; ordered: LayoutRule[] } {
+  const counted = rules.filter((r) => !r.info && r.status !== 'n/a');
+  return {
+    passed: counted.filter((r) => r.status === 'pass').length,
+    counted: counted.length,
+    ordered: [...rules].sort((a, b) => displayOrder(a) - displayOrder(b)),
+  };
+}
+
+/** A rule's detail with its "<n> mm" lengths in the project's units. */
+export function layoutDetail(detail: string, units: 'mm' | 'in'): string {
+  return detail.replace(/(\d+) mm/g, (_, n: string) => formatLength(Number(n), units));
 }
 
 /** The guideline numbers (NKBA, in mm). */
