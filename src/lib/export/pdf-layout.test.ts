@@ -22,6 +22,11 @@ describe('pdfSafe', () => {
     const { font } = await sheet();
     expect(pdfSafe(font, '1\u202f234\u00a0€\nnext')).toBe('1 234 € next');
   });
+
+  it('writes our own arrows as plain text instead of "?"', async () => {
+    const { font } = await sheet();
+    expect(pdfSafe(font, 'fridge ↔ sink → x')).toBe('fridge - sink -> x');
+  });
 });
 
 describe('fit and wrap', () => {
@@ -55,6 +60,12 @@ describe('Sheet', () => {
     expect(text.filter((t) => t === 'Part')).toHaveLength(doc.getPageCount());
     expect(text).toContain('Part 120');
     expect(text).toContain(`Kitchen · 2026-02-03 · revision 0 · page 1 of ${doc.getPageCount()}`);
+  });
+
+  it('keeps the page number in the footer when the name is very long', async () => {
+    const { doc, sheet: s } = await sheet();
+    s.footers(`${'Long name '.repeat(20)} · 2026-02-03 · revision 0`);
+    expect(pdfText(await doc.save()).some((t) => t.endsWith('page 1 of 1'))).toBe(true);
   });
 
   it('wraps a long cell instead of running past its column', async () => {

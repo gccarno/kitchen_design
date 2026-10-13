@@ -107,7 +107,8 @@ async function kitchenPages(sheet: Sheet, project: Project, catalog: Catalog, es
     sheet.line('Wall elevations', { size: H2, bold: true });
     sheet.gap(4);
     const frames = elevations.map(elevationFrame);
-    const box = { w: sheet.width, h: (sheet.bottom - sheet.y) / 3 };
+    // Each wall also spends a gap, its caption line and the gap after it.
+    const box = { w: sheet.width, h: sheet.remaining / 3 - (4 + SMALL * 1.4 + 8) };
     const scale = pickScale({ w: Math.max(...frames.map((f) => f.w)), h: Math.max(...frames.map((f) => f.h)) }, box);
     for (const e of elevations) {
       await placeDrawing(sheet, wallElevationSvg(e, units), e.label, box, scale);
@@ -156,7 +157,9 @@ export async function buildSpecSheet(project: Project, catalog: Catalog, opts: {
   if (projectKind(project) === 'closet') await closetPages(sheet, project, estimate);
   else await kitchenPages(sheet, project, catalog, estimate);
 
-  const date = (opts.date ?? new Date().toISOString()).slice(0, 10);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const date = (opts.date ?? today).slice(0, 10);
   sheet.footers(`${project.name} · ${date} · revision ${project.revision}`);
   return doc.save();
 }

@@ -30,7 +30,7 @@ export interface Column {
 /** Text the standard fonts can draw: odd spaces and line breaks become spaces, anything WinAnsi can't encode becomes "?". */
 export function pdfSafe(font: PDFFont, s: string): string {
   let out = '';
-  for (const ch of s.replace(/[  -​  　\r\n\t]/g, ' ')) {
+  for (const ch of s.replace(/[\u00a0\u2000-\u200b\u202f\u205f\u3000\r\n\t]/g, ' ').replace(/\u2194/g, '-').replace(/\u2192/g, '->')) {
     try {
       font.encodeText(ch);
       out += ch;
@@ -190,7 +190,9 @@ export class Sheet {
   footers(base: string): void {
     const pages = this.doc.getPages();
     pages.forEach((p, i) => {
-      const text = fit(this.font, pdfSafe(this.font, `${base} · page ${i + 1} of ${pages.length}`), SMALL, this.width);
+      const pagePart = pdfSafe(this.font, ` · page ${i + 1} of ${pages.length}`);
+      const room = this.width - this.font.widthOfTextAtSize(pagePart, SMALL);
+      const text = fit(this.font, pdfSafe(this.font, base), SMALL, room) + pagePart;
       p.drawText(text, { x: MARGIN_PT, y: MARGIN_PT / 2, size: SMALL, font: this.font, color: GREY });
     });
   }

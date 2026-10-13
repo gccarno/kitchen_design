@@ -8,6 +8,8 @@ export interface PartDifference {
   quantities: number[];
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 /** The estimate lines whose quantity isn't the same in every estimate (a missing line counts as 0), sorted by label. */
 export function partDifferences(estimates: Estimate[]): PartDifference[] {
   const meta = new Map<string, { label: string; unit: string }>();
@@ -15,7 +17,7 @@ export function partDifferences(estimates: Estimate[]): PartDifference[] {
   const rows: PartDifference[] = [];
   for (const [key, { label, unit }] of meta) {
     const quantities = estimates.map((e) => e.lines.find((l) => l.key === key)?.quantity ?? 0);
-    if (quantities.some((q) => q !== quantities[0])) rows.push({ key, label, unit, quantities });
+    if (quantities.some((q) => round2(q) !== round2(quantities[0]))) rows.push({ key, label, unit, quantities });
   }
   return rows.sort((a, b) => a.label.localeCompare(b.label));
 }

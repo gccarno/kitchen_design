@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { render, screen } from '@testing-library/react';
 import { createProject, duplicateAsOption } from '@/lib/storage/projects';
 import ComparePage from './page';
 
@@ -18,14 +19,17 @@ describe('/compare/[groupId]', () => {
     delete process.env.DATA_DIR;
   });
 
-  it('renders a group', async () => {
+  it('renders a group, showing every option', async () => {
     const original = createProject(dataDir, { name: 'Kitchen' });
-    duplicateAsOption(dataDir, original.id);
-    expect(await page(original.id)).toBeTruthy();
+    const b = duplicateAsOption(dataDir, original.id);
+    render(await page(original.id));
+    expect(screen.getAllByText(original.name).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(b.name).length).toBeGreaterThan(0);
   });
 
   it('is not found for an invalid or unknown group id', async () => {
-    await expect(page('../etc')).rejects.toThrow();
-    await expect(page('00000000-0000-4000-8000-000000000000')).rejects.toThrow();
+    const notFound = { digest: 'NEXT_HTTP_ERROR_FALLBACK;404' };
+    await expect(page('../etc')).rejects.toMatchObject(notFound);
+    await expect(page('00000000-0000-4000-8000-000000000000')).rejects.toMatchObject(notFound);
   });
 });

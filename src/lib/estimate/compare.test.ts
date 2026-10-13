@@ -19,6 +19,10 @@ describe('partDifferences', () => {
     ]);
   });
 
+  it('ignores floating-point noise in quantities', () => {
+    expect(partDifferences([est([line('ct', 'Countertop', 1.5, 'm²')]), est([line('ct', 'Countertop', 1.5000000001, 'm²')])])).toEqual([]);
+  });
+
   it('finds nothing when every estimate uses the same parts', () => {
     expect(partDifferences([est([line('b', 'Base', 2)]), est([line('b', 'Base', 2)])])).toEqual([]);
   });

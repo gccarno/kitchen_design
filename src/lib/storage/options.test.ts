@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createProject, duplicateAsOption, listProjects, loadProject, optionGroup, projectDir, saveProject } from './projects';
@@ -72,6 +72,19 @@ describe('design options in storage', () => {
     const b = duplicateAsOption(dataDir, closet.id);
     expect(b.kind).toBe('closet');
     expect(b.closet).toEqual(closet.closet);
+  });
+
+  it('ignores a photo id that would name a file outside the photos directory', () => {
+    const original = kitchen();
+    const file = join(projectDir(dataDir, original.id), 'project.json');
+    const edited = JSON.parse(readFileSync(file, 'utf-8'));
+    edited.photos.push({ id: '../evil', path: 'photos/x.jpg', width: 10, height: 10 });
+    writeFileSync(file, JSON.stringify(edited));
+    writeFileSync(join(projectDir(dataDir, original.id), 'evil.jpg'), 'not a photo');
+    const b = duplicateAsOption(dataDir, original.id);
+    expect(b.photos.map((p) => p.id)).toEqual(['ph1']);
+    expect(existsSync(join(projectDir(dataDir, b.id), 'evil.jpg'))).toBe(false);
+    expect(existsSync(join(projectDir(dataDir, b.id), 'photos', 'ph1.jpg'))).toBe(true);
   });
 
   it('still copies when a listed photo file is missing on disk', () => {

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { Photo, Project } from '../plan/schemas';
-import { isValidProjectId, loadProject, projectDir, projectExists } from './projects';
+import { isValidProjectId, loadProject, PHOTO_ID, projectDir, projectExists } from './projects';
 
 export type PhotoLookup =
   | { ok: true; project: Project; photo: Photo }
@@ -21,6 +21,7 @@ export function lookupPhoto(dataDir: string, projectId: string, photoId: string)
 
 /** Absolute path of a photo's JPEG on disk. */
 export function photoFilePath(dataDir: string, projectId: string, photo: Photo): string {
+  if (!PHOTO_ID.test(photo.id)) throw new Error('invalid photo id');
   // Built from the id we generated rather than the stored `path`, so the
   // file location can't be redirected by editing project.json.
   return join(projectDir(dataDir, projectId), 'photos', `${photo.id}.jpg`);

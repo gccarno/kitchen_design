@@ -232,6 +232,9 @@ export function optionGroup(dataDir: string, groupId: string): Project[] {
   );
 }
 
+/** Photo ids we generate; anything else in a hand-edited project.json could name a file elsewhere. */
+export const PHOTO_ID = /^[A-Za-z0-9_-]+$/;
+
 /**
  * Copy a project as a new design option: a new id and a fresh history,
  * linked to its group's original by `optionOf`, named "<group> — Option <L>",
@@ -246,6 +249,7 @@ export function duplicateAsOption(dataDir: string, sourceId: string): Project {
   const { history: _history, ...rest } = source;
   const copy: Project = ProjectSchema.parse({
     ...rest,
+    photos: source.photos.filter((photo) => PHOTO_ID.test(photo.id)),
     id,
     name: nextOptionName(groupName(group), group.map((p) => p.name)),
     createdAt: now,
@@ -259,6 +263,7 @@ export function duplicateAsOption(dataDir: string, sourceId: string): Project {
   const toDir = join(projectDir(dataDir, id), 'photos');
   mkdirSync(toDir, { recursive: true });
   for (const photo of source.photos) {
+    if (!PHOTO_ID.test(photo.id)) continue;
     const file = `${photo.id}.jpg`;
     if (existsSync(join(fromDir, file))) copyFileSync(join(fromDir, file), join(toDir, file));
   }
