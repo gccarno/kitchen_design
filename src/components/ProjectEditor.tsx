@@ -145,6 +145,9 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           <a className="text-blue-700 underline" href={`/api/export/${project.id}/csv?rev=${project.revision}`} download>
             CSV
           </a>
+          <a className="text-blue-700 underline" href={`/api/export/${project.id}/pdf?rev=${project.revision}`} download>
+            Spec sheet (PDF)
+          </a>
           {elevations.length > 0 && (
             <>
               <span className="text-gray-500">Elevations:</span>

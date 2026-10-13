@@ -60,6 +60,11 @@ export function elevationsFileName(project: Project, ext: string): string {
   return exportFileName(project.name, ext, 'kitchen').replace(new RegExp(`\\.${ext}$`), `-elevations.${ext}`);
 }
 
+/** A download name for the spec sheet, e.g. "our-kitchen-spec-sheet.pdf". */
+export function specSheetFileName(project: Project): string {
+  return exportFileName(project.name, 'pdf', projectKind(project) === 'closet' ? 'closet' : 'kitchen').replace(/\.pdf$/, '-spec-sheet.pdf');
+}
+
 /** The kitchen and its wall elevations as SVG, or an error response (400, or 404 with the reason). */
 export function loadElevations(id: string): { project: Project; svg: string } | { error: NextResponse } {
   const loaded = loadExportProject(id);

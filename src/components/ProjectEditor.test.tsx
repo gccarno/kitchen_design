@@ -141,6 +141,11 @@ describe('ProjectEditor', () => {
     expect(screen.getByRole('link', { name: 'SVG' }).hasAttribute('download')).toBe(true);
   });
 
+  it('links to the spec sheet PDF for the current revision', () => {
+    render(<ProjectEditor initialProject={project} />);
+    expect(screen.getByRole('link', { name: 'Spec sheet (PDF)' }).getAttribute('href')).toBe(`/api/export/${project.id}/pdf?rev=${project.revision}`);
+  });
+
   it('sketch → review → apply updates the page from the saved project', async () => {
     render(<ProjectEditor initialProject={project} />);
     fireEvent.change(screen.getByLabelText(/width/i), { target: { value: '3600' } });
