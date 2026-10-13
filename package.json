@@ -18,6 +18,7 @@
     "fast-json-patch": "^3.1.1",
     "konva": "^9.3.16",
     "next": "^15.1.0",
+    "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-dropzone": "^14.2.10",
