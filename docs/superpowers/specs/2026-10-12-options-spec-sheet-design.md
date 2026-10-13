@@ -240,6 +240,17 @@ export function buildSpecSheet(project: Project, catalog: Catalog, opts?: { date
 - After moving an item in the option, the compare page still renders.
 - "Spec sheet (PDF)" downloads `sample-kitchen-spec-sheet.pdf`.
 
+## Refinements made in the plan
+
+- The compare page shows closets with `ClosetElevation`, as the home list does (the home list doesn't use `PlanThumbnail` for closets).
+- The home list keeps its two-column grid: an option follows its original with an "Option" badge and a coloured left border instead of being indented.
+- The layout-check detail conversion moves to `layoutDetail(detail, units)` in `src/lib/plan/layout-check.ts`, shared by the panel and the PDF. With no counted rule, the compare page and the PDF cover say "Layout check: nothing to check yet".
+- In the PDF the layout-check status is a word (Pass, Fail, Info, n/a): the panel's check marks aren't in WinAnsi.
+- The PDF layout helper is `src/lib/export/pdf-layout.ts`; page sizes, margins and `pickScale` are in `src/lib/export/paper.ts`. Tests read the drawn text back from the content streams with `pdfText` instead of saving uncompressed.
+- PDF table cells wrap; a row that doesn't fit starts a new page under a repeated header.
+- `closet/svg.ts` exports `DOOR_NAME` for the closet cover.
+- The Playwright test edits a unit price in the option, not an item's position, and checks the compare page shows different totals.
+
 ## Out of scope
 
 - A PDF of the comparison.

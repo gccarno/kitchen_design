@@ -1,12 +1,14 @@
 # Kitchen Design App
 
-Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON, SVG/PNG (plan and wall elevations), and a CSV parts list.
+Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON, SVG/PNG (plan and wall elevations), a CSV parts list, and a PDF spec sheet.
 
 A **layout check** scores the kitchen against the NKBA planning guidelines — work triangle, counter beside the sink, range and fridge, dishwasher next to the sink, aisle width — and the chat can fix what fails ("fix the layout check").
 
 An **estimate** prices the parts list — cabinets, appliances, countertop, closet parts and brackets, plus installation and tax — from rough default prices you can change per project, and exports it as CSV.
 
 The **elevations** draw each kitchen wall as a front view, the way a cabinet maker would: cabinets with doors, appliances, the countertop, windows and doors at their real heights, and dimensions. They're shown in the editor and exported as SVG and PNG.
+
+**Design options** let you try another version of a design without losing the first: "Duplicate as option" makes a linked copy ("Option B"), and "Compare options" shows the options side by side — estimate, layout check, and which parts differ. The **spec sheet** downloads one design as a PDF to hand to a contractor or cabinet shop: the plan at a standard scale, the wall elevations, the parts list and estimate, and the layout check.
 
 It also designs **reach-in closets**: pick "Closet" for a new project and lay out rods, shelves, shelf towers, drawer units, shoe shelves, baskets, hooks and valet rods on a front view of the closet, set its size and doors (bifold, sliding, hinged or open), and get warnings about clothes hitting things, drawers the doors block, and shelves out of reach. The chat works for closets too ("double hang on the left, drawers in the middle").
 
@@ -20,6 +22,8 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (6 phases), 
 **Phase 8 — Layout check:** done (Tasks 40–45) — NKBA guideline checklist for kitchens, also fed to the chat.
 **Phase 9 — Estimate:** done (Tasks 46–51) — priced parts list for kitchens and closets, editable prices with undo, CSV export.
 **Phase 10 — Elevations:** done (Tasks 52–57) — kitchen wall elevations in the editor, exported as SVG and PNG.
+
+**Phase 11 — Options and spec sheet:** done (Tasks 58–66) — design options with a side-by-side comparison, and a PDF spec sheet.
 
 ## Stack
 

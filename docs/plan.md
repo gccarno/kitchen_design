@@ -37,6 +37,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Phase 8 — Layout check against NKBA guidelines (Tasks 40–45; see below)
 - [x] Phase 9 — Parts list and cost estimate (Tasks 46–51; see below)
 - [x] Phase 10 — Kitchen wall elevations (Tasks 52–57; see below)
+- [x] Phase 11 — Design options and the spec sheet (Tasks 58–66; see below)
 
 ## Decisions (locked in with user)
 
@@ -815,6 +816,18 @@ Refinements made along the way: an appliance name that doesn't fit falls back to
 The example kitchens' elevations are recorded in `__snapshots__` (one line per wall: pieces with position, width and height, countertop runs and openings), so a change to the membership rule or the heights table shows up. Each kitchen's runs appear on the walls they were built against, with countertops over the base runs.
 
 Known gaps: heights are standard values, not stored per item, and there's no ceiling height; items on neighbouring walls aren't drawn in section; islands and free-standing furniture aren't drawn.
+
+---
+
+## Phase 11 — Design options and the spec sheet (tasks 58–66)
+
+Sub-project 4 of 4 from the 2026-10-10 feature review. Spec: `docs/superpowers/specs/2026-10-12-options-spec-sheet-design.md`; task-by-task plan: `docs/superpowers/plans/2026-10-12-options-spec-sheet.md`.
+
+> ✅ Done. "Duplicate as option" in the editor copies a design (room, items, prices, photos) as a new project linked to the original by `optionOf`, named "<name> — Option B", C, …, with its own undo history (`duplicateAsOption` in `src/lib/storage/projects.ts`, naming in `src/lib/plan/options.ts`). Options follow their original on the home page with an "Option" badge. `/compare/<groupId>` shows the options side by side — thumbnail, estimate total and subtotal, layout check, item count — and a "What differs" table of the parts whose quantities differ. "Spec sheet (PDF)" downloads `GET /api/export/[id]/pdf`: the plan at a standard scale (1:20, 1:25, 1:50 or 1:100), the wall elevations, the parts list and estimate, and the layout check, on Letter or A4 by the project's units (`buildSpecSheet` in `src/lib/export/spec-sheet.ts`, over the `pdf-lib` layout helper in `src/lib/export/pdf-layout.ts`).
+
+Refinements made along the way: closets show their front on the compare page, as on the home list; options are marked on the home page with a badge and a coloured border rather than indented; the layout-check status in the PDF is a word (the check marks aren't in the PDF's standard fonts); PDF table cells wrap, and long tables repeat their header on the next page.
+
+Known gaps: the PDF's standard fonts can't draw characters outside Western European text (they print as "?"); drawings in the PDF are 200 dpi images, not vectors; there's no PDF of the comparison, and a project can't be moved into or out of an option group after it's made.
 
 ---
 
