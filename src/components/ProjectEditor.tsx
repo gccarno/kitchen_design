@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import CatalogSidebar from './CatalogSidebar';
 import ChatPanel from './ChatPanel';
 import ClosetEditor from './ClosetEditor';
@@ -31,7 +32,15 @@ import { useEditorStore } from '@/store/editor';
  * elevation (`ClosetEditor`). Both: export links, and the review step that
  * proposed changes go through before they are saved.
  */
-export default function ProjectEditor({ initialProject }: { initialProject: Project }) {
+interface ProjectEditorProps {
+  initialProject: Project;
+  /** How many projects share this one's option group (from the server); the compare link needs two. */
+  optionCount?: number;
+  /** The option group's id (from the server). */
+  groupId?: string;
+}
+
+export default function ProjectEditor({ initialProject, optionCount, groupId }: ProjectEditorProps) {
   const load = useEditorStore((s) => s.load);
   useEffect(() => load(initialProject), [load, initialProject]);
 
@@ -45,6 +54,9 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
   const [placingItem, setPlacingItem] = useState<CatalogItem | null>(null);
   const canvasRef = useRef<HTMLElement>(null);
   const reviewRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   // Bring each new proposal (from photos, chat, or the sketch) into view for review.
   useEffect(() => {
@@ -89,6 +101,23 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
     return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
   }
 
+  // Copy the design as a new option and open the copy. The button stays
+  // disabled until the page changes, so a double click makes one copy.
+  async function duplicate() {
+    if (duplicating) return;
+    setDuplicating(true);
+    setDuplicateError(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/duplicate`, { method: 'POST' });
+      const body = (await res.json().catch(() => ({}))) as { project?: Project; error?: string };
+      if (!res.ok || !body.project) throw new Error(body.error ?? `could not duplicate (${res.status})`);
+      router.push(`/project/${body.project.id}`);
+    } catch (err) {
+      setDuplicateError((err as Error).message);
+      setDuplicating(false);
+    }
+  }
+
   const bounds = polygonBounds(project.room.polygon as Point[]);
   const areaM2 = polygonAreaMm2(project.room.polygon as Point[]) / 1e6;
 
@@ -128,6 +157,26 @@ export default function ProjectEditor({ initialProject }: { initialProject: Proj
             </>
           )}
         </div>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <button
+            type="button"
+            className="rounded border px-3 py-1 disabled:opacity-40"
+            disabled={duplicating}
+            onClick={() => void duplicate()}
+          >
+            Duplicate as option
+          </button>
+          {groupId && (optionCount ?? 0) >= 2 && (
+            <Link className="text-blue-700 underline" href={`/compare/${groupId}`}>
+              Compare options
+            </Link>
+          )}
+        </div>
+        {duplicateError && (
+          <p role="alert" className="text-sm text-red-700">
+            Couldn’t duplicate: {duplicateError}
+          </p>
+        )}
       </header>
 
       {proposal && (

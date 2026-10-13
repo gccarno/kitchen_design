@@ -16,6 +16,8 @@ vi.mock('./FloorPlanCanvas', () => ({
     return <div role="img" aria-label={props.label} />;
   },
 }));
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
 import { useEditorStore } from '@/store/editor';
 import { ProjectSchema, type PlacedItem, type Project, type Room } from '@/lib/plan/schemas';
 import { act } from '@testing-library/react';
@@ -50,10 +52,52 @@ describe('ProjectEditor', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     useEditorStore.setState({ project: null, proposal: null });
+    push.mockClear();
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
   });
   afterEach(() => vi.unstubAllGlobals());
+
+  it('duplicates the project as an option and opens the copy', async () => {
+    fetchMock.mockResolvedValueOnce(json({ project: { ...project, id: 'copy-id', name: `${project.name} — Option B` } }, 201));
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate as option' }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/project/copy-id'));
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`/api/projects/${project.id}/duplicate`);
+    expect(init.method).toBe('POST');
+  });
+
+  it('disables Duplicate as option while the copy is being made, so a double click makes one copy', () => {
+    fetchMock.mockReturnValueOnce(new Promise(() => {}));
+    render(<ProjectEditor initialProject={project} />);
+    const button = screen.getByRole('button', { name: 'Duplicate as option' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('says why a duplicate failed and lets you try again', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: 'project not found' }, 404));
+    render(<ProjectEditor initialProject={project} />);
+    const button = screen.getByRole('button', { name: 'Duplicate as option' });
+    fireEvent.click(button);
+    expect((await screen.findByRole('alert')).textContent).toContain('project not found');
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('links to the comparison only when the project has options', () => {
+    const { unmount } = render(<ProjectEditor initialProject={project} />);
+    expect(screen.queryByRole('link', { name: 'Compare options' })).toBeNull();
+    unmount();
+    const one = render(<ProjectEditor initialProject={project} groupId="g-1" optionCount={1} />);
+    expect(screen.queryByRole('link', { name: 'Compare options' })).toBeNull();
+    one.unmount();
+    render(<ProjectEditor initialProject={project} groupId="g-1" optionCount={2} />);
+    expect(screen.getByRole('link', { name: 'Compare options' }).getAttribute('href')).toBe('/compare/g-1');
+  });
 
   it('shows the project, its current room, and every way to get a room', () => {
     render(<ProjectEditor initialProject={project} />);
