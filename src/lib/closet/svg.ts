@@ -17,21 +17,23 @@ const FONT = 'Helvetica, Arial, sans-serif';
 const TEXT_MM = 90;
 const r = (n: number) => Math.round(n * 10) / 10;
 
-const DOOR_NAME = { bifold: 'Bifold doors', sliding: 'Sliding doors', hinged: 'Hinged doors', open: 'No doors' } as const;
+export const DOOR_NAME = { bifold: 'Bifold doors', sliding: 'Sliding doors', hinged: 'Hinged doors', open: 'No doors' } as const;
 
-export function closetToSvg(project: Project, opts: { date?: string } = {}): string {
+export function closetToSvg(project: Project, opts: { date?: string; titleBlock?: boolean } = {}): string {
   const closet = project.closet;
   if (!closet) throw new Error('not a closet project');
   const { widthMm: W, heightMm: H, depthMm: D, opening } = closet;
   const units = project.units;
+  const titled = opts.titleBlock !== false;
 
   const left = 500;
   const top = 250;
-  const bottom = 900;
+  // Room under the floor for the width dimension, and the title block when there is one.
+  const bottom = titled ? 900 : 400;
   const x0 = -left;
   const y0 = -top;
   // Wide enough for the title block even for a narrow closet.
-  const width = Math.max(W + left + 300, 3000);
+  const width = titled ? Math.max(W + left + 300, 3000) : W + left + 300;
   const height = H + top + bottom;
 
   const out: string[] = [
@@ -55,19 +57,21 @@ export function closetToSvg(project: Project, opts: { date?: string } = {}): str
     '</g>'
   );
 
-  const door =
-    opening.style === 'open'
-      ? DOOR_NAME.open
-      : `${DOOR_NAME[opening.style]}, ${formatLength(opening.widthMm, units)} opening at ${formatLength(opening.leftMm, units)} from the left`;
-  const date = (opts.date ?? project.updatedAt).slice(0, 10);
-  const fy = H + 450;
-  out.push(
-    `<g id="title" fill="${INK}">`,
-    `<text x="0" y="${fy}" font-size="${TEXT_MM * 1.6}" font-weight="bold">${escapeXml(project.name)}</text>`,
-    `<text x="0" y="${fy + 170}" font-size="${TEXT_MM}">${escapeXml(`Front elevation · ${formatLength(D, units)} deep · ${door}`)}</text>`,
-    `<text x="0" y="${fy + 300}" font-size="${TEXT_MM}">${escapeXml(`Scale 1:${SVG_SCALE} · revision ${project.revision} · ${date}`)}</text>`,
-    '</g>',
-    '</svg>'
-  );
+  if (titled) {
+    const door =
+      opening.style === 'open'
+        ? DOOR_NAME.open
+        : `${DOOR_NAME[opening.style]}, ${formatLength(opening.widthMm, units)} opening at ${formatLength(opening.leftMm, units)} from the left`;
+    const date = (opts.date ?? project.updatedAt).slice(0, 10);
+    const fy = H + 450;
+    out.push(
+      `<g id="title" fill="${INK}">`,
+      `<text x="0" y="${fy}" font-size="${TEXT_MM * 1.6}" font-weight="bold">${escapeXml(project.name)}</text>`,
+      `<text x="0" y="${fy + 170}" font-size="${TEXT_MM}">${escapeXml(`Front elevation · ${formatLength(D, units)} deep · ${door}`)}</text>`,
+      `<text x="0" y="${fy + 300}" font-size="${TEXT_MM}">${escapeXml(`Scale 1:${SVG_SCALE} · revision ${project.revision} · ${date}`)}</text>`,
+      '</g>'
+    );
+  }
+  out.push('</svg>');
   return out.join('\n');
 }

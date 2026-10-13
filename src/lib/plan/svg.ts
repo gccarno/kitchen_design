@@ -19,6 +19,8 @@ export interface SvgOptions {
   labels?: Record<string, string>;
   /** Date shown in the title block (ISO string); defaults to the project's updatedAt. */
   date?: string;
+  /** Draw the title block (default true); the spec sheet prints its own. */
+  titleBlock?: boolean;
 }
 
 const FONT = 'Helvetica, Arial, sans-serif';
@@ -124,15 +126,17 @@ export function planToSvg(project: Project, opts: SvgOptions = {}): string {
   // Footer: scale bar, north arrow, title block.
   const fy = b.maxY + margin + 150;
   out.push(scaleBar(x0 + 200, fy, units), northArrow(x0 + width - 400, b.minY - margin + 450));
-  const date = (opts.date ?? project.updatedAt).slice(0, 10);
-  out.push(
-    `<g id="title" fill="#111827" text-anchor="end">` +
-      `<text x="${r(x0 + width - 200)}" y="${r(fy + 150)}" font-size="${TEXT_MM * 1.6}" font-weight="bold">${escapeXml(project.name)}</text>` +
-      `<text x="${r(x0 + width - 200)}" y="${r(fy + 380)}" font-size="${TEXT_MM}">${escapeXml(
-        `Scale 1:${SVG_SCALE} · revision ${project.revision} · ${date} · ${units === 'mm' ? 'millimetres' : 'feet and inches'}`
-      )}</text>` +
-      `</g>`
-  );
+  if (opts.titleBlock !== false) {
+    const date = (opts.date ?? project.updatedAt).slice(0, 10);
+    out.push(
+      `<g id="title" fill="#111827" text-anchor="end">` +
+        `<text x="${r(x0 + width - 200)}" y="${r(fy + 150)}" font-size="${TEXT_MM * 1.6}" font-weight="bold">${escapeXml(project.name)}</text>` +
+        `<text x="${r(x0 + width - 200)}" y="${r(fy + 380)}" font-size="${TEXT_MM}">${escapeXml(
+          `Scale 1:${SVG_SCALE} · revision ${project.revision} · ${date} · ${units === 'mm' ? 'millimetres' : 'feet and inches'}`
+        )}</text>` +
+        `</g>`
+    );
+  }
 
   out.push('</svg>');
   return out.join('\n');

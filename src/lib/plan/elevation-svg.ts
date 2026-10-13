@@ -6,7 +6,7 @@
 
 import type { Catalog } from '../catalog/loader';
 import { INK, shapeToSvg } from '../drawing/shapes';
-import { wallElevations } from './elevation';
+import { wallElevations, type WallElevation } from './elevation';
 import { elevationDrawing, elevationFrame } from './elevation-drawing';
 import type { Project } from './schemas';
 import { escapeXml, SVG_SCALE } from './svg';
@@ -45,6 +45,17 @@ export function elevationsToSvg(project: Project, catalog: Catalog, opts: { date
     `<title>${escapeXml(`${project.name} — wall elevations`)}</title>`,
     `<rect x="0" y="0" width="${r(width)}" height="${r(height)}" fill="#ffffff"/>`,
     ...body,
+    '</svg>',
+  ].join('\n');
+}
+
+/** One wall's elevation alone, framed by `elevationFrame` and sized to print at 1:SVG_SCALE (for the spec sheet). */
+export function wallElevationSvg(e: WallElevation, units: 'mm' | 'in'): string {
+  const f = elevationFrame(e);
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r(f.x)} ${r(f.y)} ${r(f.w)} ${r(f.h)}" width="${r(f.w / SVG_SCALE)}mm" height="${r(f.h / SVG_SCALE)}mm" font-family="${FONT}">`,
+    `<rect x="${r(f.x)}" y="${r(f.y)}" width="${r(f.w)}" height="${r(f.h)}" fill="#ffffff"/>`,
+    ...elevationDrawing(e, units).map(shapeToSvg),
     '</svg>',
   ].join('\n');
 }
