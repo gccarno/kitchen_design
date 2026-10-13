@@ -200,6 +200,8 @@ export const ProjectSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   kind: ProjectKindSchema.optional(),
+  /** Set on a design option: the id of the original design it was copied from (`plan/options.ts`). */
+  optionOf: z.string().min(1).optional(),
   units: Units,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),

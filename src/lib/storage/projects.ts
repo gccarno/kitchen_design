@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -11,6 +12,7 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { closetFootprint, newCloset } from '../closet/catalog';
+import { groupName, nextOptionName, optionGroupId, sortGroup } from '../plan/options';
 import { ProjectSchema, projectKind, type Project, type ProjectKind } from '../plan/schemas';
 
 /**
@@ -175,44 +177,93 @@ export async function deleteProject(dataDir: string, id: string): Promise<boolea
   });
 }
 
-/** What the project list page shows: name, last change, and enough of the plan to draw a thumbnail. */
-export type ProjectSummary = Pick<Project, 'id' | 'name' | 'kind' | 'updatedAt' | 'revision' | 'room' | 'items' | 'closet'>;
+/** What the project list page shows: name, last change, option link, and enough of the plan to draw a thumbnail. */
+export type ProjectSummary = Pick<
+  Project,
+  'id' | 'name' | 'kind' | 'createdAt' | 'updatedAt' | 'revision' | 'room' | 'items' | 'closet' | 'optionOf'
+>;
 
 /**
- * List all projects under `dataDir`. Skips directories whose `project.json`
- * fails to parse (those are surfaced in logs, not thrown — one bad project
- * shouldn't break the list).
+ * Every project under `dataDir` that parses. Malformed ones are skipped
+ * (surfaced via logs, not thrown — one bad project shouldn't break a list).
  */
-export function listProjects(dataDir: string): ProjectSummary[] {
+function loadAll(dataDir: string): Project[] {
   const root = join(dataDir, 'projects');
   if (!existsSync(root)) return [];
-  const entries = readdirSync(root, { withFileTypes: true });
-  const out: ProjectSummary[] = [];
-  for (const entry of entries) {
+  const out: Project[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const file = join(root, entry.name, 'project.json');
     if (!existsSync(file)) continue;
     try {
-      const raw = JSON.parse(readFileSync(file, 'utf-8'));
-      const project = ProjectSchema.parse(raw);
-      out.push({
-        id: project.id,
-        name: project.name,
-        kind: projectKind(project),
-        updatedAt: project.updatedAt,
-        revision: project.revision,
-        room: project.room,
-        items: project.items,
-        ...(project.closet ? { closet: project.closet } : {}),
-      });
+      out.push(ProjectSchema.parse(JSON.parse(readFileSync(file, 'utf-8'))));
     } catch {
       // Skip malformed projects — surfaced via logs, not errors.
       continue;
     }
   }
-  // Newest first.
-  out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return out;
+}
+
+/** List all projects under `dataDir`, newest first. */
+export function listProjects(dataDir: string): ProjectSummary[] {
+  return loadAll(dataDir)
+    .map((project) => ({
+      id: project.id,
+      name: project.name,
+      kind: projectKind(project),
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      revision: project.revision,
+      room: project.room,
+      items: project.items,
+      ...(project.closet ? { closet: project.closet } : {}),
+      ...(project.optionOf ? { optionOf: project.optionOf } : {}),
+    }))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/** The projects in option group `groupId`: the original first (if it still exists), then its options oldest first. */
+export function optionGroup(dataDir: string, groupId: string): Project[] {
+  if (!isValidProjectId(groupId)) return [];
+  return sortGroup(
+    loadAll(dataDir).filter((p) => optionGroupId(p) === groupId),
+    groupId
+  );
+}
+
+/**
+ * Copy a project as a new design option: a new id and a fresh history,
+ * linked to its group's original by `optionOf`, named "<group> — Option <L>",
+ * with its photo files copied. The source is not changed.
+ */
+export function duplicateAsOption(dataDir: string, sourceId: string): Project {
+  const source = loadProject(dataDir, sourceId);
+  const groupId = optionGroupId(source);
+  const group = optionGroup(dataDir, groupId);
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  const { history: _history, ...rest } = source;
+  const copy: Project = ProjectSchema.parse({
+    ...rest,
+    id,
+    name: nextOptionName(groupName(group), group.map((p) => p.name)),
+    createdAt: now,
+    updatedAt: now,
+    revision: 0,
+    optionOf: groupId,
+    history: [],
+  });
+
+  const fromDir = join(projectDir(dataDir, source.id), 'photos');
+  const toDir = join(projectDir(dataDir, id), 'photos');
+  mkdirSync(toDir, { recursive: true });
+  for (const photo of source.photos) {
+    const file = `${photo.id}.jpg`;
+    if (existsSync(join(fromDir, file))) copyFileSync(join(fromDir, file), join(toDir, file));
+  }
+  atomicWriteJson(join(projectDir(dataDir, id), 'project.json'), copy);
+  return copy;
 }
 
 /** True if a project exists on disk. */

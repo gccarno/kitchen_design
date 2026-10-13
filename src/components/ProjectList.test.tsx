@@ -35,6 +35,7 @@ const summary = (id: string, name: string, revision: number): ProjectSummary => 
   id,
   name,
   revision,
+  createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-30T23:30:00.000Z',
   room: base.room,
   items: base.items,
