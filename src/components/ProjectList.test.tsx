@@ -147,4 +147,19 @@ describe('ProjectList', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
+
+  it('lists each option right after its original, with an Option badge', () => {
+    const at = (day: string) => `2026-03-0${day}T00:00:00.000Z`;
+    const original: ProjectSummary = { ...summary(A, 'Kitchen', 0), createdAt: at('1'), updatedAt: at('1') };
+    const other: ProjectSummary = { ...summary(B, 'Bathroom', 0), createdAt: at('2'), updatedAt: at('3') };
+    const C = '5b3b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6d';
+    const option: ProjectSummary = { ...summary(C, 'Kitchen — Option B', 0), optionOf: A, createdAt: at('4'), updatedAt: at('5') };
+    // Newest first, as listProjects returns them.
+    render(<ProjectList projects={[option, other, original]} />);
+    expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([`/project/${A}`, `/project/${C}`, `/project/${B}`]);
+    const cards = screen.getAllByRole('listitem');
+    expect(within(cards[1]).getByText('Option')).toBeTruthy();
+    expect(within(cards[0]).queryByText('Option')).toBeNull();
+    expect(within(cards[2]).queryByText('Option')).toBeNull();
+  });
 });

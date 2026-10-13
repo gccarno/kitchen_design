@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import ClosetElevation from './ClosetElevation';
 import PlanThumbnail from './PlanThumbnail';
 import { submitRevision } from '@/lib/client/revisions';
+import { groupForList } from '@/lib/plan/options';
 import type { ProjectSummary } from '@/lib/storage/projects';
 
 /**
@@ -63,8 +64,9 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2">
-      {projects.map((p) => (
-        <li key={p.id} className="flex flex-col gap-2 rounded border p-3">
+      {/* Each design's options follow it, marked, so a group reads together. */}
+      {groupForList(projects).flat().map((p) => (
+        <li key={p.id} className={`flex flex-col gap-2 rounded border p-3${p.optionOf ? ' border-l-4 border-l-sky-400' : ''}`}>
           <Link href={`/project/${p.id}`} className="flex flex-col gap-2 hover:opacity-80">
             {p.closet ? (
               <ClosetElevation closet={p.closet} label={`Elevation of ${p.name}`} className="h-40 w-full rounded border bg-white" />
@@ -80,6 +82,7 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
               <span className="flex items-center gap-2 font-medium">
                 {p.name}
                 {p.kind === 'closet' && <span className="rounded bg-violet-100 px-1.5 text-xs font-normal text-violet-800">Closet</span>}
+                {p.optionOf && <span className="rounded bg-sky-100 px-1.5 text-xs font-normal text-sky-800">Option</span>}
               </span>
               <span className="text-sm text-gray-500">
                 revision {p.revision} · {p.updatedAt.slice(0, 10)}
