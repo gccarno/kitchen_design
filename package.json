@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "e2e": "playwright test",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.4.0",
@@ -47,6 +48,7 @@
     "happy-dom": "^15.10.2",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.14",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
   }
