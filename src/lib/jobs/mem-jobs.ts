@@ -64,7 +64,7 @@ export class MemJobStore implements JobStore {
       projectId,
       kind,
       status: 'queued',
-      input: json(input),
+      input: json(input ?? {}),
       result: null,
       error: null,
       attempts: 0,

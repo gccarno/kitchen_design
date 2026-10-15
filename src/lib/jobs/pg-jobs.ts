@@ -53,7 +53,7 @@ export class PgJobStore implements JobStore {
     if (!isValidProjectId(projectId)) throw new InvalidProjectIdError(projectId);
     const [row] = await this.db
       .insert(jobs)
-      .values({ userId: this.ownerId, projectId, kind, status: 'queued', input })
+      .values({ userId: this.ownerId, projectId, kind, status: 'queued', input: input ?? {} })
       .returning();
     return toJob(row);
   }
