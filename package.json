@@ -13,7 +13,8 @@
     "test:ui": "vitest --ui",
     "e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
+    "import:local": "tsx --env-file-if-exists=.env.local scripts/import-local-data.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^8.4.0",

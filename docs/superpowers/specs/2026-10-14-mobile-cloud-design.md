@@ -63,6 +63,7 @@ All of today's storage calls are synchronous: `loadProject`, `saveProject`, `upd
   - The app runs migrations at startup, before it serves requests, as the garden app does with Alembic.
   - A guard refuses manual migrations against a non-localhost database unless `MIGRATE_ALLOW_REMOTE=1` is set.
 - **`scripts/import-local-data.ts`:** a one-off script that uploads the existing `./data/projects/*` into Neon and GCS.
+- **As built (Phase 1):** no `deleted_at` column — deletes stay permanent, as before; Phase 6's offline cache does full refreshes, so no tombstones are needed. Postgres tests run on PGlite instead of a Docker Postgres. Blob storage is a general `BlobStore` (disk or GCS) keyed `projects/<id>/…`, so Phase 3's PDF exports reuse it.
 
 ## Phase 2: Auth (same model as the garden app)
 - **Tables:** `users(id, email unique, password_hash)` and `auth_tokens(token_hash pk, user_id, label, created_at, last_used_at)`.

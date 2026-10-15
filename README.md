@@ -55,3 +55,18 @@ Copy `.env.example` to `.env.local` and set:
 - `LLM_TIMEOUT_MS` — per-request timeout (default `60000`)
 
 Any OpenAI-compatible endpoint works. For **OpenRouter**, set `LLM_BASE_URL=https://openrouter.ai/api/v1`; `LLM_MODEL` and `LLM_VISION_MODEL` may then be comma-separated lists — the first model is used and the rest are fallbacks OpenRouter tries when it is rate-limited or down (useful with `:free` models, which are often busy). Rate-limited requests (HTTP 429) are retried once. See `.env.example`.
+
+## Storage backends
+
+Projects and photos go through `getStorage()` (`src/lib/storage/index.ts`), which picks a backend from the environment:
+
+| Setting | Projects | Photos |
+|---|---|---|
+| nothing set (default) | `DATA_DIR/projects/<id>/project.json` | `DATA_DIR/projects/<id>/photos/` |
+| `DATABASE_URL` | Postgres (`projects` table, document in `jsonb`) | — |
+| `GCS_BUCKET` (+ `GOOGLE_APPLICATION_CREDENTIALS`) | — | GCS objects `projects/<id>/photos/<photo>.jpg` |
+
+- Schema changes: edit `src/lib/db/schema.ts`, run `npm run db:generate`, commit the new file in `drizzle/`. The app applies pending migrations at startup.
+- `npm run db:migrate` applies them by hand to a local database (it refuses a remote one unless `MIGRATE_ALLOW_REMOTE=1`).
+- `npm run import:local -- --dry-run` previews copying `./data` into the configured backends; `--yes` is needed for a non-local database.
+- Tests need no database: Postgres tests run on PGlite (in-process), GCS tests on an in-memory bucket.
