@@ -46,3 +46,10 @@ next-env.d.ts.bak
 # project data (user-generated, never committed)
 /data/projects
 /data/catalog/raw
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*-key.json
