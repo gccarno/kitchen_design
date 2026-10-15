@@ -198,3 +198,10 @@ All of today's storage calls are synchronous: `loadProject`, `saveProject`, `upd
    - Camera capture adds a photo, and PDF export opens the share sheet.
    - In airplane mode, a cached project opens read-only with the offline banner.
    - With Render asleep on a cold start, the offline page shows, then the app loads.
+
+## Carry-forward from the Phase 1 final review
+- Phase 2: assign the null-owner rows created by `npm run import:local` to the first registered user, or imported projects vanish once `getStorage(userId)` scopes by owner.
+- Phase 3: add one shared key validator (`assertKey`) used by both blob stores; add an `exportKey()` helper; give `BlobStore.get` a content type or a streaming/signed-URL path; add an orphan sweep for `projects/` blobs with no row (failed GCS delete after `deleteProject`, failed duplicate insert).
+- Phase 0/3: `GCS_PREFIX` shifts `exports/` to `<prefix>exports/`, so the 7-day lifecycle rule on `exports/` will not match prefixed exports. Use no prefix in prod.
+- Phase 4: the Drizzle migrator takes no advisory lock (one migrator at a time); `drizzle/` is read from `process.cwd()`, so a standalone/Docker image must copy it; use a direct (non-pooled) Neon connection.
+- Before Phase 4: run the "After Phase 1" smoke test against a real Neon branch and a GCS dev prefix. Postgres has only run on PGlite and GCS only on a fake bucket.
