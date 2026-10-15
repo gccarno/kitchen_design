@@ -13,25 +13,44 @@ export const SLOW_HINT_MS = 20_000;
 export const POLL_START_MS = 1500;
 export const POLL_MAX_MS = 5000;
 const POLL_BACKOFF = 1.5;
-/** Consecutive poll failures (network, 5xx, 429) ridden out before giving up. */
-export const MAX_POLL_FAILURES = 3;
+/** How long polls may keep failing (network, 5xx, 408, 429) before giving up on the connection. */
+export const MAX_FAILING_MS = 2 * 60 * 1000;
+/** The longest a client waits for one job before giving up. */
+export const MAX_WAIT_MS = 30 * 60 * 1000;
 
-/** A request or job that failed; `message` is the server's error text. */
+/** Shown when polling had to give up although the job may still finish on the server. */
+export const CONNECTION_LOST_MESSAGE = 'Connection lost — reopen this panel to check the result';
+export const WAIT_TOO_LONG_MESSAGE = 'Still no result after 30 minutes — reopen this panel to check again.';
+
+/**
+ * A request or job that failed; `message` is the server's error text.
+ * `keepJob` is true when the client gave up on its own (connection lost,
+ * waited too long, a reply it doesn't understand) — the job may still
+ * finish, so a panel keeps it remembered for the next mount. It is false
+ * for the server's own verdict (done/failed, 404 lost, other 4xx).
+ */
 export class JobFailedError extends Error {
   constructor(
     message: string,
     readonly status?: number,
-    readonly issues?: unknown
+    readonly issues?: unknown,
+    readonly keepJob = false
   ) {
     super(message);
     this.name = 'JobFailedError';
   }
 }
 
+/** Whether a panel should keep the remembered job after `err` (see JobFailedError.keepJob). */
+export const keepsJob = (err: unknown): boolean => err instanceof JobFailedError && err.keepJob;
+
 export type WaitOptions = {
   /** First poll delay (default 1.5 s); later polls back off to `maxPollMs` (default 5 s). */
   pollMs?: number;
   maxPollMs?: number;
+  /** Consecutive-failure budget (default 2 min) and overall wait limit (default 30 min). */
+  maxFailingMs?: number;
+  maxWaitMs?: number;
   signal?: AbortSignal;
   /** Message for an error response without an `error` field. */
   fallbackError?: (status: number) => string;
@@ -39,34 +58,45 @@ export type WaitOptions = {
 
 export type StartOptions = WaitOptions & { onJobId?: (id: string) => void };
 
-type JobView = { status?: string; result?: unknown; error?: { status?: number; error?: string; issues?: unknown } };
+type JobView = { status?: unknown; result?: unknown; error?: unknown };
+type JobErrorBody = { status?: number; error?: string; issues?: unknown };
 
 const defaultFallback = (status: number) => `request failed (${status})`;
 
 /**
  * Run `startRequest` (the POST); on 202 { jobId } report the id to `onJobId`
  * and poll until the job settles: resolve with its result, or throw a
- * JobFailedError carrying the job's error. Any other non-2xx start response
- * throws its `error` as before; a plain 2xx body is returned as the result.
+ * JobFailedError carrying the job's error. An error start response throws
+ * its `error` as before; any other answer (a 2xx that is not 202 { jobId }) is an error too.
  */
 export async function startAndWait<T>(startRequest: () => Promise<Response>, opts: StartOptions = {}): Promise<T> {
   const res = await startRequest();
   const body = (await res.json().catch(() => ({}))) as { jobId?: unknown; error?: string; issues?: unknown };
   if (res.status === 202 && typeof body.jobId === 'string') {
+    // Unmounted while the POST was in flight: don't remember a job nobody will resume or forget.
+    if (opts.signal?.aborted) throw abortReason(opts.signal);
     opts.onJobId?.(body.jobId);
     return waitForJob<T>(body.jobId, opts);
   }
   if (!res.ok) throw new JobFailedError(body.error ?? (opts.fallbackError ?? defaultFallback)(res.status), res.status, body.issues);
-  return body as T;
+  throw new JobFailedError(`unexpected response from the server (${res.status})`, res.status);
 }
 
 /** Poll job `jobId` until it settles (also how a remounted component resumes). See startAndWait. */
 export async function waitForJob<T>(jobId: string, opts: WaitOptions = {}): Promise<T> {
   const { signal } = opts;
   const maxDelay = opts.maxPollMs ?? POLL_MAX_MS;
+  const maxFailing = opts.maxFailingMs ?? MAX_FAILING_MS;
+  const deadline = Date.now() + (opts.maxWaitMs ?? MAX_WAIT_MS);
   let delay = opts.pollMs ?? POLL_START_MS;
-  let failures = 0;
+  let failingSince: number | null = null;
+  /** A poll failed transiently: keep going until failures have lasted `maxFailing`. */
+  const transientFailure = () => {
+    failingSince ??= Date.now();
+    if (Date.now() - failingSince >= maxFailing) throw new JobFailedError(CONNECTION_LOST_MESSAGE, undefined, undefined, true);
+  };
   for (;;) {
+    if (Date.now() >= deadline) throw new JobFailedError(WAIT_TOO_LONG_MESSAGE, undefined, undefined, true);
     await sleep(delay, signal);
     delay = Math.min(delay * POLL_BACKOFF, maxDelay);
     let res: Response;
@@ -74,23 +104,35 @@ export async function waitForJob<T>(jobId: string, opts: WaitOptions = {}): Prom
       res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, { cache: 'no-store', signal });
     } catch (err) {
       if (isAbortError(err) || signal?.aborted) throw abortReason(signal, err);
-      if (++failures > MAX_POLL_FAILURES) throw err;
+      transientFailure();
       continue;
     }
-    const body = (await res.json().catch(() => ({}))) as JobView & { error?: unknown };
+    const body = (await res.json().catch(() => ({}))) as JobView;
     if (res.status === 404) throw new JobFailedError(JOB_LOST_MESSAGE, 404);
     if (!res.ok) {
+      if (res.status >= 500 || res.status === 429 || res.status === 408) {
+        transientFailure();
+        continue;
+      }
+      // Any other 4xx is the server's final word. A 401 means the session ended: the job
+      // belongs to that session's user, so it is not worth remembering either.
       const message = typeof body.error === 'string' ? body.error : `could not check on the request (${res.status})`;
-      const transient = res.status >= 500 || res.status === 429 || res.status === 408;
-      if (!transient || ++failures > MAX_POLL_FAILURES) throw new JobFailedError(message, res.status);
-      continue;
+      throw new JobFailedError(message, res.status);
     }
-    failures = 0;
-    if (body.status === 'done') return body.result as T;
-    if (body.status === 'failed') {
-      const e = (body.error ?? {}) as NonNullable<JobView['error']>;
-      const status = e.status ?? 500;
-      throw new JobFailedError(e.error ?? (opts.fallbackError ?? defaultFallback)(status), status, e.issues);
+    failingSince = null;
+    switch (body.status) {
+      case 'done':
+        return body.result as T;
+      case 'failed': {
+        const e = (body.error ?? {}) as JobErrorBody;
+        const status = e.status ?? 500;
+        throw new JobFailedError(e.error ?? (opts.fallbackError ?? defaultFallback)(status), status, e.issues);
+      }
+      case 'queued':
+      case 'running':
+        continue;
+      default:
+        throw new JobFailedError('unexpected response from the server', res.status, undefined, true);
     }
   }
 }

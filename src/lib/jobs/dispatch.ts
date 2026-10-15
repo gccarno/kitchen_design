@@ -1,6 +1,7 @@
+import { authEnabled } from '../auth/config';
 import { getJobStore } from './index';
 import { runJob } from './run';
-import type { Job, RequeueOutcome } from './types';
+import { JOB_NEVER_STARTED, type Job, type RequeueOutcome } from './types';
 
 export type DispatchOpts = {
   fetch?: typeof fetch;
@@ -12,16 +13,21 @@ export type DispatchOpts = {
 };
 
 export const WORKER_TIMEOUT_MS = 2000;
-export const STALE_JOB_MS = 15 * 60 * 1000;
+/** A running job older than this is presumed dead (each LLM call is bounded at about 60 s, plus one retry). */
+export const STALE_JOB_MS = 5 * 60 * 1000;
 export const MAX_JOB_ATTEMPTS = 3;
 /** A job still `queued` this long after creation was never started (e.g. the server restarted). */
 export const UNSTARTED_JOB_MS = 60 * 1000;
+/** A job still `queued` this long after creation is given up on (failed 'job was never started'). */
+export const NEVER_STARTED_JOB_MS = 10 * 60 * 1000;
 
 /**
  * Start job `jobId`: hand it to the worker (`POST ${WORKER_URL}/run/${jobId}`,
  * bearer WORKER_TOKEN, 2 s timeout) and return 'worker' on a 2xx; on any
  * failure, or with no worker configured, run it in this process without
  * waiting and return 'local'. The claim makes a double start harmless.
+ * In disk mode (no DATABASE_URL) the worker is skipped: jobs live only in
+ * this process's memory, so no worker could see them.
  */
 export async function dispatchJob(jobId: string, opts: DispatchOpts = {}): Promise<'worker' | 'local'> {
   const env = opts.env ?? process.env;
@@ -29,7 +35,7 @@ export async function dispatchJob(jobId: string, opts: DispatchOpts = {}): Promi
   const run = opts.run ?? ((id: string) => runJob(id));
   const base = env.WORKER_URL;
   const token = env.WORKER_TOKEN;
-  if (base && token) {
+  if (base && token && authEnabled(env as NodeJS.ProcessEnv)) {
     try {
       const res = await doFetch(`${base.replace(/\/+$/, '')}/run/${jobId}`, {
         method: 'POST',
@@ -53,18 +59,21 @@ export async function dispatchJob(jobId: string, opts: DispatchOpts = {}): Promi
 
 /**
  * Called when a job is polled: recovers a stuck job. A `running` job started
- * over 15 minutes ago goes back to queued (or failed after 3 attempts) and is
+ * over 5 minutes ago goes back to queued (or failed after 3 attempts) and is
  * dispatched again. A job left `queued` for over a minute (never started, e.g.
  * the server restarted before running it) is dispatched too; the claim keeps
- * that safe. Returns what happened ('requeued' also covers the latter).
+ * that safe. One still `queued` after 10 minutes is failed ('job was never
+ * started'). Returns what happened ('requeued' also covers a re-dispatch).
  */
 export async function ensureProgress(job: Job, opts: DispatchOpts = {}): Promise<RequeueOutcome> {
+  const store = await getJobStore(job.userId);
   if (job.status === 'queued') {
-    if ((opts.now ?? Date.now)() - Date.parse(job.createdAt) < UNSTARTED_JOB_MS) return 'noop';
+    const age = (opts.now ?? Date.now)() - Date.parse(job.createdAt);
+    if (age < UNSTARTED_JOB_MS) return 'noop';
+    if (age > NEVER_STARTED_JOB_MS && (await store.failUnstarted(job.id, NEVER_STARTED_JOB_MS, JOB_NEVER_STARTED))) return 'failed';
     await dispatchJob(job.id, opts);
     return 'requeued';
   }
-  const store = await getJobStore(job.userId);
   const outcome = await store.requeueStale(job.id, STALE_JOB_MS, MAX_JOB_ATTEMPTS);
   if (outcome === 'requeued') await dispatchJob(job.id, opts);
   return outcome;

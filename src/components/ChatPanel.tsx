@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { proposalFromRefinement, type Proposal, type RefinementResponse } from '@/lib/plan/proposal';
-import { forgetJob, isAbortError, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
+import { forgetJob, isAbortError, keepsJob, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
 
 interface ChatPanelProps {
   projectId: string;
@@ -56,7 +56,8 @@ export default function ChatPanel({
     } catch (err) {
       // Unmounted mid-poll: keep the remembered job so the next mount resumes it.
       if (isAbortError(err)) return;
-      forgetJob(jobKey);
+      // Connection lost (or gave up waiting): the job may still finish, so the next mount resumes it.
+      if (!keepsJob(err)) forgetJob(jobKey);
       reply = { role: 'assistant', content: `Sorry — ${(err as Error).message}`, error: true };
     }
     if (current.current !== ctrl) return;

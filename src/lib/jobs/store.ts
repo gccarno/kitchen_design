@@ -46,4 +46,11 @@ export interface JobStore {
    * pollers can't both requeue one stuck job.
    */
   requeueStale(id: string, olderThanMs: number, maxAttempts: number): Promise<RequeueOutcome>;
+  /**
+   * Give up on a job nobody ever started: if it is still `queued` and was
+   * created more than `olderThanMs` ago, `queued` → `failed` with `error`
+   * (sets `finishedAt`) and true. Otherwise nothing changes: false. Atomic,
+   * like claim, so it can't race a runner that claims the job at the same moment.
+   */
+  failUnstarted(id: string, olderThanMs: number, error: JobError): Promise<boolean>;
 }

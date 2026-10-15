@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { proposalFromExtraction, type ExtractionResponse, type Proposal } from '@/lib/plan/proposal';
-import { forgetJob, isAbortError, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
+import { forgetJob, isAbortError, keepsJob, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
 
 interface ExtractPanelProps {
   projectId: string;
@@ -54,7 +54,8 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
     } catch (err) {
       // Unmounted mid-poll: keep the remembered job so the next mount resumes it.
       if (isAbortError(err)) return;
-      forgetJob(jobKey);
+      // Connection lost (or gave up waiting): the job may still finish, so the next mount resumes it.
+      if (!keepsJob(err)) forgetJob(jobKey);
       setError((err as Error).message);
     } finally {
       if (current.current === ctrl) {

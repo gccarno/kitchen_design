@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { forgetJob, isAbortError, JOB_LOST_MESSAGE, JobFailedError, recallJob, rememberJob, startAndWait, waitForJob } from './jobs';
+import {
+  CONNECTION_LOST_MESSAGE,
+  forgetJob,
+  isAbortError,
+  JOB_LOST_MESSAGE,
+  JobFailedError,
+  keepsJob,
+  recallJob,
+  rememberJob,
+  startAndWait,
+  waitForJob,
+} from './jobs';
 
 const JOB = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
 const json = (body: unknown, status = 200) =>
@@ -78,9 +89,13 @@ describe('startAndWait', () => {
     expect((error as Error).message).toBe('extraction failed (500)');
   });
 
-  it('returns a plain 200 body directly (an old-style synchronous answer)', async () => {
-    const { value } = await settle(startAndWait(async () => json({ reply: 'sync' })));
-    expect(value).toEqual({ reply: 'sync' });
+  it('treats any start answer other than 202 { jobId } as an error', async () => {
+    for (const res of [json({ reply: 'sync' }), json({}, 202)]) {
+      const { error } = await settle(startAndWait(async () => res));
+      expect(error).toBeInstanceOf(JobFailedError);
+      expect((error as Error).message).toMatch(/unexpected response/);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rides out a single failed poll (network error or 5xx)', async () => {
@@ -92,10 +107,68 @@ describe('startAndWait', () => {
     expect(value).toBe(42);
   });
 
-  it('gives up after repeated poll failures', async () => {
-    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
-    const { error } = await settle(startAndWait(async () => accepted()), 120_000);
-    expect((error as Error).message).toMatch(/Failed to fetch/);
+  it('keeps polling through failures lasting under two minutes', async () => {
+    let failing = true;
+    fetchMock.mockImplementation(async () => {
+      if (failing) throw new TypeError('Failed to fetch');
+      return job('done', { result: 'ok' });
+    });
+    const p = settle(startAndWait(async () => accepted()), 0);
+    await vi.advanceTimersByTimeAsync(100_000);
+    failing = false;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect((await p).value).toBe('ok');
+  });
+
+  it('gives up as "connection lost" after two minutes of failed polls, keeping the job', async () => {
+    fetchMock.mockImplementation(async () => json({ error: 'unavailable' }, 503));
+    const { error } = await settle(startAndWait(async () => accepted()), 130_000);
+    expect((error as Error).message).toBe(CONNECTION_LOST_MESSAGE);
+    expect(CONNECTION_LOST_MESSAGE).toBe('Connection lost — reopen this panel to check the result');
+    expect(keepsJob(error)).toBe(true);
+  });
+
+  it('treats a 401 while polling as final (the job is not kept)', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: 'Unauthorized' }, 401));
+    const { error } = await settle(startAndWait(async () => accepted()));
+    expect(error).toMatchObject({ message: 'Unauthorized', status: 401 });
+    expect(keepsJob(error)).toBe(false);
+  });
+
+  it('rejects a job status it does not know, or a missing one', async () => {
+    for (const body of [{ id: JOB, status: 'paused' }, { id: JOB }]) {
+      fetchMock.mockResolvedValueOnce(json(body));
+      const { error } = await settle(waitForJob(JOB));
+      expect((error as Error).message).toMatch(/unexpected response/);
+      expect(keepsJob(error)).toBe(true);
+    }
+  });
+
+  it('gives up after the overall wait limit', async () => {
+    fetchMock.mockImplementation(async () => job('running'));
+    const { error } = await settle(waitForJob(JOB, { maxWaitMs: 20_000 }), 40_000);
+    expect((error as Error).message).toMatch(/no result after 30 minutes/);
+    expect(keepsJob(error)).toBe(true);
+    const calls = fetchMock.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fetchMock.mock.calls.length).toBe(calls);
+  });
+
+  it('does not report the job id when aborted while the POST was in flight', async () => {
+    const ctrl = new AbortController();
+    const onJobId = vi.fn();
+    const { error } = await settle(
+      startAndWait(
+        async () => {
+          ctrl.abort();
+          return accepted();
+        },
+        { signal: ctrl.signal, onJobId }
+      )
+    );
+    expect(isAbortError(error)).toBe(true);
+    expect(onJobId).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reports a job the server no longer knows (404) as lost', async () => {

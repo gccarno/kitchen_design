@@ -117,4 +117,12 @@ export class MemJobStore implements JobStore {
     Object.assign(row, { status: 'failed', error: json(JOB_TIMED_OUT), finishedAt: this.iso() });
     return 'failed';
   }
+
+  async failUnstarted(id: string, olderThanMs: number, error: JobError): Promise<boolean> {
+    const row = this.row(id);
+    if (!row || row.status !== 'queued') return false;
+    if (Date.parse(row.createdAt) >= this.table.now() - olderThanMs) return false;
+    Object.assign(row, { status: 'failed', result: null, error: json(error), finishedAt: this.iso() });
+    return true;
+  }
 }

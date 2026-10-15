@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { JobNotFoundError, type JobStore } from './store';
-import { JOB_TIMED_OUT } from './types';
+import { JOB_NEVER_STARTED, JOB_TIMED_OUT } from './types';
 
 export type JobStoreSetup = () => Promise<{
   /** The store scoped to `userId` (null = the owner-less store). */
@@ -206,6 +206,45 @@ export function describeJobStore(name: string, setup: JobStoreSetup): void {
       expect(failed).toMatchObject({ status: 'failed', attempts: 2, error: JOB_TIMED_OUT, result: null });
       expect(failed!.finishedAt).toMatch(ISO);
       expect(await store.requeueStale(job.id, 10, 2)).toBe('noop');
+    });
+
+    it('fails a job left queued too long, but not a fresh, running or finished one', async () => {
+      const fresh = await store.create(randomUUID(), 'extract', {});
+      expect(await store.failUnstarted(fresh.id, 60_000, JOB_NEVER_STARTED)).toBe(false);
+      expect(await store.get(fresh.id)).toEqual(fresh);
+
+      const running = await store.create(randomUUID(), 'extract', {});
+      await store.claim(running.id);
+      const finished = await store.create(randomUUID(), 'refine', {});
+      await store.claim(finished.id);
+      await store.complete(finished.id, { ok: true });
+      await pause(30);
+      expect(await store.failUnstarted(running.id, 10, JOB_NEVER_STARTED)).toBe(false);
+      expect(await store.failUnstarted(finished.id, 10, JOB_NEVER_STARTED)).toBe(false);
+      expect((await store.get(finished.id))!.status).toBe('done');
+
+      expect(await store.failUnstarted(fresh.id, 10, JOB_NEVER_STARTED)).toBe(true);
+      const failed = await store.get(fresh.id);
+      expect(failed).toMatchObject({ status: 'failed', error: JOB_NEVER_STARTED, result: null, attempts: 0 });
+      expect(failed!.finishedAt).toMatch(ISO);
+      expect(await store.claim(fresh.id)).toBeNull();
+      expect(await store.failUnstarted(fresh.id, 10, JOB_NEVER_STARTED)).toBe(false);
+    });
+
+    it("never fails another owner's queued job as unstarted, nor an unknown or non-UUID id", async () => {
+      const job = await store.create(randomUUID(), 'extract', {});
+      await pause(30);
+      expect(await storeFor(await newUser()).failUnstarted(job.id, 10, JOB_NEVER_STARTED)).toBe(false);
+      expect(await store.failUnstarted(randomUUID(), 10, JOB_NEVER_STARTED)).toBe(false);
+      expect(await store.failUnstarted('nope', 10, JOB_NEVER_STARTED)).toBe(false);
+      expect((await store.get(job.id))!.status).toBe('queued');
+    });
+
+    it('lets only one of a claim and a give-up win on an old queued job', async () => {
+      const job = await store.create(randomUUID(), 'extract', {});
+      await pause(30);
+      const [claimed, gaveUp] = await Promise.all([store.claim(job.id), store.failUnstarted(job.id, 10, JOB_NEVER_STARTED)]);
+      expect(Number(claimed !== null) + Number(gaveUp)).toBe(1);
     });
 
     it('lets only one of two concurrent pollers requeue a stuck job', async () => {

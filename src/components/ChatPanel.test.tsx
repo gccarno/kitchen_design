@@ -10,6 +10,8 @@ const JOB = '9d0c8b7a-1234-4abc-8def-0123456789ab';
 const KEY = `kd-job:refine:${ID}`;
 const job = (status: string, extra: Record<string, unknown> = {}) => json({ id: JOB, kind: 'refine', status, ...extra });
 const tick = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+/** The server's answer to one request: POST → 202 { jobId }, then the job, polled, is done with `result`. */
+const viaJob = (result: unknown) => [json({ jobId: JOB }, 202), job('done', { result })];
 
 const EDIT = {
   commands: [{ type: 'moveItem', item: 'i1', wall: 'w1' }],
@@ -68,21 +70,25 @@ describe('ChatPanel', () => {
   });
 
   it('shows a plain reply without proposing anything', async () => {
-    fetchMock.mockResolvedValueOnce(json({ ...EDIT, commands: [], patch: [], summary: '', reply: 'The room is 3 × 4 m.' }));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    for (const r of viaJob({ ...EDIT, commands: [], patch: [], summary: '', reply: 'The room is 3 × 4 m.' })) fetchMock.mockResolvedValueOnce(r);
     const { onProposal, say } = setup();
     say('how big is the room?');
+    await tick(1500);
     expect(await screen.findByText('The room is 3 × 4 m.')).not.toBeNull();
     expect(onProposal).not.toHaveBeenCalled();
   });
 
   it('sends recent turns as history for follow-ups', async () => {
-    fetchMock.mockResolvedValueOnce(json(EDIT)).mockResolvedValueOnce(json(EDIT));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    for (const r of [...viaJob(EDIT), ...viaJob(EDIT)]) fetchMock.mockResolvedValueOnce(r);
     const { say } = setup();
     say('move the fridge to the north wall');
+    await tick(1500);
     await screen.findByText(/Moved the fridge/);
     say('a bit further left');
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({
       message: 'a bit further left',
       history: [
         { role: 'user', content: 'move the fridge to the north wall' },
@@ -94,7 +100,7 @@ describe('ChatPanel', () => {
   it('shows errors in the conversation but leaves them out of the history', async () => {
     fetchMock
       .mockResolvedValueOnce(json({ error: 'LLM request timed out after 120000 ms' }, 502))
-      .mockResolvedValueOnce(json(EDIT));
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202));
     const { say } = setup();
     say('first try');
     expect(await screen.findByText(/timed out/)).not.toBeNull();
@@ -110,13 +116,16 @@ describe('ChatPanel', () => {
     say('add a dishwasher');
     expect(screen.getByText(/thinking/i)).not.toBeNull();
     expect(send().disabled).toBe(true);
-    resolve(json(EDIT));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(job('done', { result: EDIT }));
+    resolve(json({ jobId: JOB }, 202));
+    await tick(1500);
     await waitFor(() => expect(screen.queryByText(/thinking/i)).toBeNull());
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2); // the POST, then one poll
   });
 
   it('sends on Enter and adds a newline on Shift+Enter', async () => {
-    fetchMock.mockResolvedValueOnce(json(EDIT));
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202));
     const { box } = setup();
     fireEvent.change(box, { target: { value: 'hello' } });
     fireEvent.keyDown(box, { key: 'Enter', shiftKey: true });
@@ -182,6 +191,26 @@ describe('ChatPanel', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/jobs/${JOB}`);
     expect(screen.getByText(/Moved the fridge\./)).not.toBeNull();
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('on a lost connection, says so and keeps the job so reopening the panel resumes it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockImplementation(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    setup().say('add a dishwasher');
+    await tick(130_000);
+    expect(await screen.findByText('Sorry — Connection lost — reopen this panel to check the result')).not.toBeNull();
+    expect(screen.queryByText(/thinking/i)).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem(KEY)!)).toMatchObject({ jobId: JOB });
+
+    cleanupRender();
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(job('done', { result: EDIT }));
+    const { onProposal } = setup();
+    await tick(1500);
+    await waitFor(() => expect(onProposal).toHaveBeenCalled());
     expect(sessionStorage.getItem(KEY)).toBeNull();
   });
 });

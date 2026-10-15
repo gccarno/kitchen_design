@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { jobs } from '../db/schema';
 import type { Db } from '../db/types';
 import { InvalidProjectIdError, isValidProjectId } from '../storage/ids';
@@ -6,6 +6,9 @@ import { JobNotFoundError, type JobStore } from './store';
 import { JOB_TIMED_OUT, type Job, type JobError, type JobKind, type JobStatus, type RequeueOutcome } from './types';
 
 type Row = typeof jobs.$inferSelect;
+
+/** Finished (done/failed) jobs are deleted this long after they finish, so the table can't grow without bound. */
+export const PG_FINISHED_TTL_DAYS = 7;
 
 /** Postgres timestamp text ("2026-10-15 14:25:10.123456+00") as ISO-8601 UTC. */
 const iso = (ts: string): string => new Date(ts).toISOString();
@@ -55,7 +58,27 @@ export class PgJobStore implements JobStore {
       .insert(jobs)
       .values({ userId: this.ownerId, projectId, kind, status: 'queued', input: input ?? {} })
       .returning();
+    // Housekeeping rides along with job creation; it never delays or fails it.
+    void this.pruneFinished().catch(() => {});
     return toJob(row);
+  }
+
+  /**
+   * Delete every owner's jobs that finished more than PG_FINISHED_TTL_DAYS ago
+   * (one DELETE; unscoped on purpose — only finished rows, never queued/running).
+   * Resolves to the number of rows removed.
+   */
+  async pruneFinished(): Promise<number> {
+    const removed = await this.db
+      .delete(jobs)
+      .where(
+        and(
+          inArray(jobs.status, ['done', 'failed']),
+          sql`${jobs.finishedAt} < now() - (${PG_FINISHED_TTL_DAYS}::int * interval '1 day')`
+        )
+      )
+      .returning({ id: jobs.id });
+    return removed.length;
   }
 
   async get(id: string): Promise<Job | null> {
@@ -119,6 +142,21 @@ export class PgJobStore implements JobStore {
       .returning({ status: jobs.status });
     if (!row) return 'noop';
     return row.status === 'queued' ? 'requeued' : 'failed';
+  }
+
+  async failUnstarted(id: string, olderThanMs: number, error: JobError): Promise<boolean> {
+    if (!isValidProjectId(id)) return false;
+    const rows = await this.db
+      .update(jobs)
+      .set({ status: 'failed', result: null, error, finishedAt: sql`now()` })
+      .where(
+        and(
+          this.mine(id, 'queued'),
+          sql`${jobs.createdAt} < now() - (${olderThanMs}::double precision * interval '1 millisecond')`
+        )
+      )
+      .returning({ id: jobs.id });
+    return rows.length > 0;
   }
 }
 

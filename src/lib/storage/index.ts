@@ -42,10 +42,15 @@ export async function getStorage(): Promise<Storage> {
  * without a valid token.
  */
 export async function getRequestStorage(): Promise<{ storage: Storage; userId: string | null }> {
-  if (!authEnabled()) return { storage: await getStorageFor(null), userId: null };
-  const { requireUser } = await import('../auth/session');
-  const userId = (await requireUser()).id;
+  const userId = await getRequestUserId();
   return { storage: await getStorageFor(userId), userId };
+}
+
+/** The validated user's id for this request (null in disk mode); throws UnauthorizedError without a valid token. */
+export async function getRequestUserId(): Promise<string | null> {
+  if (!authEnabled()) return null;
+  const { requireUser } = await import('../auth/session');
+  return (await requireUser()).id;
 }
 
 /**

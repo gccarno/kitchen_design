@@ -32,3 +32,6 @@ export type RequeueOutcome = 'requeued' | 'failed' | 'noop';
 
 /** The error a job gets when it ran too long too many times. */
 export const JOB_TIMED_OUT: JobError = { status: 500, error: 'job timed out' };
+
+/** The error a job gets when it sat queued too long without ever starting. */
+export const JOB_NEVER_STARTED: JobError = { status: 500, error: 'job was never started' };

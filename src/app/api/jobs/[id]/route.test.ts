@@ -5,6 +5,8 @@ import { resetTestDb, sharedTestDb } from '@/lib/db/test-db';
 import type { Db } from '@/lib/db/types';
 import { createSession, createUser } from '@/lib/auth/users';
 import { getJobStore } from '@/lib/jobs';
+import { jobs as jobsTable } from '@/lib/db/schema';
+import { eq, sql } from 'drizzle-orm';
 
 const state = vi.hoisted(() => ({ db: undefined as unknown, headers: new Headers() }));
 vi.mock('@/lib/db/client', () => ({ getDb: () => state.db }));
@@ -21,6 +23,7 @@ beforeEach(async () => {
   state.headers = new Headers();
   vi.stubEnv('DATABASE_URL', 'postgres://test');
   vi.stubEnv('WORKER_URL', '');
+  vi.stubEnv('GCS_BUCKET', '');
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -76,6 +79,38 @@ describe('GET /api/jobs/[id]', () => {
       status: 'failed',
       error: { status: 502, error: 'model kept answering badly', issues: ['x'] },
     });
+  });
+
+  it('requeues and re-dispatches a job stuck running for over 5 minutes', async () => {
+    const { jobs } = await signIn('a@example.com');
+    const job = await jobs.create(PROJECT, 'refine', { message: 'x' });
+    await jobs.claim(job.id);
+    await db
+      .update(jobsTable)
+      .set({ startedAt: sql`now() - interval '6 minutes'` })
+      .where(eq(jobsTable.id, job.id));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await poll(job.id);
+    expect(res.status).toBe(200);
+    // The answer is read after recovery: requeued (or already re-claimed/finished by the re-dispatch).
+    expect(['queued', 'running', 'failed']).toContain((await res.json()).status);
+    // Dispatched again in-process: the runner claims it a second time and, as
+    // the project doesn't exist, fails it — it is not left stuck.
+    await vi.waitFor(async () => expect((await jobs.get(job.id))!.status).toBe('failed'));
+    expect(await jobs.get(job.id)).toMatchObject({ attempts: 2, error: { status: 404, error: 'project not found' } });
+    spy.mockRestore();
+  });
+
+  it('leaves a job running for under 5 minutes alone', async () => {
+    const { jobs } = await signIn('a@example.com');
+    const job = await jobs.create(PROJECT, 'refine', { message: 'x' });
+    await jobs.claim(job.id);
+    await db
+      .update(jobsTable)
+      .set({ startedAt: sql`now() - interval '4 minutes'` })
+      .where(eq(jobsTable.id, job.id));
+    expect((await (await poll(job.id)).json()).status).toBe('running');
+    expect(await jobs.get(job.id)).toMatchObject({ status: 'running', attempts: 1 });
   });
 
   it("is 404 for another user's job, an unknown id and a non-UUID id", async () => {

@@ -11,7 +11,8 @@ vi.mock('./index', async () => {
 const { getJobStore } = await import('./index');
 
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
-const env = { WORKER_URL: 'http://worker.test/', WORKER_TOKEN: 'tok' };
+// Auth on (DATABASE_URL set): jobs live in Postgres, where a worker can see them.
+const env = { WORKER_URL: 'http://worker.test/', WORKER_TOKEN: 'tok', DATABASE_URL: 'postgres://db.test/x' };
 
 beforeEach(() => {
   vi.stubEnv('DATABASE_URL', '');
@@ -45,6 +46,14 @@ describe('dispatchJob', () => {
   ])('falls back to a local run on %s', async (_n, impl) => {
     const run = vi.fn(async () => {});
     expect(await dispatchJob(ID, { env, fetch: asFetch(vi.fn(impl)), run })).toBe('local');
+    expect(run).toHaveBeenCalledWith(ID);
+  });
+
+  it('skips the worker in disk mode, where jobs live only in this process', async () => {
+    const fetchFn = vi.fn();
+    const run = vi.fn(async () => {});
+    expect(await dispatchJob(ID, { env: { ...env, DATABASE_URL: '' }, fetch: asFetch(fetchFn), run })).toBe('local');
+    expect(fetchFn).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledWith(ID);
   });
 
@@ -91,7 +100,9 @@ describe('ensureProgress', () => {
     const job = await store.create(PROJECT, 'refine', { message: 'x' });
     await store.claim(job.id);
     const run = vi.fn(async () => {});
-    clock.now += 16 * 60 * 1000;
+    clock.now += 4 * 60 * 1000;
+    expect(await ensureProgress((await store.get(job.id))!, { env: {}, run, now: () => clock.now })).toBe('noop');
+    clock.now += 2 * 60 * 1000; // now over 5 minutes
     const running = (await store.get(job.id))!;
     expect(await ensureProgress(running, { env: {}, run, now: () => clock.now })).toBe('requeued');
     expect(run).toHaveBeenCalledWith(job.id);
@@ -117,13 +128,26 @@ describe('ensureProgress', () => {
     expect(run).toHaveBeenCalledWith(job.id);
   });
 
+  it('gives up on a job still queued after 10 minutes, without dispatching it', async () => {
+    const store = await getJobStore(null);
+    const job = await store.create(PROJECT, 'refine', {});
+    const run = vi.fn(async () => {});
+    clock.now += 9 * 60 * 1000;
+    expect(await ensureProgress(job, { env: {}, run, now: () => clock.now })).toBe('requeued');
+    expect(run).toHaveBeenCalledTimes(1);
+    clock.now += 2 * 60 * 1000;
+    expect(await ensureProgress(job, { env: {}, run, now: () => clock.now })).toBe('failed');
+    expect(run).toHaveBeenCalledTimes(1);
+    expect((await store.get(job.id))!).toMatchObject({ status: 'failed', error: { status: 500, error: 'job was never started' } });
+  });
+
   it('marks a job failed after too many attempts and does not dispatch', async () => {
     const store = await getJobStore(null);
     const job = await store.create(PROJECT, 'refine', {});
     const run = vi.fn(async () => {});
     for (let i = 0; i < 3; i++) {
       await store.claim(job.id);
-      clock.now += 16 * 60 * 1000;
+      clock.now += 6 * 60 * 1000;
       const cur = (await store.get(job.id))!;
       expect(await ensureProgress(cur, { env: {}, run, now: () => clock.now })).toBe(i < 2 ? 'requeued' : 'failed');
     }

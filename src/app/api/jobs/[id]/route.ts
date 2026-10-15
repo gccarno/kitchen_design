@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getJobStore, type Job } from '@/lib/jobs';
 import { ensureProgress } from '@/lib/jobs/dispatch';
-import { getRequestStorage } from '@/lib/storage';
+import { getRequestUserId } from '@/lib/storage';
 import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
@@ -30,8 +30,7 @@ function view(job: Job) {
  */
 async function handleGet(_req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
-  const { userId } = await getRequestStorage();
-  const store = await getJobStore(userId);
+  const store = await getJobStore(await getRequestUserId());
   let job = await store.get(id);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404, headers: noStore });
   if (job.status === 'queued' || job.status === 'running') {

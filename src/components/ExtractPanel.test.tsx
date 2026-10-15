@@ -81,7 +81,7 @@ describe('ExtractPanel', () => {
   });
 
   it('allows extracting with no measurements (blank rows are ignored)', async () => {
-    fetchMock.mockResolvedValueOnce(json(RESULT));
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202));
     const { button } = setup();
     fireEvent.click(button());
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -118,8 +118,12 @@ describe('ExtractPanel', () => {
     fireEvent.click(button());
     expect(screen.getByText(/can take up to a minute/i)).not.toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    resolve(json(RESULT));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(job('done', { result: RESULT }));
+    resolve(json({ jobId: JOB }, 202));
+    await tick(1500);
     await waitFor(() => expect(button().disabled).toBe(false));
+    expect(fetchMock).toHaveBeenCalledTimes(2); // the POST, then one poll
   });
 
   it('shows the server error, e.g. no LLM configured', async () => {
@@ -182,5 +186,24 @@ describe('ExtractPanel', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(`/api/jobs/${JOB}`);
     expect(first.onProposal).not.toHaveBeenCalled();
+  });
+
+  it('on a lost connection, says so and keeps the job so reopening the panel resumes it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockImplementation(async () => json({ error: 'down' }, 503));
+    const first = setup();
+    fireEvent.click(first.button());
+    await tick(130_000);
+    expect(await screen.findByText('Connection lost — reopen this panel to check the result')).not.toBeNull();
+    expect(first.button().disabled).toBe(false);
+    expect(sessionStorage.getItem(KEY)).toContain(JOB);
+
+    cleanupRender();
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(job('done', { result: RESULT }));
+    const second = setup();
+    await tick(1500);
+    await waitFor(() => expect(second.onProposal).toHaveBeenCalled());
+    expect(sessionStorage.getItem(KEY)).toBeNull();
   });
 });
