@@ -40,3 +40,27 @@ export const authTokens = pgTable('auth_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'string' }),
 });
+
+/**
+ * Async LLM work (extract, refine) the client polls. `user_id` is null in
+ * disk mode. `status` moves queued → running → done | failed; the claim is a
+ * conditional UPDATE, so a job runs at most once per queueing.
+ */
+export const jobs = pgTable(
+  'jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id').notNull(),
+    kind: text('kind').notNull(),
+    status: text('status').notNull(),
+    input: jsonb('input').notNull(),
+    result: jsonb('result'),
+    error: jsonb('error'),
+    attempts: integer('attempts').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    startedAt: timestamp('started_at', { withTimezone: true, mode: 'string' }),
+    finishedAt: timestamp('finished_at', { withTimezone: true, mode: 'string' }),
+  },
+  (t) => [index('jobs_user_created_idx').on(t.userId, t.createdAt), index('jobs_status_started_idx').on(t.status, t.startedAt)]
+);
