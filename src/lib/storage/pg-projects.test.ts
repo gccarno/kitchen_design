@@ -41,6 +41,13 @@ describe('PgProjectStore', () => {
     expect((await store.list()).map((s) => s.name)).toEqual(['Good']);
   });
 
+  it('locks the row with FOR UPDATE when updating', async () => {
+    const db = await sharedTestDb();
+    const store = new PgProjectStore(db);
+    const { sql: text } = store.lockedRowQuery(db, randomUUID()).toSQL();
+    expect(text.toLowerCase()).toContain('for update');
+  });
+
   it('keeps the denormalized columns in step with the document', async () => {
     const db = await sharedTestDb();
     const store = new PgProjectStore(db);

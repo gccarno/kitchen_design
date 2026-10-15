@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -6,6 +6,28 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { POST } from './route';
 import { createProject, loadProject, projectDir } from '@/lib/storage/projects';
+
+const raceState = vi.hoisted(() => ({ vanish: false }));
+vi.mock('@/lib/storage', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/storage')>();
+  return {
+    ...mod,
+    getStorage: async () => {
+      const s = await mod.getStorage();
+      if (!raceState.vanish) return s;
+      return {
+        ...s,
+        projects: {
+          ...s.projects,
+          load: s.projects.load.bind(s.projects),
+          update: async (id: string) => {
+            throw new mod.ProjectNotFoundError(id);
+          },
+        },
+      };
+    },
+  };
+});
 
 function makeJpeg(width: number, height: number): Promise<Buffer> {
   return sharp({
@@ -107,5 +129,16 @@ describe('POST /api/upload', () => {
     );
     expect(results.every((r) => r.status === 201)).toBe(true);
     expect(loadProject(dataDir, p.id).photos).toHaveLength(5);
+  });
+
+  it('returns 404 when the project is deleted between the check and the update', async () => {
+    const p = createProject(dataDir, { name: 'Test' });
+    raceState.vanish = true;
+    try {
+      const res = await post({ projectId: p.id, file: await jpegBlob() });
+      expect(res.status).toBe(404);
+    } finally {
+      raceState.vanish = false;
+    }
   });
 });

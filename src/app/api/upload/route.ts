@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addPhoto, getStorage, isValidProjectId } from '@/lib/storage';
+import { addPhoto, getStorage, isValidProjectId, ProjectNotFoundError } from '@/lib/storage';
 import { normalizeOrientation, readImageDimensions } from '@/lib/exif';
 
 // Disable any caching on this route.
@@ -60,6 +60,13 @@ export async function POST(req: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'file is not a readable image' }, { status: 400 });
   }
 
-  const photo = await addPhoto(storage, projectId, normalized, dims);
-  return NextResponse.json({ photo }, { status: 201 });
+  try {
+    const photo = await addPhoto(storage, projectId, normalized, dims);
+    return NextResponse.json({ photo }, { status: 201 });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) {
+      return NextResponse.json({ error: 'project not found' }, { status: 404 });
+    }
+    throw err;
+  }
 }

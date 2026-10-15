@@ -10,6 +10,8 @@ import { ProjectNotFoundError, toSummary, type ProjectStore, type ProjectSummary
  * Projects in Postgres, one row each, scoped to one owner. `update` locks
  * the row (SELECT … FOR UPDATE) inside a transaction, so concurrent writers
  * — parallel photo uploads, two devices — are applied one after another.
+ * Update callbacks must not query the db: the transaction holds a pooled
+ * connection (pool of 5), so a nested query can deadlock the pool.
  */
 export class PgProjectStore implements ProjectStore {
   constructor(
@@ -49,14 +51,19 @@ export class PgProjectStore implements ProjectStore {
     return row ? ProjectSchema.parse(row.doc) : null;
   }
 
+  /** The SELECT … FOR UPDATE that serializes writers (public so a test can assert the lock). */
+  lockedRowQuery(db: Pick<Db, 'select'>, id: string) {
+    return db
+      .select({ doc: projects.doc })
+      .from(projects)
+      .where(and(eq(projects.id, id), this.owned()))
+      .for('update');
+  }
+
   async update(id: string, update: (current: Project) => Project | Promise<Project>): Promise<Project> {
     if (!isValidProjectId(id)) throw new ProjectNotFoundError(id);
     return this.db.transaction(async (tx) => {
-      const [row] = await tx
-        .select({ doc: projects.doc })
-        .from(projects)
-        .where(and(eq(projects.id, id), this.owned()))
-        .for('update');
+      const [row] = await this.lockedRowQuery(tx, id);
       if (!row) throw new ProjectNotFoundError(id);
       const next = await update(ProjectSchema.parse(row.doc));
       if (next.id !== id) throw new Error('an update must not change the project id');

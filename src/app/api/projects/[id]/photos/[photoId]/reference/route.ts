@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStorage, lookupPhoto, type Storage } from '@/lib/storage';
+import { getStorage, lookupPhoto, ProjectNotFoundError, type Storage } from '@/lib/storage';
 import { ReferenceInputSchema, resolveReference } from '@/lib/plan/reference-objects';
 import type { Photo } from '@/lib/plan/schemas';
 
@@ -40,8 +40,13 @@ export async function PUT(req: Request, { params }: Ctx): Promise<NextResponse> 
     return NextResponse.json({ error: resolved.issues.join('; ') }, { status: 400 });
   }
 
-  const photo = await setPhoto(storage, id, photoId, (p) => ({ ...p, referenceObject: resolved.value }));
-  return NextResponse.json({ photo });
+  try {
+    const photo = await setPhoto(storage, id, photoId, (p) => ({ ...p, referenceObject: resolved.value }));
+    return NextResponse.json({ photo });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) return NextResponse.json({ error: 'project not found' }, { status: 404 });
+    throw err;
+  }
 }
 
 /** DELETE .../reference — clear the photo's reference object. */
@@ -51,8 +56,13 @@ export async function DELETE(_req: Request, { params }: Ctx): Promise<NextRespon
   const found = await lookupPhoto(storage, id, photoId);
   if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
 
-  const photo = await setPhoto(storage, id, photoId, ({ referenceObject: _removed, ...rest }) => rest);
-  return NextResponse.json({ photo });
+  try {
+    const photo = await setPhoto(storage, id, photoId, ({ referenceObject: _removed, ...rest }) => rest);
+    return NextResponse.json({ photo });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) return NextResponse.json({ error: 'project not found' }, { status: 404 });
+    throw err;
+  }
 }
 
 async function setPhoto(
