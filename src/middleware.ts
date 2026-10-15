@@ -12,7 +12,7 @@ import type { AuthUser } from '@/lib/auth/users';
 export const config = {
   runtime: 'nodejs',
   // Skip static assets and the public paths (decide() checks those again).
-  matcher: ['/((?!_next/static/|_next/image|favicon\.ico$|icons/|manifest|login(?:/|$)|api/auth/|api/health(?:/|$)).*)'],
+  matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$|icons/|manifest(?:\\.json|\\.webmanifest)$|login(?:/|$)|api/auth/|api/health(?:/|$)).*)'],
 };
 
 export type RequestInfo = { pathname: string; search: string; authEnabled: boolean };
@@ -26,10 +26,12 @@ export function isPublicPath(pathname: string): boolean {
     under(pathname, '/login') ||
     pathname.startsWith('/api/auth/') ||
     under(pathname, '/api/health') ||
-    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/_next/static/') ||
+    pathname === '/_next/image' ||
     pathname === '/favicon.ico' ||
     pathname.startsWith('/icons/') ||
-    pathname.startsWith('/manifest')
+    pathname === '/manifest.json' ||
+    pathname === '/manifest.webmanifest'
   );
 }
 

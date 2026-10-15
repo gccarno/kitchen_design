@@ -25,6 +25,10 @@ import * as reference from './projects/[id]/photos/[photoId]/reference/route';
 import * as upload from './upload/route';
 import * as csv from './export/[id]/csv/route';
 import * as svg from './export/[id]/svg/route';
+import * as pdf from './export/[id]/pdf/route';
+import * as png from './export/[id]/png/route';
+import * as elevPng from './export/[id]/elevations/png/route';
+import * as elevSvg from './export/[id]/elevations/svg/route';
 
 const state = vi.hoisted(() => ({ db: undefined as unknown, headers: new Headers() }));
 vi.mock('@/lib/db/client', () => ({ getDb: () => state.db }));
@@ -70,6 +74,10 @@ function calls(id: string, photoId: string): [string, () => Promise<Response>][]
     ['POST upload', () => upload.POST(new Request('http://localhost/x', { method: 'POST', body: form }))],
     ['GET export csv', () => csv.GET(new Request('http://localhost/x'), ctx(id))],
     ['GET export svg', () => svg.GET(new Request('http://localhost/x'), ctx(id))],
+    ['GET export pdf', () => pdf.GET(new Request('http://localhost/x'), ctx(id))],
+    ['GET export png', () => png.GET(new Request('http://localhost/x'), ctx(id))],
+    ['GET export elevations png', () => elevPng.GET(new Request('http://localhost/x'), ctx(id))],
+    ['GET export elevations svg', () => elevSvg.GET(new Request('http://localhost/x'), ctx(id))],
   ];
 }
 
@@ -90,6 +98,7 @@ describe('storage-backed API routes with auth on', () => {
       for (const [name, call] of calls(p.id, ph.id)) {
         const res = await call();
         expect(res.status, name).toBe(401);
+        expect(res.headers.get('cache-control'), name).toBe('no-store');
         expect(await res.json(), name).toEqual({ error: 'Unauthorized' });
       }
     }

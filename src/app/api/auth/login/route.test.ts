@@ -8,8 +8,18 @@ import { Throttle, setEmailThrottle, setLoginThrottle } from '@/lib/auth/throttl
 import { createUser, userForToken } from '@/lib/auth/users';
 import { POST } from './route';
 
-const state = vi.hoisted(() => ({ db: undefined as unknown }));
+const state = vi.hoisted(() => ({ db: undefined as unknown, authCalls: 0 }));
 vi.mock('@/lib/db/client', () => ({ getDb: () => state.db }));
+vi.mock('@/lib/auth/users', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/auth/users')>();
+  return {
+    ...mod,
+    authenticate: (...args: Parameters<typeof mod.authenticate>) => {
+      state.authCalls++;
+      return mod.authenticate(...args);
+    },
+  };
+});
 
 const URL = 'http://localhost/api/auth/login';
 const PW = 'a-good-password';
@@ -29,6 +39,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   setLoginThrottle(undefined);
   setEmailThrottle(undefined);
+  state.authCalls = 0;
 });
 
 const login = (email: string, password: string, ip = '1.2.3.4') =>
@@ -68,6 +79,15 @@ describe('POST /api/auth/login', () => {
   it('keys on a lowercased email and the first forwarded hop', async () => {
     for (let i = 0; i < 5; i++) await login(i % 2 ? 'A@Example.com' : 'a@example.com', 'wrong-password-1');
     expect((await login('a@example.com', 'wrong-password-1')).status).toBe(429);
+  });
+
+  it('reserves attempts up front: parallel wrong guesses on one key reach authenticate at most 5 times', async () => {
+    await createUser(db, 'a@example.com', PW);
+    state.authCalls = 0;
+    const results = await Promise.all(Array.from({ length: 12 }, () => login('a@example.com', 'wrong-password-1')));
+    expect(state.authCalls).toBe(5);
+    expect(results.filter((r) => r.status === 401)).toHaveLength(5);
+    expect(results.filter((r) => r.status === 429)).toHaveLength(7);
   });
 
   it('a success clears earlier failures', async () => {

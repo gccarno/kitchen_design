@@ -26,14 +26,23 @@ export class Throttle {
     return !e || e.count < this.maxFailures;
   }
 
-  recordFailure(key: string): void {
+  /**
+   * Reserve one attempt for `key` BEFORE doing the work it guards, so concurrent attempts
+   * cannot all pass a check-then-act race. Returns false (and consumes nothing) when the key
+   * is at its limit. Call `clear(key)` on success; failures simply stay counted.
+   * A new key is also refused when the map is full of keys that are all at their limit
+   * (conservatively treated as limited rather than growing or evicting a victim's counter).
+   */
+  tryConsume(key: string): boolean {
     const e = this.live(key);
     if (e) {
+      if (e.count >= this.maxFailures) return false;
       e.count++;
-      return;
+      return true;
     }
-    if (this.entries.size >= MAX_KEYS) this.prune();
+    if (this.entries.size >= MAX_KEYS && !this.makeRoom()) return false;
     this.entries.set(key, { count: 1, start: this.now() });
+    return true;
   }
 
   clear(key: string): void {
@@ -48,15 +57,15 @@ export class Throttle {
     return this.entries.size;
   }
 
-  private prune(): void {
+  /** Drop expired keys, then the oldest keys still below their limit; never an at-limit key. */
+  private makeRoom(): boolean {
     const t = this.now();
     for (const [k, e] of this.entries) if (t - e.start >= WINDOW_MS) this.entries.delete(k);
-    // Still full: evict the oldest-inserted keys to leave room for one more.
-    while (this.entries.size >= MAX_KEYS) {
-      const oldest = this.entries.keys().next();
-      if (oldest.done) break;
-      this.entries.delete(oldest.value);
+    for (const [k, e] of this.entries) {
+      if (this.entries.size < MAX_KEYS) break;
+      if (e.count < this.maxFailures) this.entries.delete(k);
     }
+    return this.entries.size < MAX_KEYS;
   }
 }
 
