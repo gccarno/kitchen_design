@@ -7,6 +7,9 @@ export async function register(): Promise<void> {
   // The positive NEXT_RUNTIME check must wrap the import so Next drops the
   // Node-only migrator from the edge compilation of this file.
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+      console.error('DATABASE_URL is not set in production: auth is DISABLED and the app is wide open to anyone who can reach it.');
+    }
     const { shouldMigrateOnStartup } = await import('./lib/db/remote-guard');
     if (!shouldMigrateOnStartup(process.env)) {
       if (process.env.DATABASE_URL) {

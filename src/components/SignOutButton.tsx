@@ -11,7 +11,7 @@ export default function SignOutButton({ email }: { email: string }) {
     try {
       await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     } catch {
-      // Navigate regardless; the middleware sends a still-valid session back.
+      // Navigate regardless; /login sends a still-valid session back to /.
     }
     window.location.assign('/login');
   }

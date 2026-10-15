@@ -70,10 +70,12 @@ export class Throttle {
 }
 
 export const MAX_EMAIL_FAILURES = 20;
+export const MAX_IP_ATTEMPTS = 50;
 
 const KEY = Symbol.for('kitchen-design.login-throttle');
 const EMAIL_KEY = Symbol.for('kitchen-design.login-email-throttle');
-type G = typeof globalThis & { [KEY]?: Throttle; [EMAIL_KEY]?: Throttle };
+const IP_KEY = Symbol.for('kitchen-design.login-ip-throttle');
+type G = typeof globalThis & { [KEY]?: Throttle; [EMAIL_KEY]?: Throttle; [IP_KEY]?: Throttle };
 const holder = () => globalThis as G;
 
 /** Process-wide per-(ip|email) login throttle, shared by every route bundle. */
@@ -104,4 +106,20 @@ export function setEmailThrottle(t: Throttle | undefined): void {
   const g = holder();
   if (t) g[EMAIL_KEY] = t;
   else delete g[EMAIL_KEY];
+}
+
+/**
+ * Process-wide per-IP attempt cap (50 / 15 min), consumed first on every login attempt, so a single
+ * IP cannot fill the per-key maps with distinct emails and lock everyone else out.
+ */
+export function ipThrottle(): Throttle {
+  const g = holder();
+  return (g[IP_KEY] ??= new Throttle(Date.now, MAX_IP_ATTEMPTS));
+}
+
+/** Test hook: replace the process-wide per-IP throttle (or drop it with undefined). */
+export function setIpThrottle(t: Throttle | undefined): void {
+  const g = holder();
+  if (t) g[IP_KEY] = t;
+  else delete g[IP_KEY];
 }

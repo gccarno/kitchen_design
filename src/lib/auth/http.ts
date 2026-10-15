@@ -59,11 +59,16 @@ export function credentialsFrom(body: Record<string, unknown>): { email: string;
 }
 
 /**
- * Client IP for throttling: the RIGHTMOST x-forwarded-for entry, i.e. the one appended by
- * the platform proxy (Render, Tailscale Funnel). Earlier entries are client-supplied and
- * spoofable, so they are never used. Falls back to 'unknown'.
+ * Client IP for throttling, from x-forwarded-for. TRUSTED_PROXY_HOPS (default 1) is the number of
+ * entries appended by trusted proxies: the Nth entry from the RIGHT is the client (1 = rightmost,
+ * what Render and Tailscale Funnel append). Earlier entries are client-supplied and never used.
+ * 0 ignores the header. Falls back to 'unknown' (a shared bucket) when there is no such entry.
  */
-export function clientIp(headers: Headers): string {
+export function clientIp(headers: Headers, env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.TRUSTED_PROXY_HOPS;
+  const parsed = raw === undefined || raw.trim() === '' ? 1 : Number(raw);
+  const hops = Number.isInteger(parsed) && parsed >= 0 ? parsed : 1;
+  if (hops === 0) return 'unknown';
   const parts = (headers.get('x-forwarded-for') ?? '').split(',');
-  return parts[parts.length - 1].trim() || 'unknown';
+  return parts[parts.length - hops]?.trim() || 'unknown';
 }

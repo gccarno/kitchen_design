@@ -26,4 +26,10 @@ describe('registrationAllowed', () => {
     expect(await registrationAllowed(db, env({ ALLOW_REGISTRATION: '1' }))).toBe(true);
     expect(await registrationAllowed(db, env({ ALLOW_REGISTRATION: 'true' }))).toBe(false);
   });
+
+  it('in production needs ALLOW_REGISTRATION=1 even for the first user', async () => {
+    const db = await sharedTestDb();
+    expect(await registrationAllowed(db, env({ NODE_ENV: 'production' }))).toBe(false);
+    expect(await registrationAllowed(db, env({ NODE_ENV: 'production', ALLOW_REGISTRATION: '1' }))).toBe(true);
+  });
 });

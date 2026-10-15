@@ -4,8 +4,8 @@ import { authTokens } from '@/lib/db/schema';
 import { resetTestDb, sharedTestDb } from '@/lib/db/test-db';
 import type { Db } from '@/lib/db/types';
 import { jsonReq, sessionFromSetCookie } from '@/lib/auth/route-test-helpers';
-import { Throttle, setEmailThrottle, setLoginThrottle } from '@/lib/auth/throttle';
-import { createUser, userForToken } from '@/lib/auth/users';
+import { Throttle, setEmailThrottle, setIpThrottle, setLoginThrottle } from '@/lib/auth/throttle';
+import { createSession, createUser, userForToken } from '@/lib/auth/users';
 import { POST } from './route';
 
 const state = vi.hoisted(() => ({ db: undefined as unknown, authCalls: 0 }));
@@ -33,12 +33,14 @@ beforeEach(async () => {
   await resetTestDb(db);
   setLoginThrottle(new Throttle());
   setEmailThrottle(undefined);
+  setIpThrottle(undefined);
   vi.stubEnv('DATABASE_URL', 'postgres://test');
 });
 afterEach(() => {
   vi.unstubAllEnvs();
   setLoginThrottle(undefined);
   setEmailThrottle(undefined);
+  setIpThrottle(undefined);
   state.authCalls = 0;
 });
 
@@ -88,6 +90,35 @@ describe('POST /api/auth/login', () => {
     expect(state.authCalls).toBe(5);
     expect(results.filter((r) => r.status === 401)).toHaveLength(5);
     expect(results.filter((r) => r.status === 429)).toHaveLength(7);
+  });
+
+  it('caps one IP at 50 attempts so it cannot fill the key map; other IPs still log in', async () => {
+    await createUser(db, 'a@example.com', PW);
+    const lt = new Throttle();
+    setLoginThrottle(lt);
+    state.authCalls = 0;
+    const statuses: number[] = [];
+    for (let i = 0; i < 55; i++) statuses.push((await login(`victim${i}@example.com`, 'wrong-password-1', '3.3.3.3')).status);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(50);
+    expect(statuses.slice(50)).toEqual([429, 429, 429, 429, 429]);
+    expect(state.authCalls).toBe(50);
+    expect(lt.size).toBeLessThanOrEqual(50);
+    expect((await login('a@example.com', PW, '4.4.4.4')).status).toBe(200);
+  });
+
+  it('revokes the session token presented with a successful login', async () => {
+    const u = await createUser(db, 'a@example.com', PW);
+    const old1 = await createSession(db, u.id);
+    const old2 = await createSession(db, u.id);
+    const other = await createSession(db, u.id);
+    const res = await POST(
+      jsonReq(URL, { email: 'a@example.com', password: PW }, { headers: { cookie: `session=${old1}`, authorization: `Bearer ${old2}` } })
+    );
+    expect(res.status).toBe(200);
+    expect(await userForToken(db, old1)).toBeNull();
+    expect(await userForToken(db, old2)).toBeNull();
+    expect(await userForToken(db, other)).not.toBeNull();
+    expect(await userForToken(db, sessionFromSetCookie(res)!)).not.toBeNull();
   });
 
   it('a success clears earlier failures', async () => {

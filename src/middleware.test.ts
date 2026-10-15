@@ -5,7 +5,7 @@ import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { resetTestDb, sharedTestDb } from '@/lib/db/test-db';
 import type { Db } from '@/lib/db/types';
 import { createSession, createUser, revokeToken } from '@/lib/auth/users';
-import { config, decide, isPublicPath, middleware } from './middleware';
+import { config, csrfBlocked, decide, isPublicPath, middleware } from './middleware';
 
 const state = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock('@/lib/db/client', () => ({ getDb: () => state.db }));
@@ -142,5 +142,47 @@ describe('middleware', () => {
     const res = await run('/api/projects', { 'x-user-id': 'x' });
     expect(res.headers.get('x-middleware-next')).toBe('1');
     expect((res.headers.get('x-middleware-override-headers') ?? '').split(',')).not.toContain('x-user-id');
+  });
+});
+
+describe('csrfBlocked', () => {
+  const h = (o: Record<string, string>) => new Headers(o);
+  it('blocks cross-site state-changing API requests', () => {
+    expect(csrfBlocked('POST', '/api/upload', h({ 'sec-fetch-site': 'cross-site' }))).toBe(true);
+    expect(csrfBlocked('POST', '/api/projects', h({ 'sec-fetch-site': 'same-site' }))).toBe(true);
+    expect(csrfBlocked('DELETE', '/api/projects/x', h({ 'sec-fetch-site': 'cross-site' }))).toBe(true);
+    expect(csrfBlocked('POST', '/api/projects', h({ origin: 'https://evil.example', host: 'app.example' }))).toBe(true);
+    expect(csrfBlocked('POST', '/api/projects', h({ origin: 'null', host: 'app.example' }))).toBe(true);
+  });
+  it('allows same-origin, header-less, Bearer and safe-method requests', () => {
+    expect(csrfBlocked('POST', '/api/projects', h({ 'sec-fetch-site': 'same-origin', origin: 'https://app.example', host: 'app.example' }))).toBe(false);
+    expect(csrfBlocked('POST', '/api/projects', h({ 'sec-fetch-site': 'none' }))).toBe(false);
+    expect(csrfBlocked('POST', '/api/projects', h({}))).toBe(false);
+    expect(csrfBlocked('POST', '/api/projects', h({ 'sec-fetch-site': 'cross-site', authorization: 'Bearer t' }))).toBe(false);
+    expect(csrfBlocked('GET', '/api/projects', h({ 'sec-fetch-site': 'cross-site' }))).toBe(false);
+    expect(csrfBlocked('POST', '/somewhere', h({ 'sec-fetch-site': 'cross-site' }))).toBe(false);
+  });
+});
+
+describe('middleware CSRF', () => {
+  beforeAll(async () => {
+    state.db = await sharedTestDb();
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('403s a cross-site POST to /api/upload and /api/projects even with a valid session', async () => {
+    vi.stubEnv('DATABASE_URL', 'postgres://test');
+    const db = await sharedTestDb();
+    await resetTestDb(db);
+    const u = await createUser(db, 'a@example.com', 'a-good-password');
+    const t = await createSession(db, u.id);
+    for (const path of ['/api/upload', '/api/projects']) {
+      const res = await middleware(
+        new NextRequest(`http://localhost${path}`, { method: 'POST', headers: { cookie: `session=${t}`, 'sec-fetch-site': 'cross-site' } })
+      );
+      expect(res.status, path).toBe(403);
+    }
+    const ok = await middleware(new NextRequest('http://localhost/api/projects', { method: 'POST', headers: { cookie: `session=${t}` } }));
+    expect(ok.status).toBe(200);
   });
 });

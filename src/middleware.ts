@@ -47,8 +47,36 @@ export function decide(info: RequestInfo, user: AuthUser | null): Decision {
   return { action: 'redirect', location: `/login?next=${encodeURIComponent(info.pathname + info.search)}` };
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * Cheap CSRF hardening for cookie-authenticated API calls: a state-changing /api/* request without an
+ * Authorization header is refused when the browser says it is cross-site (Sec-Fetch-Site other than
+ * same-origin/none) or its Origin host differs from Host. Requests carrying neither header (curl,
+ * native clients) pass.
+ */
+export function csrfBlocked(method: string, pathname: string, headers: Headers): boolean {
+  if (SAFE_METHODS.has(method.toUpperCase()) || !under(pathname, '/api') || headers.has('authorization')) return false;
+  const site = headers.get('sec-fetch-site');
+  if (site !== null && site !== 'same-origin' && site !== 'none') return true;
+  const origin = headers.get('origin');
+  if (origin !== null) {
+    let originHost: string | null = null;
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      /* 'null' or malformed: treated as a mismatch */
+    }
+    if (originHost === null || originHost !== headers.get('host')) return true;
+  }
+  return false;
+}
+
 export async function middleware(req: NextRequest): Promise<Response> {
   const info: RequestInfo = { pathname: req.nextUrl.pathname, search: req.nextUrl.search, authEnabled: authEnabled() };
+  if (needsUser(info) && csrfBlocked(req.method, info.pathname, req.headers)) {
+    return Response.json({ error: 'Cross-site request refused' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
+  }
   const user = needsUser(info) ? await userFromHeaders(req.headers) : null;
   const decision = decide(info, user);
   if (decision.action === 'unauthorized') return unauthorizedResponse();

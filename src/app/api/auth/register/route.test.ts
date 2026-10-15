@@ -56,6 +56,13 @@ describe('POST /api/auth/register', () => {
     expect((await db.select().from(projects).where(eq(projects.ownerId, id2))).length).toBe(0);
   });
 
+  it('in production the first user is refused too unless ALLOW_REGISTRATION=1', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect((await POST(jsonReq(URL, { email: 'a@example.com', password: PW }))).status).toBe(403);
+    vi.stubEnv('ALLOW_REGISTRATION', '1');
+    expect((await POST(jsonReq(URL, { email: 'a@example.com', password: PW }))).status).toBe(201);
+  });
+
   it('is closed (403) for a second user unless ALLOW_REGISTRATION=1', async () => {
     await POST(jsonReq(URL, { email: 'a@example.com', password: PW }));
     const closed = await POST(jsonReq(URL, { email: 'b@example.com', password: PW }));
