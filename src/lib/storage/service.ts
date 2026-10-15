@@ -67,7 +67,8 @@ export async function lookupPhoto(storage: Storage, projectId: string, photoId: 
   const project = await storage.projects.load(projectId);
   if (!project) return { ok: false, status: 404, error: 'project not found' };
   const photo = project.photos.find((p) => p.id === photoId);
-  if (!photo) return { ok: false, status: 404, error: 'photo not found' };
+  // A listed photo with an id we couldn't have generated (hand-edited project) is treated as absent.
+  if (!photo || !PHOTO_ID.test(photo.id)) return { ok: false, status: 404, error: 'photo not found' };
   return { ok: true, project, photo };
 }
 

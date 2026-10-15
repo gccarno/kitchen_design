@@ -55,6 +55,12 @@ describe('storage service', () => {
     expect(await lookupPhoto(storage, newProject({ name: 'x' }).id, photo.id)).toEqual({ ok: false, status: 404, error: 'project not found' });
   });
 
+  it('treats a listed photo with a tampered id as not found', async () => {
+    const p = { ...newProject({ name: 'P' }), photos: [{ id: '../evil', path: 'photos/x.jpg', width: 1, height: 1 }] };
+    await storage.projects.insert(p);
+    expect(await lookupPhoto(storage, p.id, '../evil')).toEqual({ ok: false, status: 404, error: 'photo not found' });
+  });
+
   it('deletes a project with its photos, and nothing else', async () => {
     const a = newProject({ name: 'A' });
     const b = newProject({ name: 'B' });

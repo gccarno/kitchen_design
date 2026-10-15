@@ -11,7 +11,7 @@ import {
 } from '@/lib/llm';
 import { loadCatalog } from '@/lib/catalog/loader';
 import { projectKind } from '@/lib/plan/schemas';
-import { isValidProjectId, loadProject, projectExists, resolveDataDir } from '@/lib/storage/projects';
+import { getStorage, isValidProjectId } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,8 +42,8 @@ const RefineRequestSchema = z.object({
 export async function POST(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
-  const dataDir = resolveDataDir();
-  if (!projectExists(dataDir, id)) return NextResponse.json({ error: 'project not found' }, { status: 404 });
+  const project = await (await getStorage()).projects.load(id);
+  if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 });
 
   let body: unknown;
   try {
@@ -68,7 +68,6 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
   }
 
   try {
-    const project = loadProject(dataDir, id);
     const { message, history } = input.data;
     const result =
       projectKind(project) === 'closet'

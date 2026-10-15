@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { isValidProjectId, projectExists, resolveDataDir, updateProject } from '@/lib/storage/projects';
+import { getStorage, isValidProjectId, ProjectNotFoundError } from '@/lib/storage';
 import { InvalidPatchError, StaleRevisionError } from '@/lib/plan/diff';
 import { NothingToUndoError, undoRedo } from '@/lib/plan/history';
 
@@ -27,8 +27,6 @@ const UndoSchema = z.object({
 export async function POST(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
-  const dataDir = resolveDataDir();
-  if (!projectExists(dataDir, id)) return NextResponse.json({ error: 'project not found' }, { status: 404 });
 
   let body: unknown;
   try {
@@ -44,9 +42,12 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
   const { action, baseRevision } = input.data;
 
   try {
-    const project = await updateProject(dataDir, id, (current) => undoRedo(current, action, baseRevision));
+    const project = await (await getStorage()).projects.update(id, (current) => undoRedo(current, action, baseRevision));
     return NextResponse.json({ project });
   } catch (err) {
+    if (err instanceof ProjectNotFoundError) {
+      return NextResponse.json({ error: 'project not found' }, { status: 404 });
+    }
     if (err instanceof StaleRevisionError) {
       return NextResponse.json({ error: err.message, currentRevision: err.currentRevision }, { status: 409 });
     }

@@ -7,7 +7,7 @@ import ClosetElevation from './ClosetElevation';
 import PlanThumbnail from './PlanThumbnail';
 import { submitRevision } from '@/lib/client/revisions';
 import { groupForList } from '@/lib/plan/options';
-import type { ProjectSummary } from '@/lib/storage/projects';
+import type { ProjectSummary } from '@/lib/storage/store';
 
 /**
  * The home page's project cards: a thumbnail of the current plan, the name,

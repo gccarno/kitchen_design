@@ -16,7 +16,7 @@ export async function GET(req: Request, { params }: Ctx): Promise<Response> {
   if (!PNG_SCALES.includes(scale as PngScale)) {
     return NextResponse.json({ error: `scale must be ${PNG_SCALES.join(' or ')}` }, { status: 400 });
   }
-  const drawing = loadDrawing((await params).id);
+  const drawing = await loadDrawing((await params).id);
   if ('error' in drawing) return drawing.error;
   const png = await svgToPng(drawing.svg, scale as PngScale);
   const suffix = scale === 1 ? '' : `@${scale}x`;

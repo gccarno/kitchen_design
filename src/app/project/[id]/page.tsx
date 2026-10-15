@@ -2,28 +2,26 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import ProjectEditor from '@/components/ProjectEditor';
 import { optionGroupId } from '@/lib/plan/options';
-import { isValidProjectId, loadProject, optionGroup, projectExists, resolveDataDir } from '@/lib/storage/projects';
+import { getStorage, optionGroup } from '@/lib/storage';
 
-// Always read the project from disk; it changes on every save.
+// Always read the project from storage; it changes on every save.
 export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ id: string }> };
 
-function find(id: string) {
-  const dataDir = resolveDataDir();
-  if (!isValidProjectId(id) || !projectExists(dataDir, id)) return null;
-  return loadProject(dataDir, id);
+async function find(id: string) {
+  return (await getStorage()).projects.load(id);
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const project = find((await params).id);
+  const project = await find((await params).id);
   return { title: project ? `${project.name} · Home Design` : 'Project not found' };
 }
 
 export default async function ProjectPage({ params }: Props) {
-  const project = find((await params).id);
+  const project = await find((await params).id);
   if (!project) notFound();
   const groupId = optionGroupId(project);
-  const optionCount = optionGroup(resolveDataDir(), groupId).length;
+  const optionCount = (await optionGroup(await getStorage(), groupId)).length;
   return <ProjectEditor initialProject={project} groupId={groupId} optionCount={optionCount} />;
 }

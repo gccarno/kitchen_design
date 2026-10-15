@@ -5,7 +5,7 @@ import { loadCatalog } from '@/lib/catalog/loader';
 import { ProjectKindSchema } from '@/lib/plan/schemas';
 import { buildSampleCleaningCloset } from '@/lib/closet/sample-closet';
 import { buildSampleKitchen } from '@/lib/plan/sample-kitchen';
-import { createProject, resolveDataDir, saveProject } from '@/lib/storage/projects';
+import { getStorage, newProject } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -34,12 +34,12 @@ export async function POST(req: Request): Promise<NextResponse> {
     const kindIssue = input.error.issues.some((i) => i.path[0] === 'kind');
     return NextResponse.json({ error: kindIssue ? 'kind must be "kitchen" or "closet"' : 'name is required' }, { status: 400 });
   }
-  const dataDir = resolveDataDir();
+  const storage = await getStorage();
   const { sample, ...fields } = input.data;
-  let project = createProject(dataDir, fields);
+  let project = newProject(fields);
   if (sample) {
     project = project.kind === 'closet' ? buildSampleCleaningCloset(project, randomUUID) : buildSampleKitchen(project, loadCatalog(), randomUUID);
-    saveProject(dataDir, project);
   }
+  await storage.projects.insert(project);
   return NextResponse.json({ project }, { status: 201 });
 }

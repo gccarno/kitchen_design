@@ -8,8 +8,7 @@ import {
   providerFromEnv,
   type LLMProvider,
 } from '@/lib/llm';
-import { isValidProjectId, loadProject, projectExists, resolveDataDir } from '@/lib/storage/projects';
-import { fsStorage, readPhoto } from '@/lib/storage';
+import { getStorage, isValidProjectId, readPhoto as readPhotoBytes } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -44,8 +43,9 @@ const ExtractRequestSchema = z.object({
 export async function POST(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
-  const dataDir = resolveDataDir();
-  if (!projectExists(dataDir, id)) return NextResponse.json({ error: 'project not found' }, { status: 404 });
+  const storage = await getStorage();
+  const project = await storage.projects.load(id);
+  if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 });
 
   let body: unknown;
   try {
@@ -59,7 +59,6 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
     return NextResponse.json({ error }, { status: 400 });
   }
 
-  const project = loadProject(dataDir, id);
   if (project.photos.length === 0) {
     return NextResponse.json({ error: 'upload at least one photo first' }, { status: 400 });
   }
@@ -81,7 +80,7 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
       measurements: input.data.measurements,
       hint: input.data.hint,
       readPhoto: async (photo) => {
-        const bytes = await readPhoto(fsStorage(dataDir), id, photo);
+        const bytes = await readPhotoBytes(storage, id, photo);
         if (!bytes) throw new Error(`photo file missing: ${photo.id}`);
         return bytes;
       },
