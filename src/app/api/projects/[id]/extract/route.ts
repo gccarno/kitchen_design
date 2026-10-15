@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import {
   extractRoom,
@@ -10,7 +9,7 @@ import {
   type LLMProvider,
 } from '@/lib/llm';
 import { isValidProjectId, loadProject, projectExists, resolveDataDir } from '@/lib/storage/projects';
-import { photoFilePath } from '@/lib/storage/photos';
+import { fsStorage, readPhoto } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -81,7 +80,11 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
       provider,
       measurements: input.data.measurements,
       hint: input.data.hint,
-      readPhoto: (photo) => readFile(photoFilePath(dataDir, id, photo)),
+      readPhoto: async (photo) => {
+        const bytes = await readPhoto(fsStorage(dataDir), id, photo);
+        if (!bytes) throw new Error(`photo file missing: ${photo.id}`);
+        return bytes;
+      },
     });
     return NextResponse.json(result);
   } catch (err) {

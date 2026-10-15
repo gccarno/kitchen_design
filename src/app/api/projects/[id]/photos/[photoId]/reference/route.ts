@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { resolveDataDir, updateProject } from '@/lib/storage/projects';
-import { lookupPhoto } from '@/lib/storage/photos';
+import { fsStorage, lookupPhoto } from '@/lib/storage';
 import { ReferenceInputSchema, resolveReference } from '@/lib/plan/reference-objects';
 import type { Photo } from '@/lib/plan/schemas';
 
@@ -23,7 +23,7 @@ type Ctx = { params: Promise<{ id: string; photoId: string }> };
 export async function PUT(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id, photoId } = await params;
   const dataDir = resolveDataDir();
-  const found = lookupPhoto(dataDir, id, photoId);
+  const found = await lookupPhoto(fsStorage(dataDir), id, photoId);
   if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
 
   let body: unknown;
@@ -49,7 +49,7 @@ export async function PUT(req: Request, { params }: Ctx): Promise<NextResponse> 
 export async function DELETE(_req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id, photoId } = await params;
   const dataDir = resolveDataDir();
-  const found = lookupPhoto(dataDir, id, photoId);
+  const found = await lookupPhoto(fsStorage(dataDir), id, photoId);
   if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
 
   const photo = await setPhoto(dataDir, id, photoId, ({ referenceObject: _removed, ...rest }) => rest);

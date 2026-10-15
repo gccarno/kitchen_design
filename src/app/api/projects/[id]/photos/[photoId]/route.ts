@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'node:fs/promises';
-import { resolveDataDir } from '@/lib/storage/projects';
-import { lookupPhoto, photoFilePath } from '@/lib/storage/photos';
+import { fsStorage, lookupPhoto, readPhoto, resolveDataDir } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,15 +15,11 @@ type Ctx = { params: Promise<{ id: string; photoId: string }> };
 export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
   const { id, photoId } = await params;
   const dataDir = resolveDataDir();
-  const found = lookupPhoto(dataDir, id, photoId);
+  const found = await lookupPhoto(fsStorage(dataDir), id, photoId);
   if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
 
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(photoFilePath(dataDir, id, found.photo));
-  } catch {
-    return NextResponse.json({ error: 'photo file missing' }, { status: 404 });
-  }
+  const bytes = await readPhoto(fsStorage(dataDir), id, found.photo);
+  if (!bytes) return NextResponse.json({ error: 'photo file missing' }, { status: 404 });
   return new Response(new Uint8Array(bytes), {
     status: 200,
     headers: {

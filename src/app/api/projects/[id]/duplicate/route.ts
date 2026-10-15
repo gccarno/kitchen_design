@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { duplicateAsOption, isValidProjectId, projectExists, resolveDataDir } from '@/lib/storage/projects';
+import { projectExists } from '@/lib/storage/projects';
+import { duplicateAsOption, fsStorage, isValidProjectId, resolveDataDir } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,5 +16,5 @@ export async function POST(_req: Request, { params }: Ctx): Promise<NextResponse
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
   const dataDir = resolveDataDir();
   if (!projectExists(dataDir, id)) return NextResponse.json({ error: 'project not found' }, { status: 404 });
-  return NextResponse.json({ project: duplicateAsOption(dataDir, id) }, { status: 201 });
+  return NextResponse.json({ project: await duplicateAsOption(fsStorage(dataDir), id) }, { status: 201 });
 }

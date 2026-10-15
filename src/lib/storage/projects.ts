@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -11,7 +10,7 @@ import {
   statSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { groupName, nextOptionName, optionGroupId, sortGroup } from '../plan/options';
+import { optionGroupId, sortGroup } from '../plan/options';
 import { newProject } from '../plan/new-project';
 import { ProjectSchema, type Project, type ProjectKind } from '../plan/schemas';
 import { isValidProjectId, InvalidProjectIdError, PHOTO_ID } from './ids';
@@ -170,42 +169,6 @@ export function optionGroup(dataDir: string, groupId: string): Project[] {
     loadAll(dataDir).filter((p) => optionGroupId(p) === groupId),
     groupId
   );
-}
-
-/**
- * Copy a project as a new design option: a new id and a fresh history,
- * linked to its group's original by `optionOf`, named "<group> — Option <L>",
- * with its photo files copied. The source is not changed.
- */
-export function duplicateAsOption(dataDir: string, sourceId: string): Project {
-  const source = loadProject(dataDir, sourceId);
-  const groupId = optionGroupId(source);
-  const group = optionGroup(dataDir, groupId);
-  const now = new Date().toISOString();
-  const id = randomUUID();
-  const { history: _history, ...rest } = source;
-  const copy: Project = ProjectSchema.parse({
-    ...rest,
-    photos: source.photos.filter((photo) => PHOTO_ID.test(photo.id)),
-    id,
-    name: nextOptionName(groupName(group), group.map((p) => p.name)),
-    createdAt: now,
-    updatedAt: now,
-    revision: 0,
-    optionOf: groupId,
-    history: [],
-  });
-
-  const fromDir = join(projectDir(dataDir, source.id), 'photos');
-  const toDir = join(projectDir(dataDir, id), 'photos');
-  mkdirSync(toDir, { recursive: true });
-  for (const photo of source.photos) {
-    if (!PHOTO_ID.test(photo.id)) continue;
-    const file = `${photo.id}.jpg`;
-    if (existsSync(join(fromDir, file))) copyFileSync(join(fromDir, file), join(toDir, file));
-  }
-  atomicWriteJson(join(projectDir(dataDir, id), 'project.json'), copy);
-  return copy;
 }
 
 /** True if a project exists on disk. */
