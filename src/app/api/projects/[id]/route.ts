@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { deleteProject, getStorage, isValidProjectId } from '@/lib/storage';
+import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,9 +12,11 @@ type Ctx = { params: Promise<{ id: string }> };
  * (Renaming goes through POST .../revisions, so it can be undone.)
  *   200 { deleted: true } · 400 invalid id · 404 unknown project
  */
-export async function DELETE(_req: Request, { params }: Ctx): Promise<NextResponse> {
+async function handleDelete(_req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
   if (!(await deleteProject(await getStorage(), id))) return NextResponse.json({ error: 'project not found' }, { status: 404 });
   return NextResponse.json({ deleted: true });
 }
+
+export const DELETE = withUnauthorized(handleDelete);

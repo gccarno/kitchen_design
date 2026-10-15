@@ -5,7 +5,8 @@ import { notFound } from 'next/navigation';
 import CompareOptions from '@/components/CompareOptions';
 import { loadCatalog } from '@/lib/catalog/loader';
 import { groupName } from '@/lib/plan/options';
-import { getStorage, optionGroup } from '@/lib/storage';
+import { getPageStorage } from '@/lib/auth/page';
+import { optionGroup } from '@/lib/storage';
 
 // Always read the projects from storage; they change on every save.
 export const dynamic = 'force-dynamic';
@@ -13,12 +14,12 @@ export const dynamic = 'force-dynamic';
 type Props = { params: Promise<{ groupId: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const group = await optionGroup(await getStorage(), (await params).groupId);
+  const group = await optionGroup(await getPageStorage(), (await params).groupId);
   return { title: group.length > 0 ? `Compare options — ${groupName(group)} · Home Design` : 'Options not found' };
 }
 
 export default async function ComparePage({ params }: Props) {
-  const group = await optionGroup(await getStorage(), (await params).groupId);
+  const group = await optionGroup(await getPageStorage(), (await params).groupId);
   if (group.length === 0) notFound();
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-4 p-4 sm:p-8">

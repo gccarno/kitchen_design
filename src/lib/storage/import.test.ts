@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createUser } from '../auth/users';
 import { resetTestDb, sharedTestDb } from '../db/test-db';
 import { newProject } from '../plan/new-project';
 import { createFakeBucket } from './fake-bucket';
@@ -56,5 +57,29 @@ describe('importProjects (disk → Postgres + GCS)', () => {
     const report = await importProjects(source, target, { dryRun: true });
     expect(report.imported).toEqual([a.id]);
     expect(await target.projects.load(a.id)).toBeNull();
+  });
+
+  it('imports into a given owner, skips what that owner already has on a re-run, and keeps other owners apart', async () => {
+    const db = await sharedTestDb();
+    const alice = await createUser(db, 'alice@x.io', 'correct horse battery');
+    const bob = await createUser(db, 'bob@x.io', 'correct horse battery');
+    const blobs = new GcsBlobStore(createFakeBucket());
+    const asAlice: Storage = { projects: new PgProjectStore(db, alice.id), blobs };
+    const a = newProject({ name: 'A' });
+    const b = newProject({ name: 'B' });
+    await source.projects.insert(a);
+    await source.projects.insert(b);
+
+    const first = await importProjects(source, asAlice);
+    expect(first.imported.sort()).toEqual([a.id, b.id].sort());
+    expect(await asAlice.projects.load(a.id)).not.toBeNull();
+    expect(await new PgProjectStore(db, bob.id).load(a.id)).toBeNull();
+    expect(await new PgProjectStore(db, null).load(a.id)).toBeNull();
+
+    const c = newProject({ name: 'C' });
+    await source.projects.insert(c);
+    const second = await importProjects(source, asAlice);
+    expect(second.imported).toEqual([c.id]);
+    expect(second.skipped.sort()).toEqual([a.id, b.id].sort());
   });
 });

@@ -5,7 +5,7 @@ import { FsBlobStore } from './fs-blobs';
 import { FsProjectStore } from './fs-projects';
 import { GcsBlobStore } from './gcs-blobs';
 import { PgProjectStore } from './pg-projects';
-import { getStorage } from './index';
+import { getStorage, getStorageFor } from './index';
 
 const KEYS = ['DATABASE_URL', 'GCS_BUCKET', 'GCS_PREFIX'] as const;
 
@@ -21,9 +21,11 @@ describe('getStorage() backend selection', () => {
     expect(s.blobs).toBeInstanceOf(FsBlobStore);
   });
 
+  // With DATABASE_URL set, getStorage() also needs a signed-in user (see index.test.ts);
+  // the backend choice itself is getStorageFor's.
   it('uses Postgres when DATABASE_URL is set (connects lazily, so no server is needed here)', async () => {
     process.env.DATABASE_URL = 'postgres://u:p@localhost:1/none';
-    const s = await getStorage();
+    const s = await getStorageFor(null);
     expect(s.projects).toBeInstanceOf(PgProjectStore);
     expect(s.blobs).toBeInstanceOf(FsBlobStore);
   });

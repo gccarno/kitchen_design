@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getStorage, lookupPhoto, ProjectNotFoundError, type Storage } from '@/lib/storage';
 import { ReferenceInputSchema, resolveReference } from '@/lib/plan/reference-objects';
 import type { Photo } from '@/lib/plan/schemas';
+import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,7 +20,7 @@ type Ctx = { params: Promise<{ id: string; photoId: string }> };
  * Photos aren't part of the editable plan, so this is a direct write rather
  * than a JSON-Patch revision.
  */
-export async function PUT(req: Request, { params }: Ctx): Promise<NextResponse> {
+async function handlePut(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id, photoId } = await params;
   const storage = await getStorage();
   const found = await lookupPhoto(storage, id, photoId);
@@ -50,7 +51,7 @@ export async function PUT(req: Request, { params }: Ctx): Promise<NextResponse> 
 }
 
 /** DELETE .../reference — clear the photo's reference object. */
-export async function DELETE(_req: Request, { params }: Ctx): Promise<NextResponse> {
+async function handleDelete(_req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id, photoId } = await params;
   const storage = await getStorage();
   const found = await lookupPhoto(storage, id, photoId);
@@ -78,3 +79,6 @@ async function setPhoto(
   }));
   return project.photos.find((ph) => ph.id === photoId);
 }
+
+export const PUT = withUnauthorized(handlePut);
+export const DELETE = withUnauthorized(handleDelete);

@@ -73,6 +73,7 @@ All of today's storage calls are synchronous: `loadProject`, `saveProject`, `upd
 - **Middleware:** `src/middleware.ts` sends unauthenticated page requests to `/login` and returns 401 for unauthenticated `/api/*` calls. Exceptions are `/api/health`, the auth routes and the worker callback.
 - **Registration:** open only for the first user or when `ALLOW_REGISTRATION=1`. `scripts/create-user.ts` is the fallback.
 - **Ownership:** every store call takes `userId`. Sharing is out of scope for now.
+- **As built (Phase 2):** passwords use `node:crypto` scrypt rather than argon2 (no native module for Render/arm64/Capacitor). Auth is on iff `DATABASE_URL` is set. Registration is open only while the users table is empty, or with `ALLOW_REGISTRATION=1`; `npm run create-user` adds accounts by hand. `import:local --owner <email>` imports into an existing user's account. The login page validates `?next=` as a same-origin path.
 
 ## Phase 3: Read API + async jobs
 - **New endpoints:**

@@ -20,5 +20,5 @@ export function sharedTestDb(): Promise<Db> {
 }
 
 export async function resetTestDb(db: Db): Promise<void> {
-  await db.execute(sql`TRUNCATE projects`);
+  await db.execute(sql`TRUNCATE projects, users CASCADE`);
 }
