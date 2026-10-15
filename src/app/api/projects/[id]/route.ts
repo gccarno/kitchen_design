@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteProject, isValidProjectId, resolveDataDir } from '@/lib/storage/projects';
+import { deleteProject, getStorage, isValidProjectId } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,6 +14,6 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function DELETE(_req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
-  if (!(await deleteProject(resolveDataDir(), id))) return NextResponse.json({ error: 'project not found' }, { status: 404 });
+  if (!(await deleteProject(await getStorage(), id))) return NextResponse.json({ error: 'project not found' }, { status: 404 });
   return NextResponse.json({ deleted: true });
 }

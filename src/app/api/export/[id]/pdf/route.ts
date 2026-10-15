@@ -13,7 +13,7 @@ type Ctx = { params: Promise<{ id: string }> };
  *   200 application/pdf · 400 invalid id · 404 unknown project
  */
 export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
-  const loaded = loadExportProject((await params).id);
+  const loaded = await loadExportProject((await params).id);
   if ('error' in loaded) return loaded.error;
   const pdf = await buildSpecSheet(loaded.project, loadCatalog());
   return new Response(new Uint8Array(pdf), {

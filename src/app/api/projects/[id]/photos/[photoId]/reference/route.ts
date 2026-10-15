@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { resolveDataDir, updateProject } from '@/lib/storage/projects';
-import { lookupPhoto } from '@/lib/storage/photos';
+import { getStorage, lookupPhoto, ProjectNotFoundError, type Storage } from '@/lib/storage';
 import { ReferenceInputSchema, resolveReference } from '@/lib/plan/reference-objects';
 import type { Photo } from '@/lib/plan/schemas';
 
@@ -22,8 +21,8 @@ type Ctx = { params: Promise<{ id: string; photoId: string }> };
  */
 export async function PUT(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id, photoId } = await params;
-  const dataDir = resolveDataDir();
-  const found = lookupPhoto(dataDir, id, photoId);
+  const storage = await getStorage();
+  const found = await lookupPhoto(storage, id, photoId);
   if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
 
   let body: unknown;
@@ -41,28 +40,38 @@ export async function PUT(req: Request, { params }: Ctx): Promise<NextResponse> 
     return NextResponse.json({ error: resolved.issues.join('; ') }, { status: 400 });
   }
 
-  const photo = await setPhoto(dataDir, id, photoId, (p) => ({ ...p, referenceObject: resolved.value }));
-  return NextResponse.json({ photo });
+  try {
+    const photo = await setPhoto(storage, id, photoId, (p) => ({ ...p, referenceObject: resolved.value }));
+    return NextResponse.json({ photo });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) return NextResponse.json({ error: 'project not found' }, { status: 404 });
+    throw err;
+  }
 }
 
 /** DELETE .../reference — clear the photo's reference object. */
 export async function DELETE(_req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id, photoId } = await params;
-  const dataDir = resolveDataDir();
-  const found = lookupPhoto(dataDir, id, photoId);
+  const storage = await getStorage();
+  const found = await lookupPhoto(storage, id, photoId);
   if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
 
-  const photo = await setPhoto(dataDir, id, photoId, ({ referenceObject: _removed, ...rest }) => rest);
-  return NextResponse.json({ photo });
+  try {
+    const photo = await setPhoto(storage, id, photoId, ({ referenceObject: _removed, ...rest }) => rest);
+    return NextResponse.json({ photo });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) return NextResponse.json({ error: 'project not found' }, { status: 404 });
+    throw err;
+  }
 }
 
 async function setPhoto(
-  dataDir: string,
+  storage: Storage,
   projectId: string,
   photoId: string,
   change: (p: Photo) => Photo
 ): Promise<Photo | undefined> {
-  const project = await updateProject(dataDir, projectId, (p) => ({
+  const project = await storage.projects.update(projectId, (p) => ({
     ...p,
     photos: p.photos.map((ph) => (ph.id === photoId ? change(ph) : ph)),
     updatedAt: new Date().toISOString(),

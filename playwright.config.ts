@@ -35,6 +35,6 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { DATA_DIR: E2E_DATA_DIR, LLM_API_KEY: '', NEXT_TELEMETRY_DISABLED: '1' },
+    env: { DATA_DIR: E2E_DATA_DIR, LLM_API_KEY: '', DATABASE_URL: '', GCS_BUCKET: '', GCS_PREFIX: '', NEXT_TELEMETRY_DISABLED: '1' },
   },
 });

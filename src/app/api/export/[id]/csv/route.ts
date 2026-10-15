@@ -14,7 +14,7 @@ type Ctx = { params: Promise<{ id: string }> };
  *   200 text/csv · 400 invalid id · 404 unknown project
  */
 export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
-  const loaded = loadExportProject((await params).id);
+  const loaded = await loadExportProject((await params).id);
   if ('error' in loaded) return loaded.error;
   const { project } = loaded;
   return new Response(estimateToCsv(buildEstimate(project, loadCatalog())), {

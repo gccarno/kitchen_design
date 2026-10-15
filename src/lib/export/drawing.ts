@@ -1,6 +1,6 @@
 /**
  * Shared by the export routes: load a project and draw it, and rasterize
- * the drawing. Server-only (reads project files; sharp is native).
+ * the drawing. Server-only (loads the project from storage; sharp is native).
  */
 
 import { NextResponse } from 'next/server';
@@ -11,7 +11,7 @@ import { wallElevations } from '../plan/elevation';
 import { elevationsToSvg } from '../plan/elevation-svg';
 import { projectKind, type Project } from '../plan/schemas';
 import { exportFileName, planToSvg, SVG_SCALE } from '../plan/svg';
-import { isValidProjectId, loadProject, projectExists, resolveDataDir } from '../storage/projects';
+import { getStorage, isValidProjectId } from '../storage';
 
 /** At 1×, one pixel per this many plan millimetres (a 5 m room is ~1000 px wide). */
 export const PNG_MM_PER_PX = 5;
@@ -24,19 +24,19 @@ export function drawingFileName(project: Project, ext: string): string {
 }
 
 /** The project to export, or a 400 (bad id) / 404 (unknown project) response. */
-export function loadExportProject(id: string): { project: Project } | { error: NextResponse } {
+export async function loadExportProject(id: string): Promise<{ project: Project } | { error: NextResponse }> {
   if (!isValidProjectId(id)) return { error: NextResponse.json({ error: 'invalid project id' }, { status: 400 }) };
-  const dataDir = resolveDataDir();
-  if (!projectExists(dataDir, id)) return { error: NextResponse.json({ error: 'project not found' }, { status: 404 }) };
-  return { project: loadProject(dataDir, id) };
+  const project = await (await getStorage()).projects.load(id);
+  if (!project) return { error: NextResponse.json({ error: 'project not found' }, { status: 404 }) };
+  return { project };
 }
 
 /**
  * The project and its drawing, or an error response: a kitchen's plan (items
  * labelled with catalog names), or a closet's front elevation.
  */
-export function loadDrawing(id: string): { project: Project; svg: string } | { error: NextResponse } {
-  const loaded = loadExportProject(id);
+export async function loadDrawing(id: string): Promise<{ project: Project; svg: string } | { error: NextResponse }> {
+  const loaded = await loadExportProject(id);
   if ('error' in loaded) return loaded;
   const { project } = loaded;
   if (projectKind(project) === 'closet') return { project, svg: closetToSvg(project) };
@@ -66,8 +66,8 @@ export function specSheetFileName(project: Project): string {
 }
 
 /** The kitchen and its wall elevations as SVG, or an error response (400, or 404 with the reason). */
-export function loadElevations(id: string): { project: Project; svg: string } | { error: NextResponse } {
-  const loaded = loadExportProject(id);
+export async function loadElevations(id: string): Promise<{ project: Project; svg: string } | { error: NextResponse }> {
+  const loaded = await loadExportProject(id);
   if ('error' in loaded) return loaded;
   const { project } = loaded;
   if (projectKind(project) === 'closet') {

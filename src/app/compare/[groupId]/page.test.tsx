@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { createProject, duplicateAsOption } from '@/lib/storage/projects';
+import { createProject } from '@/lib/storage/projects';
+import { duplicateAsOption, fsStorage } from '@/lib/storage';
 import ComparePage from './page';
 
 const page = (groupId: string) => ComparePage({ params: Promise.resolve({ groupId }) });
@@ -21,7 +22,7 @@ describe('/compare/[groupId]', () => {
 
   it('renders a group, showing every option', async () => {
     const original = createProject(dataDir, { name: 'Kitchen' });
-    const b = duplicateAsOption(dataDir, original.id);
+    const b = (await duplicateAsOption(fsStorage(dataDir), original.id))!;
     render(await page(original.id));
     expect(screen.getAllByText(original.name).length).toBeGreaterThan(0);
     expect(screen.getAllByText(b.name).length).toBeGreaterThan(0);

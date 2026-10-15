@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
  *   200 image/svg+xml · 400 invalid id · 404 unknown project
  */
 export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
-  const drawing = loadDrawing((await params).id);
+  const drawing = await loadDrawing((await params).id);
   if ('error' in drawing) return drawing.error;
   return new Response(drawing.svg, {
     headers: {
