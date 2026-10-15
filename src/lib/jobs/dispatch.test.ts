@@ -57,11 +57,29 @@ describe('dispatchJob', () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
-  it('does not wait for the local run and swallows its errors', async () => {
-    const run = vi.fn(() => new Promise<void>((_, reject) => setTimeout(() => reject(new Error('x')), 10)));
-    expect(await dispatchJob(ID, { env: {}, run, now: () => clock.now })).toBe('local');
+  it('returns without waiting for the local run, even one that never settles', async () => {
+    const run = vi.fn(() => new Promise<void>(() => {}));
+    const timeout = new Promise<'blocked'>((r) => setTimeout(() => r('blocked'), 200));
+    expect(await Promise.race([dispatchJob(ID, { env: {}, run }), timeout])).toBe('local');
+    await Promise.resolve();
+    expect(run).toHaveBeenCalledWith(ID);
+  });
+
+  it('swallows a rejected local run and logs only its name', async () => {
+    const run = vi.fn(() => new Promise<void>((_, reject) => setTimeout(() => reject(new Error('secret detail')), 10)));
+    expect(await dispatchJob(ID, { env: {}, run })).toBe('local');
     await new Promise((r) => setTimeout(r, 40));
-    expect(console.error).toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith('local job run failed: Error');
+  });
+
+  it('survives a local run that throws synchronously', async () => {
+    const run = vi.fn((): Promise<void> => {
+      throw new TypeError('sync boom');
+    });
+    await expect(dispatchJob(ID, { env: {}, run })).resolves.toBe('local');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(run).toHaveBeenCalledWith(ID);
+    expect(console.error).toHaveBeenCalledWith('local job run failed: TypeError');
   });
 });
 

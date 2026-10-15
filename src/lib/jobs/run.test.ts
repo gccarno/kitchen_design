@@ -9,6 +9,7 @@ import type { LLMProvider, VisionRequest } from '../llm';
 import { ExtractionError, LLMRequestError } from '../llm';
 import { addPhoto, getStorageFor, newProject } from '../storage';
 import { getJobStore } from './index';
+import { MemJobStore } from './mem-jobs';
 import { runJob } from './run';
 
 /** Replays queued outcomes for both vision and text calls; counts calls. */
@@ -162,6 +163,15 @@ describe('runJob', () => {
     await runJob(job.id, { provider });
     expect(provider.calls).toBe(1);
     expect((await store.get(job.id))!.attempts).toBe(1);
+  });
+
+  it('never throws when storing the failure itself fails, and logs only the error name', async () => {
+    const { job } = await setup('refine', { message: 'x' });
+    vi.spyOn(MemJobStore.prototype, 'fail').mockRejectedValue(new Error('db down: secret'));
+    await expect(runJob(job.id, { provider: new StubProvider([new LLMRequestError('nope')]) })).resolves.toBeUndefined();
+    const logged = vi.mocked(console.error).mock.calls.flat().join(' ');
+    expect(logged).toMatch(/Error/);
+    expect(logged).not.toMatch(/secret/);
   });
 
   it('never throws, even for an unknown or non-UUID job', async () => {

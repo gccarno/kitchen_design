@@ -43,7 +43,11 @@ export async function dispatchJob(jobId: string, opts: DispatchOpts = {}): Promi
       console.error(`worker unreachable: ${err instanceof Error ? err.name : typeof err}`);
     }
   }
-  void run(jobId).catch((err) => console.error(`local job run failed: ${err instanceof Error ? err.name : typeof err}`));
+  // Started on a later microtask and never awaited: the caller's response is not held up, and a
+  // run that throws synchronously or rejects is logged (by error name only), never propagated.
+  void Promise.resolve()
+    .then(() => run(jobId))
+    .catch((err: unknown) => console.error(`local job run failed: ${err instanceof Error ? err.name : typeof err}`));
   return 'local';
 }
 
