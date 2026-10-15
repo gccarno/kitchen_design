@@ -33,9 +33,19 @@ const gcsStores = new Map<string, Promise<GcsBlobStore>>();
  * Cheap — the database pool and GCS clients are shared — so don't cache the result.
  */
 export async function getStorage(): Promise<Storage> {
-  if (!authEnabled()) return getStorageFor(null);
+  return (await getRequestStorage()).storage;
+}
+
+/**
+ * getStorage() plus the validated user's id (null in disk mode), for routes
+ * that also open the user's job store. Same rules: throws UnauthorizedError
+ * without a valid token.
+ */
+export async function getRequestStorage(): Promise<{ storage: Storage; userId: string | null }> {
+  if (!authEnabled()) return { storage: await getStorageFor(null), userId: null };
   const { requireUser } = await import('../auth/session');
-  return getStorageFor((await requireUser()).id);
+  const userId = (await requireUser()).id;
+  return { storage: await getStorageFor(userId), userId };
 }
 
 /**

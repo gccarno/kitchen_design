@@ -55,6 +55,7 @@ describe('ProjectEditor', () => {
     push.mockClear();
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
+    sessionStorage.clear(); // no remembered job from an earlier test
   });
   afterEach(() => vi.unstubAllGlobals());
 

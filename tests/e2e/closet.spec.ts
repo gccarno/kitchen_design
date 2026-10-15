@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
-import { projectJson, settle } from './helpers';
+import { mockJob, projectJson, settle } from './helpers';
 
 /** Create a closet project from the home page; returns its id and the elevation. */
 async function createCloset(page: Page, name: string): Promise<{ id: string; svg: Locator }> {
@@ -88,24 +88,20 @@ test('change the size and doors, and ask the chat for a layout', async ({ page }
   await expect(page.getByText('Revision 1')).toBeVisible();
   expect(projectJson(id).closet).toMatchObject({ widthMm: 2400, opening: { style: 'sliding', leftMm: 0, widthMm: 2400 } });
 
-  // The e2e server has no LLM key, so the refine response is mocked in the browser.
-  await page.route(`**/api/projects/${id}/refine`, async (route) => {
-    await route.fulfill({
-      json: {
-        commands: [{ type: 'addComponent', kind: 'drawers', xMm: 1300 }],
-        patch: [
-          {
-            op: 'add',
-            path: '/closet/components/0',
-            value: { id: 'f1e2d3c4-0000-4000-8000-000000000001', kind: 'drawers', xMm: 1300, widthMm: 610, yMm: 0, heightMm: 914, depthMm: 406, count: 4 },
-          },
-        ],
-        summary: 'Add a drawer unit',
-        reply: 'Added a 4-drawer unit in the right half.',
-        warnings: [],
-        baseRevision: 1,
+  // The e2e server has no LLM key, so the refine job (202, then polling) is mocked in the browser.
+  await mockJob(page, `**/api/projects/${id}/refine`, {
+    commands: [{ type: 'addComponent', kind: 'drawers', xMm: 1300 }],
+    patch: [
+      {
+        op: 'add',
+        path: '/closet/components/0',
+        value: { id: 'f1e2d3c4-0000-4000-8000-000000000001', kind: 'drawers', xMm: 1300, widthMm: 610, yMm: 0, heightMm: 914, depthMm: 406, count: 4 },
       },
-    });
+    ],
+    summary: 'Add a drawer unit',
+    reply: 'Added a 4-drawer unit in the right half.',
+    warnings: [],
+    baseRevision: 1,
   });
   await page.getByLabel('Ask for a change').fill('add drawers on the right');
   await page.getByLabel('Ask for a change').press('Enter');

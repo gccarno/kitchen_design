@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { proposalFromExtraction, type ExtractionResponse, type Proposal } from '@/lib/plan/proposal';
+import { forgetJob, isAbortError, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
 
 interface ExtractPanelProps {
   projectId: string;
@@ -10,6 +11,7 @@ interface ExtractPanelProps {
 }
 
 const MAX_MEASUREMENTS = 4;
+const fallbackError = (status: number) => `extraction failed (${status})`;
 
 type Row = { key: number; description: string; length: string };
 
@@ -24,7 +26,10 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
   const [hint, setHint] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
   const inFlight = useRef(false);
+  const current = useRef<AbortController | null>(null);
+  const jobKey = `kd-job:extract:${projectId}`;
 
   const filled = rows.filter((r) => r.description.trim() !== '' || r.length.trim() !== '');
   const incomplete = filled.some((r) => r.description.trim() === '' || !(Number(r.length) > 0));
@@ -34,30 +39,66 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...change } : r)));
   }
 
-  async function run() {
+  /** Run one extraction (a new job, or a resumed one) and hand its result on as a proposal. */
+  async function execute(work: (signal: AbortSignal) => Promise<ExtractionResponse>) {
     if (inFlight.current) return;
     inFlight.current = true;
+    const ctrl = new AbortController();
+    current.current = ctrl;
     setBusy(true);
     setError(null);
     try {
-      const body: { measurements: { description: string; lengthMm: number }[]; hint?: string } = {
-        measurements: filled.map((r) => ({ description: r.description.trim(), lengthMm: Number(r.length) })),
-      };
-      if (hint.trim()) body.hint = hint.trim();
-      const res = await fetch(`/api/projects/${projectId}/extract`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = (await res.json().catch(() => ({}))) as Partial<ExtractionResponse> & { error?: string };
-      if (!res.ok) throw new Error(data.error ?? `extraction failed (${res.status})`);
-      onProposal(proposalFromExtraction(data as ExtractionResponse));
+      const data = await work(ctrl.signal);
+      forgetJob(jobKey);
+      onProposal(proposalFromExtraction(data));
     } catch (err) {
+      // Unmounted mid-poll: keep the remembered job so the next mount resumes it.
+      if (isAbortError(err)) return;
+      forgetJob(jobKey);
       setError((err as Error).message);
     } finally {
-      inFlight.current = false;
-      setBusy(false);
+      if (current.current === ctrl) {
+        current.current = null;
+        inFlight.current = false;
+        setBusy(false);
+      }
     }
+  }
+
+  // Resume a job started before this component last unmounted (navigated away and back).
+  useEffect(() => {
+    const saved = recallJob(jobKey);
+    if (saved) void execute((signal) => waitForJob<ExtractionResponse>(saved.jobId, { signal, fallbackError }));
+    return () => {
+      current.current?.abort();
+      current.current = null;
+      inFlight.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per project; execute reads refs only
+  }, [jobKey]);
+
+  useEffect(() => {
+    if (!busy) return setSlow(false);
+    const timer = setTimeout(() => setSlow(true), SLOW_HINT_MS);
+    return () => clearTimeout(timer);
+  }, [busy]);
+
+  function run() {
+    const body: { measurements: { description: string; lengthMm: number }[]; hint?: string } = {
+      measurements: filled.map((r) => ({ description: r.description.trim(), lengthMm: Number(r.length) })),
+    };
+    if (hint.trim()) body.hint = hint.trim();
+    void execute((signal) =>
+      startAndWait<ExtractionResponse>(
+        () =>
+          fetch(`/api/projects/${projectId}/extract`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          }),
+        { signal, fallbackError, onJobId: (jobId) => rememberJob(jobKey, { jobId }) }
+      )
+    );
   }
 
   return (
@@ -131,6 +172,9 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
         Get room from photos
       </button>
       {busy && <p className="text-sm text-gray-600">Asking the model… this can take up to a minute.</p>}
+      {busy && slow && (
+        <p className="text-sm text-gray-600">Still working — the model is slow right now. You can leave this page and come back.</p>
+      )}
       {error && (
         <p role="alert" className="text-sm text-red-700">
           {error}

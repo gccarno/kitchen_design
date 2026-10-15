@@ -58,6 +58,7 @@ describe('ClosetEditor', () => {
       return new Response(JSON.stringify({ project: server }), { status: 200 });
     });
     vi.stubGlobal('fetch', fetchMock);
+    sessionStorage.clear(); // no remembered job from an earlier test
   });
   afterEach(() => vi.unstubAllGlobals());
 

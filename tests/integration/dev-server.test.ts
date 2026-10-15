@@ -84,6 +84,7 @@ beforeAll(async () => {
       LLM_BASE_URL: llmBaseUrl,
       LLM_API_KEY: 'fake-key',
       LLM_VISION_MODEL: 'fake-vision',
+      WORKER_URL: '', // jobs run in the dev server's own process
     },
     cwd: process.cwd(),
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -157,6 +158,21 @@ afterAll(async () => {
     }
   }
 });
+
+/** The 202 { jobId } answer of an LLM route, polled at /api/jobs/<id> until it settles; returns the job. */
+async function settleJob(res: Response): Promise<{ status: string; result?: unknown; error?: unknown }> {
+  expect(res.status).toBe(202);
+  const { jobId } = (await res.json()) as { jobId: string };
+  for (let i = 0; i < 600; i++) {
+    const polled = await fetch(`${BASE}/api/jobs/${jobId}`);
+    expect(polled.status).toBe(200);
+    expect(polled.headers.get('cache-control')).toContain('no-store');
+    const job = (await polled.json()) as { status: string; result?: unknown; error?: unknown };
+    if (job.status === 'done' || job.status === 'failed') return job;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('job did not settle');
+}
 
 async function pollHome(): Promise<boolean> {
   for (let i = 0; i < 30; i++) {
@@ -283,7 +299,7 @@ describe('dev server end-to-end', () => {
     expect(llmRequests.length).toBe(llmCallsBefore);
   });
 
-  it('extracts a room through the real provider over HTTP, then commits it', async () => {
+  it('extracts a room through the real provider over HTTP (202 + polled job), then commits it', async () => {
     const p = createProject(dataDir, { name: 'Extract' });
     const jpeg = await sharp({
       create: { width: 3000, height: 2000, channels: 3, background: { r: 90, g: 90, b: 90 } },
@@ -301,8 +317,9 @@ describe('dev server end-to-end', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ measurements: [{ description: 'sink wall', lengthMm: 3600 }] }),
     });
-    expect(res.status).toBe(200);
-    const result = (await res.json()) as { room: Room; patch: unknown[]; baseRevision: number; notes: string };
+    const job = await settleJob(res);
+    expect(job.status).toBe('done');
+    const result = job.result as { room: Room; patch: unknown[]; baseRevision: number; notes: string };
     expect(result.notes).toBe('from the fake LLM');
     expect(wallLengthMm(result.room, 0)).toBeCloseTo(3600);
 
@@ -328,7 +345,7 @@ describe('dev server end-to-end', () => {
     expect(loadProject(dataDir, p.id).room).toEqual(result.room);
   });
 
-  it('turns a chat request into commands via the real provider, then commits them', async () => {
+  it('turns a chat request into commands via the real provider (202 + polled job), then commits them', async () => {
     const p = createProject(dataDir, { name: 'Refine' });
     const before = llmRequests.length;
     const res = await fetch(`${BASE}/api/projects/${p.id}/refine`, {
@@ -336,8 +353,9 @@ describe('dev server end-to-end', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message: 'add a dishwasher on the north wall' }),
     });
-    expect(res.status).toBe(200);
-    const result = (await res.json()) as { patch: unknown[]; baseRevision: number; summary: string; reply: string };
+    const job = await settleJob(res);
+    expect(job.status).toBe('done');
+    const result = job.result as { patch: unknown[]; baseRevision: number; summary: string; reply: string };
     expect(result.reply).toMatch(/dishwasher/);
 
     // The prompt the model saw: plan refs, catalog, and the request; text model, JSON mode.

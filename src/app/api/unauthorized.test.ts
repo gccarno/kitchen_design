@@ -23,6 +23,8 @@ import * as undo from './projects/[id]/undo/route';
 import * as photo from './projects/[id]/photos/[photoId]/route';
 import * as reference from './projects/[id]/photos/[photoId]/reference/route';
 import * as upload from './upload/route';
+import * as job from './jobs/[id]/route';
+import { getJobStore } from '@/lib/jobs';
 import * as csv from './export/[id]/csv/route';
 import * as svg from './export/[id]/svg/route';
 import * as pdf from './export/[id]/pdf/route';
@@ -56,7 +58,7 @@ afterEach(() => {
 const json = (body: unknown) => new Request('http://localhost/x', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const ctx = (id: string, photoId: string = randomUUID()) => ({ params: Promise.resolve({ id, photoId }) });
 
-function calls(id: string, photoId: string): [string, () => Promise<Response>][] {
+function calls(id: string, photoId: string, jobId: string): [string, () => Promise<Response>][] {
   const form = new FormData();
   form.set('projectId', id);
   form.set('file', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'x.jpg');
@@ -73,6 +75,7 @@ function calls(id: string, photoId: string): [string, () => Promise<Response>][]
     ['GET photo', () => photo.GET(new Request('http://localhost/x'), ctx(id, photoId))],
     ['PUT reference', () => reference.PUT(json({}), ctx(id, photoId))],
     ['DELETE reference', () => reference.DELETE(new Request('http://localhost/x', { method: 'DELETE' }), ctx(id, photoId))],
+    ['GET job', () => job.GET(new Request('http://localhost/x'), ctx(jobId))],
     ['POST upload', () => upload.POST(new Request('http://localhost/x', { method: 'POST', body: form }))],
     ['GET export csv', () => csv.GET(new Request('http://localhost/x'), ctx(id))],
     ['GET export svg', () => svg.GET(new Request('http://localhost/x'), ctx(id))],
@@ -89,15 +92,17 @@ async function seedA() {
   const p = newProject({ name: "A's kitchen" });
   await storage.projects.insert(p);
   const ph = await addPhoto(storage, p.id, Buffer.from('jpeg'), { width: 1, height: 1 });
-  return { p, ph };
+  const jobs = await getJobStore(a.id);
+  const j = await jobs.create(p.id, 'refine', { message: 'hi' });
+  return { p, ph, j, jobs };
 }
 
 describe('storage-backed API routes with auth on', () => {
   it('answer 401 JSON without a valid session', async () => {
-    const { p, ph } = await seedA();
+    const { p, ph, j } = await seedA();
     for (const headers of [{}, { cookie: 'session=bogus' }, { 'x-user-id': randomUUID() }] as Record<string, string>[]) {
       state.headers = new Headers(headers);
-      for (const [name, call] of calls(p.id, ph.id)) {
+      for (const [name, call] of calls(p.id, ph.id, j.id)) {
         const res = await call();
         expect(res.status, name).toBe(401);
         expect(res.headers.get('cache-control'), name).toBe('no-store');
@@ -107,15 +112,18 @@ describe('storage-backed API routes with auth on', () => {
   });
 
   it("answer 404 for another user's project", async () => {
-    const { p, ph } = await seedA();
+    const { p, ph, j, jobs } = await seedA();
     const b = await createUser(db, 'b@example.com', 'b-good-password');
     state.headers = new Headers({ cookie: `session=${await createSession(db, b.id)}` });
-    for (const [name, call] of calls(p.id, ph.id)) {
+    for (const [name, call] of calls(p.id, ph.id, j.id)) {
       if (name === 'POST /api/projects' || name === 'GET /api/projects') continue;
       const res = await call();
       expect(res.status, name).toBe(404);
     }
     expect(await (await getStorageFor(b.id)).projects.list()).toEqual([]);
+    // B's poll left A's job alone and B sees none of A's jobs.
+    expect((await jobs.get(j.id))!.status).toBe('queued');
+    expect(await (await getJobStore(b.id)).get(j.id)).toBeNull();
     const still = await (await getStorageFor((await db.query.users.findFirst())!.id)).projects.load(p.id);
     expect(still?.name).toBe("A's kitchen");
   });

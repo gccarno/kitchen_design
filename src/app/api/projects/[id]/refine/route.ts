@@ -1,49 +1,35 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import {
-  LLMNotConfiguredError,
-  LLMRequestError,
-  providerFromEnv,
-  refineCloset,
-  refinePlan,
-  RefinementError,
-  type LLMProvider,
-} from '@/lib/llm';
-import { loadCatalog } from '@/lib/catalog/loader';
-import { projectKind } from '@/lib/plan/schemas';
-import { getStorage, isValidProjectId } from '@/lib/storage';
+import { LLMNotConfiguredError, providerFromEnv } from '@/lib/llm';
+import { getJobStore } from '@/lib/jobs';
+import { dispatchJob } from '@/lib/jobs/dispatch';
+import { RefineInputSchema } from '@/lib/jobs/handlers';
+import { getRequestStorage, isValidProjectId } from '@/lib/storage';
 import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-// Free models can take a minute or more (whole layouts 2–4 min with a reasoning
-// model); allow for the provider timeout plus one retry.
-export const maxDuration = 660;
+// The LLM call runs as a job (worker or in-process); this request only validates and enqueues.
+export const maxDuration = 30;
 
 type Ctx = { params: Promise<{ id: string }> };
-
-const RefineRequestSchema = z.object({
-  message: z.string().trim().min(1).max(1000),
-  history: z
-    .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(2000) }))
-    .max(10)
-    .default([]),
-});
 
 /**
  * POST /api/projects/[id]/refine — JSON body { message, history? }.
  *
- * Turns a chat request into a proposed edit — plan commands for a kitchen,
- * closet commands for a closet. Does NOT change the project:
- * returns `{ commands, patch, summary, reply, warnings, baseRevision }`;
- * the client shows the patch for review and commits it via POST .../revisions.
- * `patch` is empty when the model only replied (a question, or it couldn't).
- *   400 bad request · 404 unknown project · 502 LLM failure · 503 no LLM configured
+ * Starts a job that turns a chat request into a proposed edit — plan commands
+ * for a kitchen, closet commands for a closet — and answers 202 { jobId } at
+ * once. Poll GET /api/jobs/[jobId]: when done, its `result` is
+ * `{ commands, patch, summary, reply, warnings, baseRevision }` (the job does
+ * NOT change the project; the client reviews the patch and commits it via
+ * POST .../revisions; `patch` is empty when the model only replied); when
+ * failed, its `error` is `{ status: 502|500, error, issues? }`.
+ *   400 bad request · 404 unknown project · 503 no LLM configured — all before any job exists
  */
 async function handlePost(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
-  const project = await (await getStorage()).projects.load(id);
+  const { storage, userId } = await getRequestStorage();
+  const project = await storage.projects.load(id);
   if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 });
 
   let body: unknown;
@@ -52,15 +38,14 @@ async function handlePost(req: Request, { params }: Ctx): Promise<NextResponse> 
   } catch {
     return NextResponse.json({ error: 'expected a JSON body' }, { status: 400 });
   }
-  const input = RefineRequestSchema.safeParse(body);
+  const input = RefineInputSchema.safeParse(body);
   if (!input.success) {
     const error = input.error.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ');
     return NextResponse.json({ error }, { status: 400 });
   }
 
-  let provider: LLMProvider;
   try {
-    provider = providerFromEnv();
+    providerFromEnv();
   } catch (err) {
     if (err instanceof LLMNotConfiguredError) {
       return NextResponse.json({ error: `${err.message} You can still edit the plan by hand.` }, { status: 503 });
@@ -68,23 +53,9 @@ async function handlePost(req: Request, { params }: Ctx): Promise<NextResponse> 
     throw err;
   }
 
-  try {
-    const { message, history } = input.data;
-    const result =
-      projectKind(project) === 'closet'
-        ? await refineCloset({ project, provider, message, history })
-        : await refinePlan({ project, catalog: loadCatalog(), provider, message, history });
-    return NextResponse.json(result);
-  } catch (err) {
-    if (err instanceof RefinementError) {
-      return NextResponse.json({ error: err.message, issues: err.issues }, { status: 502 });
-    }
-    if (err instanceof LLMRequestError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
-    }
-    console.error('refine failed', err);
-    return NextResponse.json({ error: 'unexpected server error during refinement' }, { status: 500 });
-  }
+  const job = await (await getJobStore(userId)).create(id, 'refine', input.data);
+  await dispatchJob(job.id);
+  return NextResponse.json({ jobId: job.id }, { status: 202, headers: { 'Cache-Control': 'no-store' } });
 }
 
 export const POST = withUnauthorized(handlePost);

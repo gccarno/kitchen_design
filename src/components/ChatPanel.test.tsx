@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, cleanup as cleanupRender } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import ChatPanel from './ChatPanel';
@@ -6,6 +6,10 @@ import ChatPanel from './ChatPanel';
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+const JOB = '9d0c8b7a-1234-4abc-8def-0123456789ab';
+const KEY = `kd-job:refine:${ID}`;
+const job = (status: string, extra: Record<string, unknown> = {}) => json({ id: JOB, kind: 'refine', status, ...extra });
+const tick = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 
 const EDIT = {
   commands: [{ type: 'moveItem', item: 'i1', wall: 'w1' }],
@@ -33,13 +37,19 @@ describe('ChatPanel', () => {
   beforeEach(() => {
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
+    sessionStorage.clear();
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it('sends the message and turns an edit into an LLM proposal', async () => {
-    fetchMock.mockResolvedValueOnce(json(EDIT));
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(job('done', { result: EDIT }));
     const { onProposal, say, box } = setup();
     say('move the fridge to the north wall');
+    await tick(1500);
 
     await waitFor(() => expect(onProposal).toHaveBeenCalled());
     const [url, init] = fetchMock.mock.calls[0];
@@ -118,5 +128,60 @@ describe('ChatPanel', () => {
   it('does not send an empty message', () => {
     const { send } = setup();
     expect(send().disabled).toBe(true);
+  });
+
+  it("shows a failed job's error in the conversation", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'LLM request timed out after 120000 ms' } }));
+    const { say, send } = setup();
+    say('add a dishwasher');
+    await tick(1500);
+    expect(await screen.findByText('Sorry — LLM request timed out after 120000 ms')).not.toBeNull();
+    expect(screen.queryByText(/thinking/i)).toBeNull();
+    expect(send().disabled).toBe(true); // empty draft
+    expect(sessionStorage.getItem(KEY)).toBeNull();
+  });
+
+  it('explains a job the server lost (404 while polling)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(json({ error: 'job not found' }, 404));
+    const { say } = setup();
+    say('add a dishwasher');
+    await tick(1500);
+    expect(await screen.findByText('Sorry — The request was lost (the server restarted). Please try again.')).not.toBeNull();
+  });
+
+  it('says it is still working after 20 s', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockImplementation(async () => job('running'));
+    const { say } = setup();
+    say('add a dishwasher');
+    await tick(19_000);
+    expect(screen.queryByText(/still working/i)).toBeNull();
+    await tick(1_500);
+    expect(screen.getByText(/still working/i)).not.toBeNull();
+  });
+
+  it('resumes a remembered request after a remount, showing the question and then the answer', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockImplementation(async () => job('running'));
+    setup().say('move the fridge to the north wall');
+    await tick(1500);
+    cleanupRender();
+    expect(JSON.parse(sessionStorage.getItem(KEY)!)).toEqual({ jobId: JOB, message: 'move the fridge to the north wall' });
+
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(job('done', { result: EDIT }));
+    const { onProposal } = setup();
+    expect(screen.getByText('move the fridge to the north wall')).not.toBeNull();
+    expect(screen.getByText(/thinking/i)).not.toBeNull();
+    await tick(1500);
+    await waitFor(() => expect(onProposal).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/jobs/${JOB}`);
+    expect(screen.getByText(/Moved the fridge\./)).not.toBeNull();
+    expect(sessionStorage.getItem(KEY)).toBeNull();
   });
 });
