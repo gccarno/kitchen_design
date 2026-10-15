@@ -10,6 +10,7 @@ import {
   EmailTakenError,
   InvalidCredentialsInputError,
   authenticate,
+  findUserByEmail,
   createSession,
   createUser,
   revokeToken,
@@ -21,6 +22,14 @@ const PW = 'a-good-password';
 
 describe('users', () => {
   beforeEach(async () => resetTestDb(await sharedTestDb()));
+
+  it('findUserByEmail normalizes and returns null for unknown or invalid emails', async () => {
+    const db = await sharedTestDb();
+    const u = await createUser(db, 'alice@example.com', PW);
+    expect(await findUserByEmail(db, ' ALICE@example.com ')).toEqual(u);
+    expect(await findUserByEmail(db, 'nobody@example.com')).toBeNull();
+    expect(await findUserByEmail(db, 'not-an-email')).toBeNull();
+  });
 
   it('creates a user with a normalized email and counts users', async () => {
     const db = await sharedTestDb();

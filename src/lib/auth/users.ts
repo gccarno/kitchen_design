@@ -76,6 +76,14 @@ export async function authenticate(db: Db, email: string, password: string): Pro
   return row && ok ? { id: row.id, email: row.email } : null;
 }
 
+/** The user with this (normalized) email, or null. For scripts. */
+export async function findUserByEmail(db: Db, email: string): Promise<AuthUser | null> {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return null;
+  const [row] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.email, normalized)).limit(1);
+  return row ?? null;
+}
+
 export async function createSession(db: Db, userId: string, label?: string): Promise<string> {
   const { token, hash } = newToken();
   await db.insert(authTokens).values({ tokenHash: hash, userId, label: label ?? null });

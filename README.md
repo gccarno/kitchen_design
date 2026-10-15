@@ -70,3 +70,13 @@ Projects and photos go through `getStorage()` (`src/lib/storage/index.ts`), whic
 - `npm run db:migrate` applies them by hand to a local database (it refuses a remote one unless `MIGRATE_ALLOW_REMOTE=1`).
 - `npm run import:local -- --dry-run` previews copying `./data` into the configured backends; `--yes` is needed for a non-local database.
 - Tests need no database: Postgres tests run on PGlite (in-process), GCS tests on an in-memory bucket.
+
+## Accounts
+
+Accounts are on whenever `DATABASE_URL` is set; in disk mode there is no login and nothing changes.
+
+- Each user sees only their own projects. Sign in at `/login`; the home page header shows your email and a **Sign out** button.
+- Registration is open only while there are no users (the first user also claims any owner-less projects from `import:local`). After that, set `ALLOW_REGISTRATION=1` to let anyone sign up, or add accounts by hand:
+  `NEW_USER_PASSWORD='at least 10 chars' npm run create-user -- you@example.com` (the password comes from the environment, not argv; a non-local database needs `MIGRATE_ALLOW_REMOTE=1`).
+- `npm run import:local -- --owner you@example.com` imports `./data` straight into that existing user's account (without `--owner`, projects are imported owner-less). Re-running skips projects that user already has.
+- Sessions are an httpOnly `session` cookie (or `Authorization: Bearer` for scripts). Failed logins are throttled.

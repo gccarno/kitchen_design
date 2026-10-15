@@ -1,15 +1,17 @@
 /**
- * npm run import:local -- [--data ./data] [--dry-run] [--yes]
+ * npm run import:local -- [--data ./data] [--owner <email>] [--dry-run] [--yes]
  *
  * Copy projects and photos from a local data directory into the configured
  * cloud backends (DATABASE_URL, and GCS_BUCKET for photos). Re-runnable:
  * projects already in the database are skipped. Imported projects have no
- * owner (owner_id NULL) until the first user registers and claims them.
+ * owner (owner_id NULL) until the first user registers and claims them,
+ * unless --owner <email> imports them straight into that existing user's account.
  * A non-local database needs --yes.
  */
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { closeDb } from '../src/lib/db/client';
+import { findUserByEmail } from '../src/lib/auth/users';
+import { closeDb, getDb } from '../src/lib/db/client';
 import { isLocalDatabase } from '../src/lib/db/remote-guard';
 import { importProjects } from '../src/lib/storage/import';
 import { fsStorage, getStorageFor } from '../src/lib/storage';
@@ -19,6 +21,7 @@ const { values } = parseArgs({
     data: { type: 'string', default: './data' },
     'dry-run': { type: 'boolean', default: false },
     yes: { type: 'boolean', default: false },
+    owner: { type: 'string' },
   },
 });
 
@@ -36,7 +39,16 @@ async function main(): Promise<void> {
   if (!process.env.GCS_BUCKET) console.warn('GCS_BUCKET is not set: photos will be written to DATA_DIR on this machine.');
 
   try {
-    const report = await importProjects(fsStorage(resolve(values.data!)), await getStorageFor(null), { dryRun: values['dry-run'] });
+    let ownerId: string | null = null;
+    if (values.owner !== undefined) {
+      const user = await findUserByEmail(getDb(), values.owner);
+      if (!user) {
+        console.error(`No user with email ${values.owner}. Create one first: npm run create-user -- <email>`);
+        process.exit(1);
+      }
+      ownerId = user.id;
+    }
+    const report = await importProjects(fsStorage(resolve(values.data!)), await getStorageFor(ownerId), { dryRun: values['dry-run'] });
     console.log(`${values['dry-run'] ? 'Would import' : 'Imported'} ${report.imported.length}, skipped ${report.skipped.length} already present.`);
     if (report.missingPhotos.length > 0) console.warn(`Photos listed but missing on disk: ${report.missingPhotos.join(', ')}`);
   } finally {
