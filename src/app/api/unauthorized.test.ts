@@ -61,7 +61,9 @@ function calls(id: string, photoId: string): [string, () => Promise<Response>][]
   form.set('projectId', id);
   form.set('file', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'x.jpg');
   return [
+    ['GET /api/projects', () => projects.GET()],
     ['POST /api/projects', () => projects.POST(json({ name: 'x' }))],
+    ['GET /api/projects/[id]', () => project.GET(new Request('http://localhost/x'), ctx(id))],
     ['DELETE /api/projects/[id]', () => project.DELETE(new Request('http://localhost/x', { method: 'DELETE' }), ctx(id))],
     ['POST duplicate', () => duplicate.POST(json({}), ctx(id))],
     ['POST extract', () => extract.POST(json({}), ctx(id))],
@@ -109,7 +111,7 @@ describe('storage-backed API routes with auth on', () => {
     const b = await createUser(db, 'b@example.com', 'b-good-password');
     state.headers = new Headers({ cookie: `session=${await createSession(db, b.id)}` });
     for (const [name, call] of calls(p.id, ph.id)) {
-      if (name === 'POST /api/projects') continue;
+      if (name === 'POST /api/projects' || name === 'GET /api/projects') continue;
       const res = await call();
       expect(res.status, name).toBe(404);
     }
