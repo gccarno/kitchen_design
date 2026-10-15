@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getStorage, lookupPhoto, readPhoto } from '@/lib/storage';
+import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -12,7 +13,7 @@ type Ctx = { params: Promise<{ id: string; photoId: string }> };
  * Streams a project photo. Photos live in the blob store (disk or GCS), so this
  * is the only way the browser can load them.
  */
-export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
+async function handleGet(_req: Request, { params }: Ctx): Promise<Response> {
   const { id, photoId } = await params;
   const storage = await getStorage();
   const found = await lookupPhoto(storage, id, photoId);
@@ -29,3 +30,5 @@ export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
     },
   });
 }
+
+export const GET = withUnauthorized(handleGet);

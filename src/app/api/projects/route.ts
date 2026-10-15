@@ -6,6 +6,7 @@ import { ProjectKindSchema } from '@/lib/plan/schemas';
 import { buildSampleCleaningCloset } from '@/lib/closet/sample-closet';
 import { buildSampleKitchen } from '@/lib/plan/sample-kitchen';
 import { getStorage, newProject } from '@/lib/storage';
+import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,7 +23,7 @@ const CreateProjectSchema = z.object({
  * closet, and returns it (201). With `sample: true` it comes furnished: a
  * sample kitchen, or a sample cleaning closet.
  */
-export async function POST(req: Request): Promise<NextResponse> {
+async function handlePost(req: Request): Promise<NextResponse> {
   let body: unknown;
   try {
     body = await req.json();
@@ -43,3 +44,5 @@ export async function POST(req: Request): Promise<NextResponse> {
   await storage.projects.insert(project);
   return NextResponse.json({ project }, { status: 201 });
 }
+
+export const POST = withUnauthorized(handlePost);

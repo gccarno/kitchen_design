@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getStorage, isValidProjectId, ProjectNotFoundError } from '@/lib/storage';
 import { commitRevision, InvalidPatchError, StaleRevisionError } from '@/lib/plan/diff';
 import { JsonPatchOpSchema, SUMMARY_MAX_LENGTH } from '@/lib/plan/schemas';
+import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,7 +29,7 @@ const CommitSchema = z.object({
  *   404 { error }                       unknown project
  *   409 { error, currentRevision }      baseRevision is stale — re-propose
  */
-export async function POST(req: Request, { params }: Ctx): Promise<NextResponse> {
+async function handlePost(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
 
@@ -63,3 +64,5 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
     throw err;
   }
 }
+
+export const POST = withUnauthorized(handlePost);

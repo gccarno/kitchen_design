@@ -3,14 +3,16 @@
  *
  * Copy projects and photos from a local data directory into the configured
  * cloud backends (DATABASE_URL, and GCS_BUCKET for photos). Re-runnable:
- * projects already in the database are skipped. A non-local database needs --yes.
+ * projects already in the database are skipped. Imported projects have no
+ * owner (owner_id NULL) until the first user registers and claims them.
+ * A non-local database needs --yes.
  */
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { closeDb } from '../src/lib/db/client';
 import { isLocalDatabase } from '../src/lib/db/remote-guard';
 import { importProjects } from '../src/lib/storage/import';
-import { fsStorage, getStorage } from '../src/lib/storage';
+import { fsStorage, getStorageFor } from '../src/lib/storage';
 
 const { values } = parseArgs({
   options: {
@@ -34,7 +36,7 @@ async function main(): Promise<void> {
   if (!process.env.GCS_BUCKET) console.warn('GCS_BUCKET is not set: photos will be written to DATA_DIR on this machine.');
 
   try {
-    const report = await importProjects(fsStorage(resolve(values.data!)), await getStorage(), { dryRun: values['dry-run'] });
+    const report = await importProjects(fsStorage(resolve(values.data!)), await getStorageFor(null), { dryRun: values['dry-run'] });
     console.log(`${values['dry-run'] ? 'Would import' : 'Imported'} ${report.imported.length}, skipped ${report.skipped.length} already present.`);
     if (report.missingPhotos.length > 0) console.warn(`Photos listed but missing on disk: ${report.missingPhotos.join(', ')}`);
   } finally {

@@ -1,12 +1,12 @@
 import NewProjectForm from '@/components/NewProjectForm';
 import ProjectList from '@/components/ProjectList';
-import { getStorage } from '@/lib/storage';
+import { getPageStorage } from '@/lib/auth/page';
 
 // The list reads storage on every request.
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const projects = await (await getStorage()).projects.list();
+  const projects = await (await getPageStorage()).projects.list();
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-8 p-4 sm:p-8">
       <header className="flex flex-col gap-1">

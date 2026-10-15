@@ -3,6 +3,7 @@
  * request. Disk by default; Postgres when DATABASE_URL is set, GCS when
  * GCS_BUCKET is set.
  */
+import { authEnabled } from '../auth/config';
 import { FsBlobStore } from './fs-blobs';
 import { FsProjectStore } from './fs-projects';
 import { resolveDataDir } from './projects';
@@ -23,14 +24,32 @@ export function fsStorage(dataDir: string): Storage {
 const gcsStores = new Map<string, Promise<GcsBlobStore>>();
 
 /**
- * The storage for this request: Postgres when DATABASE_URL is set, GCS when
- * GCS_BUCKET is set, the disk under DATA_DIR otherwise (each independently).
+ * The storage for this request. Disk under DATA_DIR when DATABASE_URL is
+ * unset (no auth, single user — exactly as before). With DATABASE_URL set,
+ * auth is on: the request's session token (Bearer or cookie) is validated
+ * here, and the projects are the signed-in user's own; throws
+ * UnauthorizedError when there is no valid token. Nothing a client sends
+ * other than that token (e.g. an `x-user-id` header) is ever trusted.
  * Cheap — the database pool and GCS clients are shared — so don't cache the result.
  */
 export async function getStorage(): Promise<Storage> {
+  if (!authEnabled()) return getStorageFor(null);
+  const { requireUser } = await import('../auth/session');
+  return getStorageFor((await requireUser()).id);
+}
+
+/**
+ * Storage for `userId` without looking at any request: for scripts and tests.
+ * With DATABASE_URL set, projects are scoped to that owner (null = the
+ * owner-less rows `import:local` creates); on disk the owner is ignored.
+ * App code must use getStorage(), which takes the user from a validated token.
+ * GCS_BUCKET selects GCS for blobs (blob keys are per project; access to them
+ * goes through the owner-scoped project lookup).
+ */
+export async function getStorageFor(userId: string | null): Promise<Storage> {
   const dataDir = resolveDataDir();
-  const projects = process.env.DATABASE_URL
-    ? new (await import('./pg-projects')).PgProjectStore((await import('../db/client')).getDb())
+  const projects = authEnabled()
+    ? new (await import('./pg-projects')).PgProjectStore((await import('../db/client')).getDb(), userId)
     : new FsProjectStore(dataDir);
   let blobs: Storage['blobs'];
   const bucket = process.env.GCS_BUCKET;

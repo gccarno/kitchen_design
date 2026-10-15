@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { addPhoto, getStorage, isValidProjectId, ProjectNotFoundError } from '@/lib/storage';
 import { normalizeOrientation, readImageDimensions } from '@/lib/exif';
+import { withUnauthorized } from '@/lib/auth/session';
 
 // Disable any caching on this route.
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,7 @@ const MAX_BYTES = 20 * 1024 * 1024; // 20 MB per photo
  * the photo metadata. The reference object is marked afterwards via
  * PUT /api/projects/[id]/photos/[photoId]/reference.
  */
-export async function POST(req: Request): Promise<NextResponse> {
+async function handlePost(req: Request): Promise<NextResponse> {
   let formData: FormData;
   try {
     formData = await req.formData();
@@ -70,3 +71,5 @@ export async function POST(req: Request): Promise<NextResponse> {
     throw err;
   }
 }
+
+export const POST = withUnauthorized(handlePost);

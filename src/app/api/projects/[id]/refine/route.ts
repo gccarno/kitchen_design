@@ -12,6 +12,7 @@ import {
 import { loadCatalog } from '@/lib/catalog/loader';
 import { projectKind } from '@/lib/plan/schemas';
 import { getStorage, isValidProjectId } from '@/lib/storage';
+import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -39,7 +40,7 @@ const RefineRequestSchema = z.object({
  * `patch` is empty when the model only replied (a question, or it couldn't).
  *   400 bad request · 404 unknown project · 502 LLM failure · 503 no LLM configured
  */
-export async function POST(req: Request, { params }: Ctx): Promise<NextResponse> {
+async function handlePost(req: Request, { params }: Ctx): Promise<NextResponse> {
   const { id } = await params;
   if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400 });
   const project = await (await getStorage()).projects.load(id);
@@ -85,3 +86,5 @@ export async function POST(req: Request, { params }: Ctx): Promise<NextResponse>
     return NextResponse.json({ error: 'unexpected server error during refinement' }, { status: 500 });
   }
 }
+
+export const POST = withUnauthorized(handlePost);
