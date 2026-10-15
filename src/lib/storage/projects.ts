@@ -11,9 +11,13 @@ import {
   statSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { closetFootprint, newCloset } from '../closet/catalog';
 import { groupName, nextOptionName, optionGroupId, sortGroup } from '../plan/options';
-import { ProjectSchema, projectKind, type Project, type ProjectKind } from '../plan/schemas';
+import { newProject } from '../plan/new-project';
+import { ProjectSchema, type Project, type ProjectKind } from '../plan/schemas';
+import { isValidProjectId, InvalidProjectIdError, PHOTO_ID } from './ids';
+import { toSummary, type ProjectSummary } from './store';
+
+export { InvalidProjectIdError, isValidProjectId, PHOTO_ID } from './ids';
 
 /**
  * Resolved data directory. Defaults to `./data` at process start, can be
@@ -21,20 +25,6 @@ import { ProjectSchema, projectKind, type Project, type ProjectKind } from '../p
  */
 export function resolveDataDir(): string {
   return process.env.DATA_DIR || join(process.cwd(), 'data');
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Thrown for any project id that is not a UUID — the path-traversal guard. */
-export class InvalidProjectIdError extends Error {
-  constructor(id: string) {
-    super(`invalid project id: ${JSON.stringify(id)}`);
-    this.name = 'InvalidProjectIdError';
-  }
-}
-
-export function isValidProjectId(id: string): boolean {
-  return UUID_RE.test(id);
 }
 
 /**
@@ -61,44 +51,9 @@ export function atomicWriteJson(target: string, value: unknown): void {
 }
 
 /** Create a fresh project on disk and return it. */
-export function createProject(
-  dataDir: string,
-  overrides: { id?: string; name: string; kind?: ProjectKind }
-): Project {
-  const now = new Date().toISOString();
-  const id = overrides.id ?? randomUUID();
-  const dir = projectDir(dataDir, id);
-  const kind = overrides.kind ?? 'kitchen';
-  const closet = kind === 'closet' ? newCloset() : undefined;
-  const project: Project = ProjectSchema.parse({
-    id,
-    name: overrides.name,
-    kind,
-    units: 'mm',
-    createdAt: now,
-    updatedAt: now,
-    revision: 0,
-    photos: [],
-    room: {
-      // Kitchens start as a 3m × 4m rectangle so the editor has something to
-      // draw on; the user replaces it once photos are extracted or the room
-      // is sketched. A closet's room is just its footprint.
-      polygon: closet
-        ? closetFootprint(closet)
-        : [
-            [0, 0],
-            [3000, 0],
-            [3000, 4000],
-            [0, 4000],
-          ],
-      walls: Array.from({ length: 4 }, () => ({ id: randomUUID(), thicknessMm: 100 })),
-      openings: [],
-    },
-    items: [],
-    ...(closet ? { closet } : {}),
-    history: [],
-  });
-
+export function createProject(dataDir: string, overrides: { id?: string; name: string; kind?: ProjectKind }): Project {
+  const project = newProject(overrides);
+  const dir = projectDir(dataDir, project.id);
   mkdirSync(join(dir, 'photos'), { recursive: true });
   atomicWriteJson(join(dir, 'project.json'), project);
   return project;
@@ -177,11 +132,7 @@ export async function deleteProject(dataDir: string, id: string): Promise<boolea
   });
 }
 
-/** What the project list page shows: name, last change, option link, and enough of the plan to draw a thumbnail. */
-export type ProjectSummary = Pick<
-  Project,
-  'id' | 'name' | 'kind' | 'createdAt' | 'updatedAt' | 'revision' | 'room' | 'items' | 'closet' | 'optionOf'
->;
+export type { ProjectSummary } from './store';
 
 /**
  * Every project under `dataDir` that parses. Malformed ones are skipped
@@ -208,18 +159,7 @@ function loadAll(dataDir: string): Project[] {
 /** List all projects under `dataDir`, newest first. */
 export function listProjects(dataDir: string): ProjectSummary[] {
   return loadAll(dataDir)
-    .map((project) => ({
-      id: project.id,
-      name: project.name,
-      kind: projectKind(project),
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-      revision: project.revision,
-      room: project.room,
-      items: project.items,
-      ...(project.closet ? { closet: project.closet } : {}),
-      ...(project.optionOf ? { optionOf: project.optionOf } : {}),
-    }))
+    .map(toSummary)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
@@ -231,9 +171,6 @@ export function optionGroup(dataDir: string, groupId: string): Project[] {
     groupId
   );
 }
-
-/** Photo ids we generate; anything else in a hand-edited project.json could name a file elsewhere. */
-export const PHOTO_ID = /^[A-Za-z0-9_-]+$/;
 
 /**
  * Copy a project as a new design option: a new id and a fresh history,
