@@ -4,7 +4,7 @@ import { authTokens } from '@/lib/db/schema';
 import { resetTestDb, sharedTestDb } from '@/lib/db/test-db';
 import type { Db } from '@/lib/db/types';
 import { jsonReq, sessionFromSetCookie } from '@/lib/auth/route-test-helpers';
-import { Throttle, setLoginThrottle } from '@/lib/auth/throttle';
+import { Throttle, setEmailThrottle, setLoginThrottle } from '@/lib/auth/throttle';
 import { createUser, userForToken } from '@/lib/auth/users';
 import { POST } from './route';
 
@@ -22,15 +22,17 @@ beforeAll(async () => {
 beforeEach(async () => {
   await resetTestDb(db);
   setLoginThrottle(new Throttle());
+  setEmailThrottle(undefined);
   vi.stubEnv('DATABASE_URL', 'postgres://test');
 });
 afterEach(() => {
   vi.unstubAllEnvs();
   setLoginThrottle(undefined);
+  setEmailThrottle(undefined);
 });
 
 const login = (email: string, password: string, ip = '1.2.3.4') =>
-  POST(jsonReq(URL, { email, password }, { headers: { 'x-forwarded-for': `${ip}, 10.0.0.1` } }));
+  POST(jsonReq(URL, { email, password }, { headers: { 'x-forwarded-for': `6.6.6.6, ${ip}` } }));
 
 describe('POST /api/auth/login', () => {
   it('logs in and sets a working session cookie', async () => {
@@ -84,9 +86,31 @@ describe('POST /api/auth/login', () => {
     expect(t.allowed('unknown|a@example.com')).toBe(false);
   });
 
-  it('rejects an over-long password with 400 and does not count it', async () => {
-    const res = await login('a@example.com', 'x'.repeat(201));
-    expect(res.status).toBe(400);
+  it('rejects an over-long password with 400 and does not count toward the throttle', async () => {
+    await createUser(db, 'a@example.com', PW);
+    for (let i = 0; i < 10; i++) expect((await login('a@example.com', 'x'.repeat(201))).status).toBe(400);
+    expect((await login('a@example.com', PW)).status).toBe(200);
+  });
+
+  it('uses the rightmost x-forwarded-for hop, so spoofed leftmost entries do not change the key', async () => {
+    await createUser(db, 'a@example.com', PW);
+    for (let i = 0; i < 5; i++) {
+      const res = await POST(
+        jsonReq(URL, { email: 'a@example.com', password: 'wrong-password-1' }, { headers: { 'x-forwarded-for': `10.0.0.${i}, 5.5.5.5` } })
+      );
+      expect(res.status).toBe(401);
+    }
+    const res = await POST(
+      jsonReq(URL, { email: 'a@example.com', password: PW }, { headers: { 'x-forwarded-for': '99.99.99.99, 5.5.5.5' } })
+    );
+    expect(res.status).toBe(429);
+  });
+
+  it('rotating IPs cannot get past the per-email limit', async () => {
+    await createUser(db, 'a@example.com', PW);
+    for (let i = 0; i < 20; i++) expect((await login('a@example.com', 'wrong-password-1', `7.7.7.${i}`)).status).toBe(401);
+    expect((await login('a@example.com', PW, '8.8.8.8')).status).toBe(429);
+    expect((await login('b@example.com', 'wrong-password-1', '8.8.8.8')).status).toBe(401);
   });
 
   it('returns 400 for malformed bodies, 413 for huge ones, 415 for wrong type', async () => {

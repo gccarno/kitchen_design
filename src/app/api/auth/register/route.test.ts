@@ -65,6 +65,33 @@ describe('POST /api/auth/register', () => {
     expect((await POST(jsonReq(URL, { email: 'b@example.com', password: PW }))).status).toBe(201);
   });
 
+  it('lets exactly one of two concurrent first registrations succeed, under the advisory lock', async () => {
+    const queries: string[] = [];
+    type Tx = { execute: (q: unknown) => unknown };
+    const orig = db.transaction.bind(db) as unknown as (fn: (tx: Tx) => Promise<unknown>) => Promise<unknown>;
+    const wrapped = (fn: (tx: Tx) => Promise<unknown>) =>
+      orig(async (tx) => {
+        const exec = tx.execute.bind(tx);
+        tx.execute = (q) => {
+          queries.push(JSON.stringify(q));
+          return exec(q);
+        };
+        return fn(tx);
+      });
+    const spy = vi.spyOn(db, 'transaction').mockImplementation(wrapped as never);
+    try {
+      const results = await Promise.all([
+        POST(jsonReq(URL, { email: 'a@example.com', password: PW })),
+        POST(jsonReq(URL, { email: 'b@example.com', password: PW })),
+      ]);
+      expect(results.map((r) => r.status).sort()).toEqual([201, 403]);
+      expect(await db.select().from(users)).toHaveLength(1);
+      expect(queries.some((q) => q.includes('pg_advisory_xact_lock'))).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('returns 409 with a neutral message for a duplicate email', async () => {
     vi.stubEnv('ALLOW_REGISTRATION', '1');
     await POST(jsonReq(URL, { email: 'a@example.com', password: PW }));

@@ -7,7 +7,10 @@ type Entry = { count: number; start: number };
 /** In-memory failure limiter: MAX_FAILURES per key per WINDOW_MS (window starts at the first failure). */
 export class Throttle {
   private entries = new Map<string, Entry>();
-  constructor(private now: () => number = Date.now) {}
+  constructor(
+    private now: () => number = Date.now,
+    private maxFailures: number = MAX_FAILURES
+  ) {}
 
   private live(key: string): Entry | undefined {
     const e = this.entries.get(key);
@@ -20,7 +23,7 @@ export class Throttle {
 
   allowed(key: string): boolean {
     const e = this.live(key);
-    return !e || e.count < MAX_FAILURES;
+    return !e || e.count < this.maxFailures;
   }
 
   recordFailure(key: string): void {
@@ -57,13 +60,27 @@ export class Throttle {
   }
 }
 
-const KEY = Symbol.for('kitchen-design.login-throttle');
-const holder = () => globalThis as typeof globalThis & { [KEY]?: Throttle };
+export const MAX_EMAIL_FAILURES = 20;
 
-/** Process-wide login throttle, shared by every route bundle. */
+const KEY = Symbol.for('kitchen-design.login-throttle');
+const EMAIL_KEY = Symbol.for('kitchen-design.login-email-throttle');
+type G = typeof globalThis & { [KEY]?: Throttle; [EMAIL_KEY]?: Throttle };
+const holder = () => globalThis as G;
+
+/** Process-wide per-(ip|email) login throttle, shared by every route bundle. */
 export function loginThrottle(): Throttle {
   const g = holder();
   return (g[KEY] ??= new Throttle());
+}
+
+/**
+ * Process-wide per-email throttle (looser limit) so rotating IPs cannot bypass the limit.
+ * Tradeoff: someone can lock a victim's email out of login by spamming failures; accepted
+ * for a single-user app.
+ */
+export function emailThrottle(): Throttle {
+  const g = holder();
+  return (g[EMAIL_KEY] ??= new Throttle(Date.now, MAX_EMAIL_FAILURES));
 }
 
 /** Test hook: replace the process-wide throttle (or drop it with undefined). */
@@ -71,4 +88,11 @@ export function setLoginThrottle(t: Throttle | undefined): void {
   const g = holder();
   if (t) g[KEY] = t;
   else delete g[KEY];
+}
+
+/** Test hook: replace the process-wide email throttle (or drop it with undefined). */
+export function setEmailThrottle(t: Throttle | undefined): void {
+  const g = holder();
+  if (t) g[EMAIL_KEY] = t;
+  else delete g[EMAIL_KEY];
 }

@@ -3,8 +3,12 @@ import { sessionCookie } from '@/lib/auth/cookies';
 import { credentialsFrom, disabledResponse, json, jsonContentTypeGuard, readJsonBody } from '@/lib/auth/http';
 import { EmailTakenError, InvalidCredentialsInputError, createSession, createUser, userCount } from '@/lib/auth/users';
 import { getDb } from '@/lib/db/client';
+import type { Db } from '@/lib/db/types';
+import { sql } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
+
+const REGISTER_LOCK_KEY = 7_540_075;
 
 export async function POST(req: Request): Promise<Response> {
   const off = disabledResponse() ?? jsonContentTypeGuard(req);
@@ -15,10 +19,17 @@ export async function POST(req: Request): Promise<Response> {
   if (creds instanceof Response) return creds;
 
   const db = getDb();
-  if (!(await registrationAllowed(db))) return json({ error: 'Registration is closed' }, 403);
-  const first = (await userCount(db)) === 0;
   try {
-    const user = await createUser(db, creds.email, creds.password, { claimOrphans: first });
+    // One transaction under an advisory lock: check openness, create, claim orphans atomically,
+    // so two simultaneous first registrations cannot both succeed.
+    const user = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(${REGISTER_LOCK_KEY})`);
+      const txDb = tx as unknown as Db;
+      if (!(await registrationAllowed(txDb))) return null;
+      const first = (await userCount(txDb)) === 0;
+      return createUser(txDb, creds.email, creds.password, { claimOrphans: first });
+    });
+    if (!user) return json({ error: 'Registration is closed' }, 403);
     const token = await createSession(db, user.id, 'web');
     return json({ id: user.id, email: user.email }, 201, { 'Set-Cookie': sessionCookie(token) });
   } catch (err) {

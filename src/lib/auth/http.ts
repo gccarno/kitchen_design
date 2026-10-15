@@ -57,3 +57,13 @@ export function credentialsFrom(body: Record<string, unknown>): { email: string;
   }
   return { email, password };
 }
+
+/**
+ * Client IP for throttling: the RIGHTMOST x-forwarded-for entry, i.e. the one appended by
+ * the platform proxy (Render, Tailscale Funnel). Earlier entries are client-supplied and
+ * spoofable, so they are never used. Falls back to 'unknown'.
+ */
+export function clientIp(headers: Headers): string {
+  const parts = (headers.get('x-forwarded-for') ?? '').split(',');
+  return parts[parts.length - 1].trim() || 'unknown';
+}

@@ -22,3 +22,13 @@ export function tokenFromRequest(headers: Headers): string | null {
   }
   return null;
 }
+
+/** Every token presented (Bearer and cookie), de-duplicated; used by logout. */
+export function tokensFromRequest(headers: Headers): string[] {
+  const out = new Set<string>();
+  const bearer = tokenFromRequest(new Headers({ authorization: headers.get('authorization') ?? '' }));
+  if (bearer) out.add(bearer);
+  const cookie = tokenFromRequest(new Headers({ cookie: headers.get('cookie') ?? '' }));
+  if (cookie) out.add(cookie);
+  return [...out];
+}

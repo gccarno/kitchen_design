@@ -10,7 +10,8 @@ export async function GET(): Promise<Response> {
   if (authEnabled()) {
     try {
       await getDb().execute(sql`select 1`);
-    } catch {
+    } catch (err) {
+      console.error('health check failed', err instanceof Error ? err.name : 'unknown');
       return json({ ok: false }, 503);
     }
   }

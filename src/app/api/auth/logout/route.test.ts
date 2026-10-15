@@ -42,6 +42,16 @@ describe('POST /api/auth/logout', () => {
     expect(await userForToken(db, t)).toBeNull();
   });
 
+  it('revokes both the Bearer token and the cookie token when both are present', async () => {
+    const u = await createUser(db, 'a@example.com', 'a-good-password');
+    const t1 = await createSession(db, u.id);
+    const t2 = await createSession(db, u.id);
+    const res = await POST(jsonReq(URL, {}, { headers: { authorization: `Bearer ${t1}`, cookie: `session=${t2}` } }));
+    expect(res.status).toBe(204);
+    expect(await userForToken(db, t1)).toBeNull();
+    expect(await userForToken(db, t2)).toBeNull();
+  });
+
   it('is 204 with no token', async () => {
     expect((await POST(jsonReq(URL, {}))).status).toBe(204);
   });
