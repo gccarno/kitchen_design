@@ -95,3 +95,6 @@ Accounts are on whenever `DATABASE_URL` is set; in disk mode there is no login a
 - `create-user` and `import:local` do not run migrations: start the app once (it migrates on boot) or run `npm run db:migrate` against a local database first.
 - Login throttling keys on the client IP taken from `X-Forwarded-For`: `TRUSTED_PROXY_HOPS` (default `1`) says how many trailing entries your proxies append (the Nth from the right is the client; `0` ignores the header). The Phase 4 smoke test must verify what Render actually sends.
 - Sessions are an httpOnly `session` cookie (or `Authorization: Bearer` for scripts). Failed logins are throttled.
+
+## Cloud and mobile
+**Cloud sync and Android (code complete, not yet deployed):** projects sync across web and phone through one hosted backend — Render (app), Neon (Postgres), Google Cloud Storage (photos/exports), all provisioned with Terraform in `infra/terraform/`. Email/password accounts, async extract/refine jobs (optionally run on an Oracle VM worker), offline viewing via a service worker, and a Capacitor Android shell in `android/`. Setup and the steps only you can run (terraform apply, keys, Render, worker, APK install) are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) and [`android/BUILD.md`](android/BUILD.md).
