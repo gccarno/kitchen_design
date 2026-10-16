@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Design</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         font-family: system-ui, sans-serif; background: #fff; color: #1f2937; text-align: center; }
+  main { padding: 24px; }
+  h1 { font-size: 1.25rem; margin: 0 0 8px; }
+  p { margin: 0; color: #6b7280; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Waking up the server&hellip;</h1>
+  <p id="msg">Retrying automatically.</p>
+</main>
+<script>
+(function () {
+  var target = (window.Capacitor && window.Capacitor.getServerUrl && window.Capacitor.getServerUrl()) || '';
+  try { var sp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen; if (sp && sp.hide) sp.hide(); } catch (e) {}
+  var title = document.getElementById('title');
+  var msg = document.getElementById('msg');
+  function render() {
+    if (navigator.onLine) {
+      title.textContent = 'Waking up the server…';
+      msg.textContent = 'Retrying automatically.';
+    } else {
+      title.textContent = 'No connection';
+      msg.textContent = 'Waiting for the network to come back.';
+    }
+  }
+  function retry() {
+    render();
+    if (navigator.onLine && target) location.replace(target);
+  }
+  window.addEventListener('online', retry);
+  window.addEventListener('offline', render);
+  render();
+  setInterval(retry, 5000);
+})();
+</script>
+</body>
+</html>

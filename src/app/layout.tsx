@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar';
 import OfflineBanner from '@/components/OfflineBanner';
+import NativeBridge from '@/components/NativeBridge';
 
 export const metadata: Metadata = {
   title: 'Home Design',
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-background text-foreground antialiased">
         <ServiceWorkerRegistrar />
         <OfflineBanner />
+        <NativeBridge />
         {children}
       </body>
     </html>

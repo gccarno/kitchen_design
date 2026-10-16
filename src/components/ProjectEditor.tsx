@@ -18,6 +18,8 @@ import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
 import { checkLayout } from '@/lib/plan/layout-check';
+import { isNative } from '@/lib/client/native';
+import { saveAndShare } from '@/lib/client/download';
 import { wallElevations } from '@/lib/plan/elevation';
 import { validatePlan } from '@/lib/plan/validate';
 import type { CatalogItem } from '@/lib/catalog/schema';
@@ -302,7 +304,21 @@ function ExportLink({ online, href, children, ...rest }: { online: boolean; href
     );
   }
   return (
-    <a className="text-blue-700 underline" href={href} download {...rest}>
+    <a
+      className="text-blue-700 underline"
+      href={href}
+      download
+      onClick={async (e) => {
+        if (!isNative()) return;
+        e.preventDefault();
+        try {
+          await saveAndShare(href, href.split('?')[0].split('/').slice(-2).join('-'));
+        } catch (err) {
+          window.alert(err instanceof Error ? err.message : 'Download failed.');
+        }
+      }}
+      {...rest}
+    >
       {children}
     </a>
   );
