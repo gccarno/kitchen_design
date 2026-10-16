@@ -1,0 +1,39 @@
+# Render blueprint. No `region:` key on purpose (a garden-app lesson: the key can
+# conflict with an existing workspace region). Pick Virginia in the dashboard so the
+# server sits next to Neon (aws-us-east-1). Secrets are sync:false: set them by hand
+# in the dashboard and check they are set after the first deploy (see docs/DEPLOYMENT.md).
+services:
+  - type: web
+    name: kitchen-design
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL # direct (non-pooled) Neon connection string
+        sync: false
+      - key: GCS_BUCKET
+        value: kitchen-design-files
+      - key: GOOGLE_APPLICATION_CREDENTIALS # Secret File: server-key.json
+        value: /etc/secrets/gcs.json
+      - key: LLM_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_VISION_MODEL
+        sync: false
+      - key: LLM_TIMEOUT_MS
+        value: "300000"
+      - key: TRUSTED_PROXY_HOPS # verify against Render's X-Forwarded-For before go-live
+        value: "1"
+      - key: ALLOW_REGISTRATION
+        value: "0"
+      # Phase 5 (worker): add WORKER_URL (sync:false) and WORKER_TOKEN (generateValue: true).
