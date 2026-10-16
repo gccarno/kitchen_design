@@ -42,11 +42,14 @@ describe('NativeBridge', () => {
     const { unmount } = render(<NativeBridge />);
     await waitFor(() => expect(hide).toHaveBeenCalled());
     expect(setStyle).toHaveBeenCalled();
+    window.history.pushState({}, '', '/projects/1');
     backHandler!({ canGoBack: true });
     expect(back).toHaveBeenCalledTimes(1);
     expect(exitApp).not.toHaveBeenCalled();
-    backHandler!({ canGoBack: false });
+    window.history.pushState({}, '', '/');
+    backHandler!({ canGoBack: true });
     expect(exitApp).toHaveBeenCalledTimes(1);
+    expect(back).toHaveBeenCalledTimes(1);
     unmount();
     expect(remove).toHaveBeenCalled();
   });

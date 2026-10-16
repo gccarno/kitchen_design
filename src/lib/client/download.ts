@@ -10,7 +10,7 @@ function toBase64(buf: ArrayBuffer): string {
 }
 
 function safeName(name: string): string {
-  return name.replace(/[^\w.@-]+/g, '_') || 'download';
+  return name.replace(/[^\w.@-]+/g, '_').replace(/^\.+/, '') || 'download';
 }
 
 function dispositionName(header: string | null): string | null {
@@ -28,7 +28,7 @@ export async function saveAndShare(url: string, filename: string): Promise<boole
   const res = await fetch(url, { credentials: 'include' });
   const type = res.headers.get('content-type') ?? '';
   if (!res.ok) throw new Error(`Download failed (${res.status}).`);
-  if (!type || /text\/html/i.test(type)) throw new Error('Download failed: the server did not return a file. Try signing in again.');
+  if (!/^(?:application\/pdf|text\/csv|image\/png|image\/svg\+xml)(?:;|$)/i.test(type)) throw new Error('Download failed: the server did not return a file. Try signing in again.');
   const name = safeName(dispositionName(res.headers.get('content-disposition')) ?? filename);
   const data = toBase64(await res.arrayBuffer());
   const { Filesystem, Directory } = await import('@capacitor/filesystem');

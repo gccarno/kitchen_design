@@ -14,14 +14,14 @@ const config: CapacitorConfig = {
       ? {
           url,
           // Only the app origin may be navigated to inside the WebView.
-          allowNavigation: [new URL(url).host],
+          allowNavigation: [new URL(url).hostname],
           cleartext: url.startsWith('http://'),
         }
       : {}),
     errorPath: 'offline.html',
   },
   plugins: {
-    SplashScreen: { launchAutoHide: false, backgroundColor: '#ffffff' },
+    SplashScreen: { launchAutoHide: true, launchShowDuration: 3000, backgroundColor: '#ffffff' },
   },
 };
 

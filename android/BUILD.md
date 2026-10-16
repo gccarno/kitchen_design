@@ -13,6 +13,9 @@ cd android && ./gradlew assembleDebug
 APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
 For LAN dev use `http://<lan-ip>:3000` (cleartext is enabled automatically for `http://` URLs).
 
+## Errors inside the app
+Capacitor's `errorPath` (`offline.html`) also shows for main-frame HTTP errors (404, 500, 401 pages), not only network failures. The page then retries the server root every 5 s, so a deep link that errors bounces to `/`.
+
 ## Install
 ```
 adb install -r app-debug.apk

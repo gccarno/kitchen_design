@@ -45,6 +45,19 @@ describe('native download', () => {
     expect(writeFile).not.toHaveBeenCalled();
   });
 
+  it('rejects a JSON body and an unlisted type', async () => {
+    setNative(true);
+    vi.stubGlobal('fetch', respond({ type: 'application/json' }));
+    await expect(saveAndShare('/api/x', 'x.csv')).rejects.toThrow(/did not return a file/);
+  });
+
+  it('strips leading dots from the filename', async () => {
+    setNative(true);
+    vi.stubGlobal('fetch', respond({ type: 'application/pdf', cd: 'attachment; filename=".."' }));
+    await saveAndShare('/api/x', 'f.pdf');
+    expect(writeFile.mock.calls[0][0].path).toBe('download');
+  });
+
   it('rejects an error status', async () => {
     setNative(true);
     vi.stubGlobal('fetch', respond({ ok: false, status: 401, type: 'application/json' }));

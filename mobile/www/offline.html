@@ -20,6 +20,7 @@
 <script>
 (function () {
   var target = (window.Capacitor && window.Capacitor.getServerUrl && window.Capacitor.getServerUrl()) || '';
+  try { var sp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen; if (sp && sp.hide) sp.hide(); } catch (e) {}
   var title = document.getElementById('title');
   var msg = document.getElementById('msg');
   function render() {
