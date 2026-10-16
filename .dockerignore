@@ -1,0 +1,9 @@
+node_modules
+.next
+data
+.git
+test-results
+infra
+android
+*.json.key
+.env*
