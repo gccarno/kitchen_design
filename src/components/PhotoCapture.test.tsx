@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
+import { act as actOffline } from '@testing-library/react';
 import PhotoCapture from './PhotoCapture';
 import type { Photo } from '@/lib/plan/schemas';
 
@@ -125,5 +127,16 @@ describe('PhotoCapture', () => {
     });
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[withCustom]} />);
     expect((screen.getByLabelText(/size \(mm\)/i) as HTMLInputElement).value).toBe('600');
+  });
+});
+
+describe('PhotoCapture offline', () => {
+  afterEach(() => actOffline(() => markOnline()));
+  it('disables both upload inputs while offline', () => {
+    const { container } = render(<PhotoCapture projectId={PROJECT} />);
+    actOffline(() => markOffline());
+    const inputs = container.querySelectorAll('input[type="file"]');
+    expect(inputs.length).toBe(2);
+    inputs.forEach((i) => expect((i as HTMLInputElement).disabled).toBe(true));
   });
 });

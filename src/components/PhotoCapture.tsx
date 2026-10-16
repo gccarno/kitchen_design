@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { useOnline } from '@/lib/client/online';
 import ReferenceMarker from './ReferenceMarker';
 import type { ReferenceInput } from '@/lib/plan/reference-objects';
 import type { Photo, ReferenceObject } from '@/lib/plan/schemas';
@@ -21,6 +22,7 @@ type SaveState = 'saving' | 'saved' | { error: string };
  * is set: "Take photo" opens the camera, "Choose photos" opens the library.
  */
 export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosChange }: PhotoCaptureProps) {
+  const online = useOnline();
   const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
   const [uploads, setUploads] = useState<UploadStatus[]>([]);
   const [saveState, setSaveState] = useState<Record<string, SaveState>>({});
@@ -64,6 +66,7 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
   }
 
   function saveReference(photoId: string, value: ReferenceInput | null) {
+    if (!online) return;
     const url = `/api/projects/${projectId}/photos/${photoId}/reference`;
     const prev = saveChains.current.get(photoId) ?? Promise.resolve();
     const run = prev.then(async () => {
@@ -91,13 +94,13 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
-        <label className="cursor-pointer rounded bg-black px-4 py-2 text-white">
+        <label className={`rounded bg-black px-4 py-2 text-white ${online ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
           Take photo
-          <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={handleFiles} />
+          <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={!online} onChange={handleFiles} />
         </label>
-        <label className="cursor-pointer rounded border px-4 py-2">
+        <label className={`rounded border px-4 py-2 ${online ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
           Choose photos
-          <input type="file" accept="image/*" multiple className="sr-only" onChange={handleFiles} />
+          <input type="file" accept="image/*" multiple className="sr-only" disabled={!online} onChange={handleFiles} />
         </label>
       </div>
 

@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
+import { act as actOffline } from '@testing-library/react';
 import HistoryControls from './HistoryControls';
 import { commitRevision } from '@/lib/plan/diff';
 import { undoRedo } from '@/lib/plan/history';
@@ -123,5 +125,18 @@ describe('HistoryControls', () => {
     render(<HistoryControls project={renamed} onSaved={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect((await screen.findByRole('alert')).textContent).toMatch('the plan changed in another tab — reload the page');
+  });
+});
+
+describe('HistoryControls offline', () => {
+  afterEach(() => actOffline(() => markOnline()));
+  it('disables Undo and Redo while offline', () => {
+    render(<HistoryControls project={renamed} onSaved={vi.fn()} />);
+    expect((screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement).disabled).toBe(false);
+    actOffline(() => markOffline());
+    const undo = screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement;
+    expect(undo.disabled).toBe(true);
+    expect(undo.title).toBe('Offline');
+    expect((screen.getByRole('button', { name: 'Redo' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
+import { act as actOffline } from '@testing-library/react';
 
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
@@ -161,5 +163,18 @@ describe('ProjectList', () => {
     expect(within(cards[1]).getByText('Option')).toBeTruthy();
     expect(within(cards[0]).queryByText('Option')).toBeNull();
     expect(within(cards[2]).queryByText('Option')).toBeNull();
+  });
+});
+
+describe('ProjectList offline', () => {
+  afterEach(() => actOffline(() => markOnline()));
+  it('disables Rename and Delete while offline', () => {
+    render(<ProjectList projects={projects} />);
+    actOffline(() => markOffline());
+    for (const name of ['Rename Our kitchen', 'Delete Our kitchen']) {
+      const b = screen.getByRole('button', { name }) as HTMLButtonElement;
+      expect(b.disabled).toBe(true);
+      expect(b.title).toBe('Offline');
+    }
   });
 });

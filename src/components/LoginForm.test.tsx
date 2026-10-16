@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+const clearOfflineCaches = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/client/offline-cache', () => ({ clearOfflineCaches: () => clearOfflineCaches() }));
 import LoginForm from './LoginForm';
 
 const assign = vi.fn();
@@ -8,6 +10,7 @@ const fetchMock = vi.fn();
 
 beforeEach(() => {
   assign.mockReset();
+  clearOfflineCaches.mockClear();
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
   Object.defineProperty(window, 'location', { value: { assign }, configurable: true });
@@ -68,5 +71,21 @@ describe('LoginForm', () => {
     render(<LoginForm canRegister={false} next={next} />);
     fill();
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+  });
+
+  it('clears the offline caches after a successful sign-in, before navigating', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    render(<LoginForm canRegister={false} />);
+    fill();
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+    expect(clearOfflineCaches).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear the caches when sign-in fails', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: 'Invalid email or password' }), { status: 401 }));
+    render(<LoginForm canRegister={false} />);
+    fill();
+    await screen.findByRole('alert');
+    expect(clearOfflineCaches).not.toHaveBeenCalled();
   });
 });

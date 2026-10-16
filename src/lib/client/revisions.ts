@@ -1,5 +1,6 @@
 import type { Project } from '../plan/schemas';
 import type { Proposal } from '../plan/proposal';
+import { markOffline, markOnline } from './online';
 
 export type SubmitResult =
   | { ok: true; project: Project }
@@ -19,10 +20,12 @@ export async function submitRevision(projectId: string, proposal: Proposal): Pro
         source: proposal.source,
       }),
     });
+    markOnline();
     const body = (await res.json().catch(() => ({}))) as { project?: Project; error?: string };
     if (res.ok && body.project) return { ok: true, project: body.project };
     return { ok: false, stale: res.status === 409, error: body.error ?? `could not save (${res.status})` };
   } catch (err) {
+    if (err instanceof TypeError) markOffline();
     return { ok: false, stale: false, error: (err as Error).message };
   }
 }
@@ -35,10 +38,12 @@ export async function submitUndo(projectId: string, action: 'undo' | 'redo', bas
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action, baseRevision }),
     });
+    markOnline();
     const body = (await res.json().catch(() => ({}))) as { project?: Project; error?: string };
     if (res.ok && body.project) return { ok: true, project: body.project };
     return { ok: false, stale: res.status === 409, error: body.error ?? `could not ${action} (${res.status})` };
   } catch (err) {
+    if (err instanceof TypeError) markOffline();
     return { ok: false, stale: false, error: (err as Error).message };
   }
 }

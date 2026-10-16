@@ -4,6 +4,8 @@
  * Short requests only, so a phone connection never holds one open for minutes.
  */
 
+import { markOffline, markOnline } from './online';
+
 /** Shown when the server no longer knows the job (disk mode lost it on a restart, or it was pruned). */
 export const JOB_LOST_MESSAGE = 'The request was lost (the server restarted). Please try again.';
 
@@ -70,7 +72,14 @@ const defaultFallback = (status: number) => `request failed (${status})`;
  * its `error` as before; any other answer (a 2xx that is not 202 { jobId }) is an error too.
  */
 export async function startAndWait<T>(startRequest: () => Promise<Response>, opts: StartOptions = {}): Promise<T> {
-  const res = await startRequest();
+  let res: Response;
+  try {
+    res = await startRequest();
+  } catch (err) {
+    if (err instanceof TypeError) markOffline();
+    throw err;
+  }
+  markOnline();
   const body = (await res.json().catch(() => ({}))) as { jobId?: unknown; error?: string; issues?: unknown };
   if (res.status === 202 && typeof body.jobId === 'string') {
     // Unmounted while the POST was in flight: don't remember a job nobody will resume or forget.

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, act, cleanup as cleanupRender } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
 import ExtractPanel from './ExtractPanel';
 
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
@@ -205,5 +206,15 @@ describe('ExtractPanel', () => {
     await tick(1500);
     await waitFor(() => expect(second.onProposal).toHaveBeenCalled());
     expect(sessionStorage.getItem(KEY)).toBeNull();
+  });
+});
+
+describe('ExtractPanel offline', () => {
+  afterEach(() => act(() => markOnline()));
+  it('disables the extract button while offline', () => {
+    const { button } = setup();
+    act(() => markOffline());
+    expect(button().disabled).toBe(true);
+    expect(button().title).toBe('Offline');
   });
 });
