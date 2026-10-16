@@ -53,3 +53,18 @@ next-env.d.ts.bak
 *.tfstate.*
 *.tfvars
 *-key.json
+
+# android
+*.jks
+*.keystore
+keystore.properties
+local.properties
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/release/
+/android/capacitor-cordova-android-plugins/
+/android/app/src/main/assets/public/
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json
+/android/app/src/main/res/xml/config.xml

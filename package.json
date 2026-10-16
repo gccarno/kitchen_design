@@ -12,12 +12,20 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "e2e": "playwright test",
+    "cap:sync": "cap sync android",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "import:local": "tsx --env-file-if-exists=.env.local scripts/import-local-data.ts",
     "create-user": "tsx --env-file-if-exists=.env.local scripts/create-user.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "@google-cloud/storage": "^8.4.0",
     "drizzle-orm": "^0.45.4",
     "exifr": "^7.1.3",
@@ -35,6 +43,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@electric-sql/pglite": "^0.5.10",
     "@playwright/test": "^1.48.0",
     "@testing-library/jest-dom": "^7.0.1",
