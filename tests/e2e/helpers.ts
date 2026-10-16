@@ -61,3 +61,23 @@ export async function settle(locator: Locator): Promise<void> {
     }, { intervals: [100] })
     .toBe(true);
 }
+
+/**
+ * Answer an LLM endpoint the way the server does — 202 { jobId }, then the
+ * job polled at /api/jobs/<id> is `running` once and `done` with `result` —
+ * without an LLM key. `check` sees the POST body.
+ */
+export async function mockJob(page: Page, startUrl: string, result: unknown, check?: (body: unknown) => void): Promise<void> {
+  const jobId = crypto.randomUUID();
+  await page.route(startUrl, async (route) => {
+    check?.(route.request().postDataJSON());
+    await route.fulfill({ status: 202, json: { jobId } });
+  });
+  const kind = startUrl.endsWith('/extract') ? 'extract' : 'refine';
+  let polls = 0;
+  await page.route(`**/api/jobs/${jobId}`, async (route) => {
+    polls++;
+    const status = polls === 1 ? 'running' : 'done';
+    await route.fulfill({ json: { id: jobId, kind, status, ...(status === 'done' ? { result } : {}) } });
+  });
+}

@@ -8,6 +8,20 @@ export const runtime = 'nodejs';
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
+ * GET /api/projects/[id] — the full project document, without `history`.
+ *   200 project · 400 invalid id · 404 unknown project
+ */
+async function handleGet(_req: Request, { params }: Ctx): Promise<NextResponse> {
+  const noStore = { 'Cache-Control': 'no-store' };
+  const { id } = await params;
+  if (!isValidProjectId(id)) return NextResponse.json({ error: 'invalid project id' }, { status: 400, headers: noStore });
+  const project = await (await getStorage()).projects.load(id);
+  if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404, headers: noStore });
+  const { history: _history, ...doc } = project;
+  return NextResponse.json(doc, { headers: noStore });
+}
+
+/**
  * DELETE /api/projects/[id] — permanently deletes the project and its photos.
  * (Renaming goes through POST .../revisions, so it can be undone.)
  *   200 { deleted: true } · 400 invalid id · 404 unknown project
@@ -19,4 +33,5 @@ async function handleDelete(_req: Request, { params }: Ctx): Promise<NextRespons
   return NextResponse.json({ deleted: true });
 }
 
+export const GET = withUnauthorized(handleGet);
 export const DELETE = withUnauthorized(handleDelete);

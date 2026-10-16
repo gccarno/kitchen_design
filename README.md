@@ -71,6 +71,19 @@ Projects and photos go through `getStorage()` (`src/lib/storage/index.ts`), whic
 - `npm run import:local -- --dry-run` previews copying `./data` into the configured backends; `--yes` is needed for a non-local database.
 - Tests need no database: Postgres tests run on PGlite (in-process), GCS tests on an in-memory bucket.
 
+## Jobs
+
+The two slow LLM calls — room extraction from photos and chat refinement (kitchen and closet) — run as jobs, so no request is held open for minutes (fragile on a phone connection).
+
+- `POST /api/projects/[id]/extract` and `.../refine` validate synchronously (400 bad id/body/no photos, 404 unknown project, 503 no LLM configured, same messages as before), then create a job and answer `202 { jobId }` straight away.
+- The client polls `GET /api/jobs/[id]` (every 1.5 s, backing off to 5 s): `200 { id, kind, status: queued|running|done|failed, result?, error? }`. `result` is what the route used to return; `error` is `{ status, error, issues? }` with the old error status and message. Another user's, unknown or non-UUID job ids are 404. In disk mode jobs live in memory, so a restart loses them: the poll gets 404 and the UI says "The request was lost (the server restarted). Please try again."
+- The panels remember the in-flight job id in `sessionStorage`, so leaving the page and coming back resumes polling instead of posting again. After 20 s they show a "still working" hint.
+- Where a job runs: with `WORKER_URL` and `WORKER_TOKEN` set, the web process POSTs `${WORKER_URL}/run/<jobId>` (bearer `WORKER_TOKEN`, 2 s timeout); on any failure, or with no worker configured, it runs the job in-process without blocking the response. An atomic `queued → running` claim means a job runs at most once per queueing.
+- Stale jobs: when a poll finds a job `running` for over 5 minutes (each LLM call is bounded at about 60 s, plus one retry) it is re-queued and dispatched again (after 3 attempts it fails with `job timed out`). A job still `queued` a minute after creation is dispatched again, and one still `queued` after 10 minutes fails with `job was never started`.
+- With Postgres, creating a job also deletes jobs that finished more than 7 days ago (every user's; queued and running jobs are never pruned). In disk mode, finished jobs are forgotten an hour after they finish.
+- Polling rides out failed polls (network, 5xx) for up to two minutes, then says "Connection lost — reopen this panel to check the result" and keeps the job id, so reopening the panel picks the job up again. A client gives up after 30 minutes in all. The worker is only used with Postgres (`DATABASE_URL`): disk-mode jobs exist only in the web process's memory.
+- The PDF export stays a synchronous `GET /api/export/[id]/pdf` (about a second, pure TypeScript).
+
 ## Accounts
 
 Accounts are on whenever `DATABASE_URL` is set; in disk mode there is no login and nothing changes.

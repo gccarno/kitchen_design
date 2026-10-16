@@ -15,6 +15,13 @@
       "when": 1792066099333,
       "tag": "0001_marvelous_stephen_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792088725351,
+      "tag": "0002_smiling_santa_claus",
+      "breakpoints": true
     }
   ]
 }

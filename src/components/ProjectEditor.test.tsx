@@ -55,8 +55,12 @@ describe('ProjectEditor', () => {
     push.mockClear();
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
+    sessionStorage.clear(); // no remembered job from an earlier test
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it('duplicates the project as an option and opens the copy', async () => {
     fetchMock.mockResolvedValueOnce(json({ project: { ...project, id: 'copy-id', name: `${project.name} — Option B` } }, 201));
@@ -196,17 +200,25 @@ describe('ProjectEditor', () => {
 
   it('turns an extraction result into an LLM proposal for review', async () => {
     const withPhoto = { ...project, photos: [{ id: 'ph', path: 'photos/ph.jpg', width: 40, height: 30 }] };
-    fetchMock.mockResolvedValueOnce(
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const jobId = '9d0c8b7a-1234-4abc-8def-0123456789ab';
+    fetchMock.mockResolvedValueOnce(json({ jobId }, 202)).mockResolvedValueOnce(
       json({
-        patch: [{ op: 'replace', path: '/room/walls/0/thicknessMm', value: 150 }],
-        baseRevision: 0,
-        confidence: 0.64,
-        notes: 'Guessed the hidden corner.',
-        warnings: [],
+        id: jobId,
+        kind: 'extract',
+        status: 'done',
+        result: {
+          patch: [{ op: 'replace', path: '/room/walls/0/thicknessMm', value: 150 }],
+          baseRevision: 0,
+          confidence: 0.64,
+          notes: 'Guessed the hidden corner.',
+          warnings: [],
+        },
       })
     );
     render(<ProjectEditor initialProject={withPhoto} />);
     fireEvent.click(screen.getByRole('button', { name: /get room from photos/i }));
+    await act(() => vi.advanceTimersByTimeAsync(1500));
 
     const review = await screen.findByRole('region', { name: /review proposed change/i });
     expect(within(review).getByText(/64%/)).not.toBeNull();
@@ -328,19 +340,27 @@ describe('ProjectEditor', () => {
   });
 
   it('turns a chat edit into a proposal for review', async () => {
-    fetchMock.mockResolvedValueOnce(
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const jobId = '9d0c8b7a-1234-4abc-8def-0123456789ab';
+    fetchMock.mockResolvedValueOnce(json({ jobId }, 202)).mockResolvedValueOnce(
       json({
-        commands: [{ type: 'renameProject', name: 'Galley' }],
-        patch: [{ op: 'replace', path: '/name', value: 'Galley' }],
-        summary: 'Rename the project to Galley',
-        reply: 'Renamed.',
-        warnings: [],
-        baseRevision: 0,
+        id: jobId,
+        kind: 'refine',
+        status: 'done',
+        result: {
+          commands: [{ type: 'renameProject', name: 'Galley' }],
+          patch: [{ op: 'replace', path: '/name', value: 'Galley' }],
+          summary: 'Rename the project to Galley',
+          reply: 'Renamed.',
+          warnings: [],
+          baseRevision: 0,
+        },
       })
     );
     render(<ProjectEditor initialProject={project} />);
     fireEvent.change(screen.getByLabelText(/ask for a change/i), { target: { value: 'call it Galley' } });
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
+    await act(() => vi.advanceTimersByTimeAsync(1500));
 
     const review = await screen.findByRole('region', { name: /review proposed change/i });
     expect(within(review).getByText('Rename the project to Galley')).not.toBeNull();

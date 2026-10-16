@@ -45,4 +45,23 @@ async function handlePost(req: Request): Promise<NextResponse> {
   return NextResponse.json({ project }, { status: 201 });
 }
 
+/**
+ * GET /api/projects — light summaries (no plan geometry), newest first.
+ *   200 [{ id, name, kind, revision, createdAt, updatedAt, optionOf? }]
+ */
+async function handleGet(): Promise<NextResponse> {
+  const storage = await getStorage();
+  const list = (await storage.projects.list()).map((p) => ({
+    id: p.id,
+    name: p.name,
+    kind: p.kind,
+    revision: p.revision,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    ...(p.optionOf ? { optionOf: p.optionOf } : {}),
+  }));
+  return NextResponse.json(list, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+export const GET = withUnauthorized(handleGet);
 export const POST = withUnauthorized(handlePost);

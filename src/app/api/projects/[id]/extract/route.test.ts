@@ -11,6 +11,7 @@ import { POST as commit } from '../revisions/route';
 import type { LLMProvider, VisionRequest } from '@/lib/llm';
 import { LLMRequestError, LLMNotConfiguredError, LLMResponseError } from '@/lib/llm';
 import type { Project } from '@/lib/plan/schemas';
+import { MemJobStore } from '@/lib/jobs/mem-jobs';
 
 const providerFromEnv = vi.fn<() => LLMProvider>();
 vi.mock('@/lib/llm', async (importOriginal) => ({
@@ -18,6 +19,7 @@ vi.mock('@/lib/llm', async (importOriginal) => ({
   providerFromEnv: () => providerFromEnv(),
 }));
 const { POST } = await import('./route');
+const { GET: pollJob } = await import('@/app/api/jobs/[id]/route');
 
 function stub(outcomes: unknown[]): LLMProvider & { calls: number } {
   return {
@@ -60,6 +62,28 @@ function post(id: string, body: unknown): Promise<Response> {
   return POST(req, { params: Promise.resolve({ id }) });
 }
 
+type Outcome = { status: number; body: any };
+
+/**
+ * POST, and when the route answers 202 { jobId }, poll GET /api/jobs/[id]
+ * until the job settles. A done job reads as 200 + its result, a failed job
+ * as its error's status + body — what the synchronous route used to answer.
+ */
+async function run(id: string, body: unknown): Promise<Outcome> {
+  const res = await post(id, body);
+  const json = await res.json();
+  if (res.status !== 202) return { status: res.status, body: json };
+  expect(json).toEqual({ jobId: expect.any(String) });
+  for (let i = 0; i < 400; i++) {
+    const polled = await pollJob(new Request('http://localhost/x'), { params: Promise.resolve({ id: json.jobId }) });
+    const job = await polled.json();
+    if (job.status === 'done') return { status: 200, body: job.result };
+    if (job.status === 'failed') return { status: job.error.status, body: job.error };
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  throw new Error('job did not settle');
+}
+
 async function projectWithPhoto(dataDir: string): Promise<Project> {
   const p = createProject(dataDir, { name: 'P' });
   const jpeg = await sharp({ create: { width: 64, height: 48, channels: 3, background: { r: 1, g: 1, b: 1 } } })
@@ -89,9 +113,9 @@ describe('POST /api/projects/[id]/extract', () => {
   it('returns a candidate room and a patch, without changing the project', async () => {
     const p = await projectWithPhoto(dataDir);
     providerFromEnv.mockReturnValue(stub([ANSWER]));
-    const res = await post(p.id, MEASURED);
+    const res = await run(p.id, MEASURED);
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = res.body;
     expect(body).toMatchObject({ confidence: 0.8, notes: 'ok', baseRevision: 0, warnings: [] });
     expect(body.room.polygon[1][0]).toBeCloseTo(3600);
     expect(loadProject(dataDir, p.id)).toEqual(p);
@@ -112,9 +136,9 @@ describe('POST /api/projects/[id]/extract', () => {
   it('accepts a request with no measurements (and warns)', async () => {
     const p = await projectWithPhoto(dataDir);
     providerFromEnv.mockReturnValue(stub([{ ...ANSWER, measuredWalls: [] }]));
-    const res = await post(p.id, {});
+    const res = await run(p.id, {});
     expect(res.status).toBe(200);
-    expect((await res.json()).warnings.join(' ')).toMatch(/no measured walls/i);
+    expect(res.body.warnings.join(' ')).toMatch(/no measured walls/i);
   });
 
   it('returns 503 when no LLM is configured', async () => {
@@ -122,35 +146,35 @@ describe('POST /api/projects/[id]/extract', () => {
     providerFromEnv.mockImplementation(() => {
       throw new LLMNotConfiguredError();
     });
-    const res = await post(p.id, MEASURED);
+    const res = await run(p.id, MEASURED);
     expect(res.status).toBe(503);
-    expect((await res.json()).error).toMatch(/LLM_API_KEY/);
+    expect(res.body.error).toMatch(/LLM_API_KEY/);
   });
 
   it('returns 502 with issues when the model keeps answering badly', async () => {
     const p = await projectWithPhoto(dataDir);
     const bad = { ...ANSWER, measuredWalls: [] };
     providerFromEnv.mockReturnValue(stub([bad, bad]));
-    const res = await post(p.id, MEASURED);
+    const res = await run(p.id, MEASURED);
     expect(res.status).toBe(502);
-    expect((await res.json()).issues.join(' ')).toMatch(/measuredWalls/);
+    expect(res.body.issues.join(' ')).toMatch(/measuredWalls/);
   });
 
   it('returns 502 when the LLM request fails', async () => {
     const p = await projectWithPhoto(dataDir);
     providerFromEnv.mockReturnValue(stub([new LLMRequestError('LLM request timed out after 60000 ms')]));
-    const res = await post(p.id, MEASURED);
+    const res = await run(p.id, MEASURED);
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toMatch(/timed out/);
+    expect(res.body.error).toMatch(/timed out/);
   });
 
   it('answers unexpected errors with JSON (never an empty 500)', async () => {
     const p = await projectWithPhoto(dataDir);
     providerFromEnv.mockReturnValue(stub([new TypeError('something unexpected')]));
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const res = await post(p.id, MEASURED);
+    const res = await run(p.id, MEASURED);
     expect(res.status).toBe(500);
-    expect((await res.json()).error).toMatch(/unexpected/);
+    expect(res.body.error).toMatch(/unexpected/);
     spy.mockRestore();
   });
 
@@ -158,16 +182,30 @@ describe('POST /api/projects/[id]/extract', () => {
     const p = await projectWithPhoto(dataDir);
     const provider = stub([new LLMResponseError('LLM returned non-JSON content', 'x'), ANSWER]);
     providerFromEnv.mockReturnValue(provider);
-    expect((await post(p.id, MEASURED)).status).toBe(200);
+    expect((await run(p.id, MEASURED)).status).toBe(200);
     expect(provider.calls).toBe(2);
+  });
+
+  it('creates no job when validation fails or no LLM is configured', async () => {
+    const create = vi.spyOn(MemJobStore.prototype, 'create');
+    const p = await projectWithPhoto(dataDir);
+    providerFromEnv.mockImplementation(() => {
+      throw new LLMNotConfiguredError();
+    });
+    const res = await post(p.id, MEASURED);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: expect.stringMatching(/You can still sketch the room by hand\.$/) });
+    expect((await post(createProject(dataDir, { name: 'Q' }).id, MEASURED)).status).toBe(400);
+    expect(create).not.toHaveBeenCalled();
+    create.mockRestore();
   });
 
   it('returns 400 when the project has no photos', async () => {
     const p = createProject(dataDir, { name: 'P' });
     providerFromEnv.mockReturnValue(stub([ANSWER]));
-    const res = await post(p.id, MEASURED);
+    const res = await run(p.id, MEASURED);
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/photo/i);
+    expect(res.body.error).toMatch(/photo/i);
   });
 
   it.each([
@@ -178,11 +216,11 @@ describe('POST /api/projects/[id]/extract', () => {
   ])('returns 400 for %s', async (_label, body) => {
     const p = await projectWithPhoto(dataDir);
     providerFromEnv.mockReturnValue(stub([ANSWER]));
-    expect((await post(p.id, body)).status).toBe(400);
+    expect((await run(p.id, body)).status).toBe(400);
   });
 
   it('returns 400 for a non-UUID id and 404 for an unknown project', async () => {
-    expect((await post('..', MEASURED)).status).toBe(400);
-    expect((await post(randomUUID(), MEASURED)).status).toBe(404);
+    expect((await run('..', MEASURED)).status).toBe(400);
+    expect((await run(randomUUID(), MEASURED)).status).toBe(404);
   });
 });

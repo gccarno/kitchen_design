@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { planToJsonPatch } from '../../src/lib/plan/diff';
-import { createProject, pagePoint, projectJson, settle } from './helpers';
+import { createProject, mockJob, pagePoint, projectJson, settle } from './helpers';
 
 /**
  * The whole v1 journey in one test: new project → photo → measured wall →
@@ -28,21 +28,21 @@ test('photo + measured wall → extracted room → cabinet → SVG export', asyn
     ...before,
     room: { ...before.room, polygon: [[0, 0], [4000, 0], [4000, 3000], [0, 3000]] },
   };
-  await page.route(`**/api/projects/${id}/extract`, async (route) => {
-    expect(route.request().postDataJSON()).toEqual({ measurements: [{ description: 'sink wall', lengthMm: 4000 }] });
-    await route.fulfill({
-      json: {
-        room: after.room,
-        confidence: 0.8,
-        notes: 'mocked extraction',
-        scale: 1,
-        residual: 0,
-        warnings: [],
-        baseRevision: before.revision,
-        patch: planToJsonPatch(before, after),
-      },
-    });
-  });
+  await mockJob(
+    page,
+    `**/api/projects/${id}/extract`,
+    {
+      room: after.room,
+      confidence: 0.8,
+      notes: 'mocked extraction',
+      scale: 1,
+      residual: 0,
+      warnings: [],
+      baseRevision: before.revision,
+      patch: planToJsonPatch(before, after),
+    },
+    (body) => expect(body).toEqual({ measurements: [{ description: 'sink wall', lengthMm: 4000 }] })
+  );
 
   await page.getByLabel(/Which wall/).fill('sink wall');
   await page.getByLabel('Length (mm)').fill('4000');

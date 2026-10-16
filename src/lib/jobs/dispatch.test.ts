@@ -1,0 +1,157 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { dispatchJob, ensureProgress } from './dispatch';
+// A job store whose clock the tests control (the real one reads Date.now captured at creation).
+const clock = vi.hoisted(() => ({ now: 1_700_000_000_000 }));
+vi.mock('./index', async () => {
+  const { MemJobStore, MemJobTable } = await import('./mem-jobs');
+  const table = new MemJobTable(() => clock.now);
+  return { getJobStore: async (userId: string | null) => new MemJobStore(table, userId) };
+});
+const { getJobStore } = await import('./index');
+
+const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
+// Auth on (DATABASE_URL set): jobs live in Postgres, where a worker can see them.
+const env = { WORKER_URL: 'http://worker.test/', WORKER_TOKEN: 'tok', DATABASE_URL: 'postgres://db.test/x' };
+
+beforeEach(() => {
+  vi.stubEnv('DATABASE_URL', '');
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
+const asFetch = (fn: unknown) => fn as typeof fetch;
+
+describe('dispatchJob', () => {
+  it('posts to the worker with the bearer token and returns worker on 2xx', async () => {
+    const fetchFn = vi.fn(async () => new Response('{}', { status: 202 }));
+    const run = vi.fn(async () => {});
+    expect(await dispatchJob(ID, { env, fetch: asFetch(fetchFn), run })).toBe('worker');
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`http://worker.test/run/${ID}`);
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    expect(init.body).toBe('{}');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a non-2xx', async () => new Response('no', { status: 500 })],
+    ['a network error', async () => Promise.reject(new TypeError('fetch failed'))],
+    ['a timeout', async () => Promise.reject(new DOMException('timed out', 'TimeoutError'))],
+  ])('falls back to a local run on %s', async (_n, impl) => {
+    const run = vi.fn(async () => {});
+    expect(await dispatchJob(ID, { env, fetch: asFetch(vi.fn(impl)), run })).toBe('local');
+    expect(run).toHaveBeenCalledWith(ID);
+  });
+
+  it('skips the worker in disk mode, where jobs live only in this process', async () => {
+    const fetchFn = vi.fn();
+    const run = vi.fn(async () => {});
+    expect(await dispatchJob(ID, { env: { ...env, DATABASE_URL: '' }, fetch: asFetch(fetchFn), run })).toBe('local');
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledWith(ID);
+  });
+
+  it('runs locally without touching fetch when no worker is configured', async () => {
+    const fetchFn = vi.fn();
+    const run = vi.fn(async () => {});
+    expect(await dispatchJob(ID, { env: {}, fetch: asFetch(fetchFn), run })).toBe('local');
+    expect(await dispatchJob(ID, { env: { WORKER_URL: 'http://x' }, fetch: asFetch(fetchFn), run })).toBe('local');
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns without waiting for the local run, even one that never settles', async () => {
+    const run = vi.fn(() => new Promise<void>(() => {}));
+    const timeout = new Promise<'blocked'>((r) => setTimeout(() => r('blocked'), 200));
+    expect(await Promise.race([dispatchJob(ID, { env: {}, run }), timeout])).toBe('local');
+    await Promise.resolve();
+    expect(run).toHaveBeenCalledWith(ID);
+  });
+
+  it('swallows a rejected local run and logs only its name', async () => {
+    const run = vi.fn(() => new Promise<void>((_, reject) => setTimeout(() => reject(new Error('secret detail')), 10)));
+    expect(await dispatchJob(ID, { env: {}, run })).toBe('local');
+    await new Promise((r) => setTimeout(r, 40));
+    expect(console.error).toHaveBeenCalledWith('local job run failed: Error');
+  });
+
+  it('survives a local run that throws synchronously', async () => {
+    const run = vi.fn((): Promise<void> => {
+      throw new TypeError('sync boom');
+    });
+    await expect(dispatchJob(ID, { env: {}, run })).resolves.toBe('local');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(run).toHaveBeenCalledWith(ID);
+    expect(console.error).toHaveBeenCalledWith('local job run failed: TypeError');
+  });
+});
+
+describe('ensureProgress', () => {
+  const PROJECT = '9a1f8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
+
+  it('re-dispatches a stale running job once it is requeued', async () => {
+    const store = await getJobStore(null);
+    const job = await store.create(PROJECT, 'refine', { message: 'x' });
+    await store.claim(job.id);
+    const run = vi.fn(async () => {});
+    clock.now += 4 * 60 * 1000;
+    expect(await ensureProgress((await store.get(job.id))!, { env: {}, run, now: () => clock.now })).toBe('noop');
+    clock.now += 2 * 60 * 1000; // now over 5 minutes
+    const running = (await store.get(job.id))!;
+    expect(await ensureProgress(running, { env: {}, run, now: () => clock.now })).toBe('requeued');
+    expect(run).toHaveBeenCalledWith(job.id);
+    expect((await store.get(job.id))!.status).toBe('queued');
+  });
+
+  it('does nothing for a fresh running job', async () => {
+    const store = await getJobStore(null);
+    const job = await store.create(PROJECT, 'refine', {});
+    const running = (await store.claim(job.id))!;
+    const run = vi.fn(async () => {});
+    expect(await ensureProgress(running, { env: {}, run, now: () => clock.now })).toBe('noop');
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('dispatches a job that has sat queued, never started', async () => {
+    const store = await getJobStore(null);
+    const job = await store.create(PROJECT, 'refine', {});
+    const run = vi.fn(async () => {});
+    expect(await ensureProgress(job, { env: {}, run, now: () => clock.now })).toBe('noop');
+    clock.now += 2 * 60 * 1000;
+    expect(await ensureProgress(job, { env: {}, run, now: () => clock.now })).toBe('requeued');
+    expect(run).toHaveBeenCalledWith(job.id);
+  });
+
+  it('gives up on a job still queued after 10 minutes, without dispatching it', async () => {
+    const store = await getJobStore(null);
+    const job = await store.create(PROJECT, 'refine', {});
+    const run = vi.fn(async () => {});
+    clock.now += 9 * 60 * 1000;
+    expect(await ensureProgress(job, { env: {}, run, now: () => clock.now })).toBe('requeued');
+    expect(run).toHaveBeenCalledTimes(1);
+    clock.now += 2 * 60 * 1000;
+    expect(await ensureProgress(job, { env: {}, run, now: () => clock.now })).toBe('failed');
+    expect(run).toHaveBeenCalledTimes(1);
+    expect((await store.get(job.id))!).toMatchObject({ status: 'failed', error: { status: 500, error: 'job was never started' } });
+  });
+
+  it('marks a job failed after too many attempts and does not dispatch', async () => {
+    const store = await getJobStore(null);
+    const job = await store.create(PROJECT, 'refine', {});
+    const run = vi.fn(async () => {});
+    for (let i = 0; i < 3; i++) {
+      await store.claim(job.id);
+      clock.now += 6 * 60 * 1000;
+      const cur = (await store.get(job.id))!;
+      expect(await ensureProgress(cur, { env: {}, run, now: () => clock.now })).toBe(i < 2 ? 'requeued' : 'failed');
+    }
+    expect((await store.get(job.id))!.error).toEqual({ status: 500, error: 'job timed out' });
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+});
