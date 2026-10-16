@@ -43,3 +43,15 @@ projects over with `npm run import:local -- --owner <email>` (needs `GCS_BUCKET`
 - If `next build` runs out of memory on the free tier, build a Docker image in CI (Next
   `output: "standalone"`; copy `drizzle/` into the image since migrations read it at startup).
 - Without a worker, jobs run inside the web process (Phase 5 adds the worker).
+
+## 6. Worker on the Oracle VM (optional accelerator)
+The worker is never required: if it does not answer within 2 s, Render runs the job itself.
+1. CI (`worker-image.yaml`) pushes `ghcr.io/gccarno/kitchen_design/kitchen-worker:latest` (arm64) on each push to main.
+2. In the `oci-infra` repo, `workloads/kitchen-worker/` holds the compose project. `scp` that folder and
+   `worker-key.json` to `oci-free`, run `./setup.sh worker-key.json`, fill in `.env` (same values as Render, plus
+   `WORKER_TOKEN` and a Tailscale `TS_AUTHKEY`), and run `./setup.sh worker-key.json` again to start it.
+   Make the GHCR package public or `docker login ghcr.io` on the VM first.
+3. Find the Funnel URL (`docker compose exec tailscale tailscale funnel status`), then set on Render:
+   `WORKER_URL=https://kitchen-worker.<tailnet>.ts.net` and `WORKER_TOKEN` (same value as the VM).
+4. Check: `curl <WORKER_URL>/health`; run a refine and look for the worker's logs; stop the container and
+   run it again to confirm the Render fallback.
