@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { safeNextPath } from '@/lib/auth/next-path';
+import { clearOfflineCaches } from '@/lib/client/offline-cache';
 
 /** Sign-in / create-account form. "Create account" shows only when the server says registration is open. */
 export default function LoginForm({ next, canRegister }: { next?: string; canRegister: boolean }) {
@@ -23,6 +24,8 @@ export default function LoginForm({ next, canRegister }: { next?: string; canReg
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
+        // A previous user's cached projects must never be served to this one.
+        await clearOfflineCaches();
         // Full navigation, so the new cookie reaches the middleware and server components.
         window.location.assign(safeNextPath(next));
         return;

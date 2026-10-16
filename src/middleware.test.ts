@@ -27,13 +27,16 @@ describe('isPublicPath', () => {
       '/icons/icon-192.png',
       '/manifest.json',
       '/manifest.webmanifest',
+      '/sw.js',
+      '/offline',
+      '/offline/',
     ]) {
       expect(isPublicPath(p), p).toBe(true);
     }
   });
 
   it('does not treat look-alike paths as public', () => {
-    for (const p of ['/', '/loginx', '/login-evil', '/api/authx', '/api/auth', '/api/healthz', '/api/projects', '/project/1', '/icons', '/api/upload']) {
+    for (const p of ['/', '/loginx', '/login-evil', '/api/authx', '/api/auth', '/api/healthz', '/api/projects', '/project/1', '/icons', '/api/upload', '/sw.js.map', '/sw.jsx', '/offlinex', '/offline-evil', '/offline/x', '/sw']) {
       expect(isPublicPath(p), p).toBe(false);
     }
   });
@@ -76,13 +79,13 @@ describe('config', () => {
   const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
 
   it('skips static assets and public paths', () => {
-    for (const p of ['/_next/static/chunks/a.js', '/_next/image?url=x', '/favicon.ico', '/icons/icon.png', '/manifest.json', '/login', '/api/auth/login', '/api/health']) {
+    for (const p of ['/_next/static/chunks/a.js', '/_next/image?url=x', '/favicon.ico', '/icons/icon.png', '/manifest.json', '/login', '/api/auth/login', '/api/health', '/sw.js', '/offline']) {
       expect(matches(p), p).toBe(false);
     }
   });
 
   it('runs for pages and the rest of the API', () => {
-    for (const p of ['/', '/project/abc', '/compare/abc', '/api/projects', '/api/upload', '/api/export/x/csv', '/loginx', '/api/authx', '/api/healthz']) {
+    for (const p of ['/', '/project/abc', '/compare/abc', '/api/projects', '/api/upload', '/api/export/x/csv', '/loginx', '/api/authx', '/api/healthz', '/sw.js.map', '/offlinex', '/offline/x']) {
       expect(matches(p), p).toBe(true);
     }
   });
