@@ -2,11 +2,13 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useOnline } from '@/lib/client/online';
 import type { ProjectKind } from '@/lib/plan/schemas';
 
 /** Create a project and go straight to its page. */
 export default function NewProjectForm() {
   const router = useRouter();
+  const online = useOnline();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ProjectKind>('kitchen');
   const [busy, setBusy] = useState(false);
@@ -19,7 +21,7 @@ export default function NewProjectForm() {
   }
 
   async function submit(request: { name: string; kind: ProjectKind; sample?: boolean }) {
-    if (busy) return;
+    if (busy || !online) return;
     setBusy(true);
     setError(null);
     try {
@@ -72,13 +74,14 @@ export default function NewProjectForm() {
           onChange={(e) => setName(e.target.value)}
         />
       </label>
-      <button type="submit" className="rounded bg-black px-4 py-2 text-white disabled:opacity-40" disabled={busy || !name.trim()}>
+      <button type="submit" className="rounded bg-black px-4 py-2 text-white disabled:opacity-40" disabled={!online || busy || !name.trim()} title={online ? undefined : 'Offline'}>
         {busy ? 'Creating…' : 'Create project'}
       </button>
       <button
         type="button"
         className="rounded border px-4 py-2 disabled:opacity-40"
-        disabled={busy}
+        disabled={!online || busy}
+        title={online ? undefined : 'Offline'}
         onClick={() => submit({ name: kind === 'closet' ? 'Sample cleaning closet' : 'Sample kitchen', kind, sample: true })}
       >
         {kind === 'closet' ? 'Try a sample cleaning closet' : 'Try a sample kitchen'}

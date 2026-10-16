@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { proposalFromRefinement, type Proposal, type RefinementResponse } from '@/lib/plan/proposal';
+import { useOnline } from '@/lib/client/online';
 import { forgetJob, isAbortError, keepsJob, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
 
 interface ChatPanelProps {
@@ -27,6 +28,7 @@ export default function ChatPanel({
   onProposal,
   placeholder = 'e.g. move the fridge to the north wall, add a dishwasher next to the sink',
 }: ChatPanelProps) {
+  const online = useOnline();
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -90,7 +92,7 @@ export default function ChatPanel({
 
   function send() {
     const message = draft.trim();
-    if (!message || inFlight.current) return;
+    if (!message || inFlight.current || !online) return;
     const history = messages
       .filter((m) => !m.error)
       .slice(-HISTORY_TURNS)
@@ -147,7 +149,8 @@ export default function ChatPanel({
         <button
           type="button"
           className="rounded bg-black px-4 py-2 text-white disabled:opacity-40"
-          disabled={busy || draft.trim() === ''}
+          disabled={!online || busy || draft.trim() === ''}
+          title={online ? undefined : 'Offline'}
           onClick={() => send()}
         >
           Send

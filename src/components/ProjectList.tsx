@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ClosetElevation from './ClosetElevation';
 import PlanThumbnail from './PlanThumbnail';
+import KeepOfflineButton from './KeepOfflineButton';
+import { purgeProjectCache } from '@/lib/client/offline-cache';
+import { useOnline } from '@/lib/client/online';
 import { submitRevision } from '@/lib/client/revisions';
 import { groupForList } from '@/lib/plan/options';
 import type { ProjectSummary } from '@/lib/storage/store';
@@ -16,6 +19,7 @@ import type { ProjectSummary } from '@/lib/storage/store';
  */
 export default function ProjectList({ projects }: { projects: ProjectSummary[] }) {
   const router = useRouter();
+  const online = useOnline();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -39,7 +43,8 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
       setRenaming(null);
       router.refresh();
     } else {
-      setError({ id: p.id, message: result.stale ? 'this project changed in another tab — reload the page' : result.error });
+      if (result.stale) router.refresh();
+      setError({ id: p.id, message: result.error });
     }
   }
 
@@ -54,6 +59,7 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `could not delete (${res.status})`);
       }
+      await purgeProjectCache(p.id);
       setConfirming(null);
       router.refresh();
     } catch (err) {
@@ -107,7 +113,7 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === 'Escape' && setRenaming(null)}
               />
-              <button type="submit" className="rounded bg-black px-3 py-1 text-sm text-white disabled:opacity-40" disabled={busy || !draft.trim()}>
+              <button type="submit" className="rounded bg-black px-3 py-1 text-sm text-white disabled:opacity-40" disabled={!online || busy || !draft.trim()} title={online ? undefined : 'Offline'}>
                 Save
               </button>
               <button type="button" className="rounded border px-3 py-1 text-sm" onClick={() => setRenaming(null)}>
@@ -117,7 +123,7 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
           ) : confirming === p.id ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span>Delete “{p.name}” and its photos for good?</span>
-              <button type="button" className="rounded bg-red-700 px-3 py-1 text-white disabled:opacity-40" disabled={busy} onClick={() => remove(p)}>
+              <button type="button" className="rounded bg-red-700 px-3 py-1 text-white disabled:opacity-40" disabled={!online || busy} title={online ? undefined : 'Offline'} onClick={() => remove(p)}>
                 Yes, delete
               </button>
               <button type="button" className="rounded border px-3 py-1" onClick={() => setConfirming(null)}>
@@ -128,7 +134,9 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
             <div className="flex gap-2 text-sm">
               <button
                 type="button"
-                className="rounded border px-3 py-1"
+                className="rounded border px-3 py-1 disabled:opacity-40"
+                disabled={!online}
+                title={online ? undefined : 'Offline'}
                 aria-label={`Rename ${p.name}`}
                 onClick={() => {
                   setRenaming(p.id);
@@ -141,7 +149,9 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
               </button>
               <button
                 type="button"
-                className="rounded border px-3 py-1 text-red-700"
+                className="rounded border px-3 py-1 text-red-700 disabled:opacity-40"
+                disabled={!online}
+                title={online ? undefined : 'Offline'}
                 aria-label={`Delete ${p.name}`}
                 onClick={() => {
                   setConfirming(p.id);
@@ -151,6 +161,7 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
               >
                 Delete
               </button>
+              <KeepOfflineButton projectId={p.id} projectName={p.name} />
             </div>
           )}
 

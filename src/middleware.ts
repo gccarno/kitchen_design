@@ -12,7 +12,7 @@ import type { AuthUser } from '@/lib/auth/users';
 export const config = {
   runtime: 'nodejs',
   // Skip static assets and the public paths (decide() checks those again).
-  matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$|icons/|manifest(?:\\.json|\\.webmanifest)$|login(?:/|$)|api/auth/|api/health(?:/|$)).*)'],
+  matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$|icons/|manifest(?:\\.json|\\.webmanifest)$|sw\\.js$|offline/?$|login(?:/|$)|api/auth/|api/health(?:/|$)).*)'],
 };
 
 export type RequestInfo = { pathname: string; search: string; authEnabled: boolean };
@@ -20,7 +20,7 @@ export type Decision = { action: 'next' } | { action: 'redirect'; location: stri
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
-/** Reachable without signing in: the login page, the auth API, the health check, static assets. */
+/** Reachable without signing in: the login page, the auth API, the health check, static assets, and the service worker plus its static offline page. */
 export function isPublicPath(pathname: string): boolean {
   return (
     under(pathname, '/login') ||
@@ -31,7 +31,10 @@ export function isPublicPath(pathname: string): boolean {
     pathname === '/favicon.ico' ||
     pathname.startsWith('/icons/') ||
     pathname === '/manifest.json' ||
-    pathname === '/manifest.webmanifest'
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/sw.js' ||
+    pathname === '/offline' ||
+    pathname === '/offline/'
   );
 }
 

@@ -16,6 +16,8 @@ interface ReferenceMarkerProps {
    * Not called while the input is incomplete (no box yet, custom size missing).
    */
   onChange: (value: ReferenceInput | null) => void;
+  /** Read-only (e.g. offline): the box can't be drawn or changed. */
+  disabled?: boolean;
 }
 
 /** Drags shorter than this (natural px) are treated as taps and ignored. */
@@ -35,7 +37,7 @@ const KIND_OPTIONS = Object.entries(REFERENCE_OBJECTS).map(([kind, spec]) => ({
  * image pixels and drawn as percentages, so it stays put when the image
  * is displayed at a different size.
  */
-export default function ReferenceMarker({ imageUrl, value, onChange }: ReferenceMarkerProps) {
+export default function ReferenceMarker({ imageUrl, value, onChange, disabled = false }: ReferenceMarkerProps) {
   const imgRef = useRef<HTMLImageElement>(null);
   const dragStart = useRef<[number, number] | null>(null);
   // The committed box when the current drag began; restored on tap or cancel.
@@ -78,6 +80,7 @@ export default function ReferenceMarker({ imageUrl, value, onChange }: Reference
   }
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (disabled) return;
     const p = toNatural(e);
     if (!p) return;
     try {
@@ -124,6 +127,8 @@ export default function ReferenceMarker({ imageUrl, value, onChange }: Reference
           <span>Reference object</span>
           <select
             className="rounded border px-2 py-1"
+            disabled={disabled}
+            title={disabled ? 'Offline' : undefined}
             value={kind}
             onChange={(e) => {
               const k = e.target.value as ReferenceObjectKind;
@@ -144,6 +149,8 @@ export default function ReferenceMarker({ imageUrl, value, onChange }: Reference
           <span>Edge in the box</span>
           <select
             className="rounded border px-2 py-1"
+            disabled={disabled}
+            title={disabled ? 'Offline' : undefined}
             value={side}
             onChange={(e) => {
               const s = e.target.value as ReferenceSide;
@@ -162,6 +169,7 @@ export default function ReferenceMarker({ imageUrl, value, onChange }: Reference
             <input
               className="w-24 rounded border px-2 py-1"
               type="number"
+              disabled={disabled}
               inputMode="decimal"
               min={1}
               value={customSize}
@@ -173,7 +181,7 @@ export default function ReferenceMarker({ imageUrl, value, onChange }: Reference
           </label>
         )}
 
-        <button type="button" className="rounded border px-3 py-1" onClick={handleClear} disabled={!box}>
+        <button type="button" className="rounded border px-3 py-1" onClick={handleClear} disabled={disabled || !box} title={disabled ? 'Offline' : undefined}>
           Clear
         </button>
       </div>

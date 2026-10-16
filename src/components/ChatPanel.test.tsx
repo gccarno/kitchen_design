@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, act, cleanup as cleanupRender } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
 import ChatPanel from './ChatPanel';
 
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
@@ -212,5 +213,16 @@ describe('ChatPanel', () => {
     await tick(1500);
     await waitFor(() => expect(onProposal).toHaveBeenCalled());
     expect(sessionStorage.getItem(KEY)).toBeNull();
+  });
+});
+
+describe('ChatPanel offline', () => {
+  afterEach(() => act(() => markOnline()));
+  it('disables Send (title Offline) while offline', () => {
+    const { say, send } = setup();
+    act(() => markOffline());
+    say('move the fridge');
+    expect(send().disabled).toBe(true);
+    expect(send().title).toBe('Offline');
   });
 });

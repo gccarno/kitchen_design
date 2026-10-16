@@ -23,7 +23,8 @@ import { validatePlan } from '@/lib/plan/validate';
 import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
 import type { Pricing, Project } from '@/lib/plan/schemas';
-import { submitRevision } from '@/lib/client/revisions';
+import { useOnline } from '@/lib/client/online';
+import { STALE_EVENT, submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
 
 /**
@@ -55,8 +56,18 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   const canvasRef = useRef<HTMLElement>(null);
   const reviewRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const online = useOnline();
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+
+  // A save was rejected because the project changed elsewhere: reload the latest version from the server.
+  useEffect(() => {
+    const onStale = (e: Event) => {
+      if ((e as CustomEvent<{ projectId?: string }>).detail?.projectId === initialProject.id) router.refresh();
+    };
+    window.addEventListener(STALE_EVENT, onStale);
+    return () => window.removeEventListener(STALE_EVENT, onStale);
+  }, [router, initialProject.id]);
 
   // Bring each new proposal (from photos, chat, or the sketch) into view for review.
   useEffect(() => {
@@ -78,6 +89,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   // Direct edits on the canvas are committed straight away (no review step)
   // as user revisions, so they land in history for undo.
   async function editPlan(change: PlanChange, summary: string): Promise<string | null> {
+    if (!online) return 'offline — editing is disabled';
     const proposal = proposalForPlan(project, change, summary);
     // E.g. a drag that snapped back to where it started: nothing to save.
     if (proposal.patch.length === 0) return null;
@@ -86,11 +98,12 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
       saved(result.project);
       return null;
     }
-    return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
+    return result.error;
   }
 
   // Price edits save straight away too, the same way.
   async function savePricing(pricing: Pricing | undefined, summary: string): Promise<string | null> {
+    if (!online) return 'offline — editing is disabled';
     const proposal = proposalForPricing(project, pricing, summary);
     if (proposal.patch.length === 0) return null;
     const result = await submitRevision(project.id, proposal);
@@ -98,13 +111,13 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
       saved(result.project);
       return null;
     }
-    return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
+    return result.error;
   }
 
   // Copy the design as a new option and open the copy. The button stays
   // disabled until the page changes, so a double click makes one copy.
   async function duplicate() {
-    if (duplicating) return;
+    if (duplicating || !online) return;
     setDuplicating(true);
     setDuplicateError(null);
     try {
@@ -132,31 +145,31 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           <span className="text-gray-500">Revision {project.revision}</span>
           {/* The revision in the URL makes each export fresh after an edit. */}
           <span className="text-gray-500">Download drawing:</span>
-          <a className="text-blue-700 underline" href={`/api/export/${project.id}/svg?rev=${project.revision}`} download>
+          <ExportLink online={online} href={`/api/export/${project.id}/svg?rev=${project.revision}`}>
             SVG
-          </a>
-          <a className="text-blue-700 underline" href={`/api/export/${project.id}/png?scale=1&rev=${project.revision}`} download>
+          </ExportLink>
+          <ExportLink online={online} href={`/api/export/${project.id}/png?scale=1&rev=${project.revision}`}>
             PNG
-          </a>
-          <a className="text-blue-700 underline" href={`/api/export/${project.id}/png?scale=2&rev=${project.revision}`} download>
+          </ExportLink>
+          <ExportLink online={online} href={`/api/export/${project.id}/png?scale=2&rev=${project.revision}`}>
             PNG (2×)
-          </a>
+          </ExportLink>
           <span className="text-gray-500">Parts list:</span>
-          <a className="text-blue-700 underline" href={`/api/export/${project.id}/csv?rev=${project.revision}`} download>
+          <ExportLink online={online} href={`/api/export/${project.id}/csv?rev=${project.revision}`}>
             CSV
-          </a>
-          <a className="text-blue-700 underline" href={`/api/export/${project.id}/pdf?rev=${project.revision}`} download>
+          </ExportLink>
+          <ExportLink online={online} href={`/api/export/${project.id}/pdf?rev=${project.revision}`}>
             Spec sheet (PDF)
-          </a>
+          </ExportLink>
           {elevations.length > 0 && (
             <>
               <span className="text-gray-500">Elevations:</span>
-              <a className="text-blue-700 underline" aria-label="Elevations as SVG" href={`/api/export/${project.id}/elevations/svg?rev=${project.revision}`} download>
+              <ExportLink aria-label="Elevations as SVG" online={online} href={`/api/export/${project.id}/elevations/svg?rev=${project.revision}`}>
                 SVG
-              </a>
-              <a className="text-blue-700 underline" aria-label="Elevations as PNG" href={`/api/export/${project.id}/elevations/png?scale=1&rev=${project.revision}`} download>
+              </ExportLink>
+              <ExportLink aria-label="Elevations as PNG" online={online} href={`/api/export/${project.id}/elevations/png?scale=1&rev=${project.revision}`}>
                 PNG
-              </a>
+              </ExportLink>
             </>
           )}
         </div>
@@ -164,7 +177,8 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           <button
             type="button"
             className="rounded border px-3 py-1 disabled:opacity-40"
-            disabled={duplicating}
+            disabled={!online || duplicating}
+            title={online ? undefined : 'Offline'}
             onClick={() => void duplicate()}
           >
             Duplicate as option
@@ -211,7 +225,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
               items={project.items}
               units={project.units}
               label="Current room"
-              onEdit={editPlan}
+              onEdit={online ? editPlan : undefined}
               placingItem={placingItem}
               onPlacingDone={() => setPlacingItem(null)}
               itemLabels={itemLabels}
@@ -275,5 +289,21 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
         </>
       )}
     </main>
+  );
+}
+
+/** A server-generated download: a link online, a disabled label offline (it can't be fetched without a network). */
+function ExportLink({ online, href, children, ...rest }: { online: boolean; href: string; children: React.ReactNode; 'aria-label'?: string }) {
+  if (!online) {
+    return (
+      <span className="text-gray-400" title="Offline" aria-disabled="true" {...rest}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <a className="text-blue-700 underline" href={href} download {...rest}>
+      {children}
+    </a>
   );
 }

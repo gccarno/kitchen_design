@@ -9,7 +9,8 @@ import { validatePlan } from '@/lib/plan/validate';
 import { polygonBounds, type Bounds, type Point } from '@/lib/plan/geometry';
 import type { Project } from '@/lib/plan/schemas';
 import type { Proposal } from '@/lib/plan/proposal';
-import { submitRevision } from '@/lib/client/revisions';
+import { useOnline } from '@/lib/client/online';
+import { STALE_MESSAGE, submitRevision } from '@/lib/client/revisions';
 
 export type { Proposal };
 
@@ -32,6 +33,7 @@ type Status = { state: 'idle' } | { state: 'applying' } | { state: 'stale' } | {
  * through POST /api/projects/[id]/revisions.
  */
 export default function DiffPreview({ projectId, current, proposal, onApplied, onDiscard }: DiffPreviewProps) {
+  const online = useOnline();
   const [status, setStatus] = useState<Status>({ state: 'idle' });
   const inFlight = useRef(false);
 
@@ -51,7 +53,7 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
   }, [current, preview]);
 
   async function apply() {
-    if (inFlight.current) return;
+    if (inFlight.current || !online) return;
     inFlight.current = true;
     setStatus({ state: 'applying' });
     const result = await submitRevision(projectId, proposal);
@@ -65,6 +67,7 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
   }
 
   const canApply =
+    online &&
     preview.ok &&
     planErrors.length === 0 &&
     proposal.patch.length > 0 &&
@@ -146,7 +149,7 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
       )}
       {status.state === 'stale' && (
         <p role="alert" className="text-sm text-amber-700">
-          The plan changed since this was proposed. Discard it and run it again.
+          {STALE_MESSAGE}. Discard this proposal and run it again.
         </p>
       )}
       {status.state === 'error' && (
@@ -160,6 +163,7 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
           type="button"
           className="rounded bg-black px-4 py-2 text-white disabled:opacity-40"
           disabled={!canApply}
+          title={online ? undefined : 'Offline'}
           onClick={apply}
         >
           {status.state === 'applying' ? 'Applying…' : 'Apply'}

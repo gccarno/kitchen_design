@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar';
+import OfflineBanner from '@/components/OfflineBanner';
 
 export const metadata: Metadata = {
   title: 'Home Design',
@@ -17,7 +19,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-background text-foreground antialiased">{children}</body>
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <ServiceWorkerRegistrar />
+        <OfflineBanner />
+        {children}
+      </body>
     </html>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { proposalFromExtraction, type ExtractionResponse, type Proposal } from '@/lib/plan/proposal';
+import { useOnline } from '@/lib/client/online';
 import { forgetJob, isAbortError, keepsJob, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
 
 interface ExtractPanelProps {
@@ -21,6 +22,7 @@ type Row = { key: number; description: string; length: string };
  * exist yet; the server matches them up and rescales to fit.
  */
 export default function ExtractPanel({ projectId, hasPhotos, onProposal }: ExtractPanelProps) {
+  const online = useOnline();
   const nextKey = useRef(1);
   const [rows, setRows] = useState<Row[]>([{ key: 0, description: '', length: '' }]);
   const [hint, setHint] = useState('');
@@ -33,7 +35,7 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
 
   const filled = rows.filter((r) => r.description.trim() !== '' || r.length.trim() !== '');
   const incomplete = filled.some((r) => r.description.trim() === '' || !(Number(r.length) > 0));
-  const canRun = hasPhotos && !incomplete && !busy;
+  const canRun = online && hasPhotos && !incomplete && !busy;
 
   function update(key: number, change: Partial<Row>) {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...change } : r)));
@@ -168,6 +170,7 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
         type="button"
         className="self-start rounded bg-black px-4 py-2 text-white disabled:opacity-40"
         disabled={!canRun}
+        title={online ? undefined : 'Offline'}
         onClick={run}
       >
         Get room from photos

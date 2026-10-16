@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
 import ProjectEditor from './ProjectEditor';
 
 // The Konva canvas needs a real browser; it's covered by the Playwright specs.
@@ -17,7 +18,8 @@ vi.mock('./FloorPlanCanvas', () => ({
   },
 }));
 const push = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
+const refresh = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }));
 import { useEditorStore } from '@/store/editor';
 import { ProjectSchema, type PlacedItem, type Project, type Room } from '@/lib/plan/schemas';
 import { act } from '@testing-library/react';
@@ -378,5 +380,37 @@ describe('ProjectEditor', () => {
     expect(screen.getByRole('img', { name: 'Elevation of Wall 1 — north, 3000 mm' })).not.toBeNull();
     expect(screen.getByRole('link', { name: 'Elevations as SVG' }).getAttribute('href')).toBe(`/api/export/${ID}/elevations/svg?rev=0`);
     expect(screen.getByRole('link', { name: 'Elevations as PNG' }).getAttribute('href')).toBe(`/api/export/${ID}/elevations/png?scale=1&rev=0`);
+  });
+});
+
+describe('ProjectEditor stale save', () => {
+  it('reloads the latest project and shows the message when a save is rejected with 409', async () => {
+    useEditorStore.setState({ project: null, proposal: null });
+    refresh.mockClear();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ error: 'plan changed' }, 409)));
+    render(<ProjectEditor initialProject={project} />);
+    let msg: string | null = null;
+    await act(async () => {
+      msg = await editRoom({ ...project.room, polygon: [[0, 0], [3500, 0], [3500, 4000], [0, 4000]] }, 'Resize');
+    });
+    expect(msg).toBe('This project changed elsewhere — reloading the latest version; re-apply your change once it loads');
+    expect(refresh).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('ProjectEditor offline', () => {
+  afterEach(() => act(() => markOnline()));
+  it('disables Duplicate, turns server exports into disabled labels and makes the canvas read-only', () => {
+    useEditorStore.setState({ project: null, proposal: null });
+    render(<ProjectEditor initialProject={project} />);
+    expect(screen.getByRole('link', { name: 'SVG' })).not.toBeNull();
+    act(() => markOffline());
+    const dup = screen.getByRole('button', { name: 'Duplicate as option' }) as HTMLButtonElement;
+    expect(dup.disabled).toBe(true);
+    expect(dup.title).toBe('Offline');
+    expect(screen.queryByRole('link', { name: 'SVG' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'CSV' })).toBeNull();
+    expect(onEdit).toBeUndefined();
   });
 });

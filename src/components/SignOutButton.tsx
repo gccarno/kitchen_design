@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { clearOfflineCaches } from '@/lib/client/offline-cache';
 
 /** Signed-in email plus a Sign out button; POSTs the logout route, then goes to /login. */
 export default function SignOutButton({ email }: { email: string }) {
@@ -13,6 +14,7 @@ export default function SignOutButton({ email }: { email: string }) {
     } catch {
       // Navigate regardless; /login sends a still-valid session back to /.
     }
+    await clearOfflineCaches();
     window.location.assign('/login');
   }
   return (

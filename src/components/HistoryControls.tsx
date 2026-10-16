@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { changeSummary, undoRedoState } from '@/lib/plan/history';
 import type { Project } from '@/lib/plan/schemas';
+import { useOnline } from '@/lib/client/online';
 import { submitUndo } from '@/lib/client/revisions';
 
 const SHOWN = 20;
@@ -13,6 +14,7 @@ const SHOWN = 20;
  * they work across reloads.
  */
 export default function HistoryControls({ project, onSaved }: { project: Project; onSaved: (p: Project) => void }) {
+  const online = useOnline();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // A ref, not `busy`: a second Ctrl+Z (or key repeat) can arrive before the
@@ -22,7 +24,7 @@ export default function HistoryControls({ project, onSaved }: { project: Project
 
   const run = useCallback(
     async (action: 'undo' | 'redo') => {
-      if (inFlight.current || !(action === 'undo' ? undo : redo)) return;
+      if (inFlight.current || !online || !(action === 'undo' ? undo : redo)) return;
       inFlight.current = true;
       setBusy(true);
       setError(null);
@@ -30,9 +32,9 @@ export default function HistoryControls({ project, onSaved }: { project: Project
       inFlight.current = false;
       setBusy(false);
       if (result.ok) onSaved(result.project);
-      else setError(result.stale ? 'the plan changed in another tab — reload the page' : result.error);
+      else setError(result.error);
     },
-    [undo, redo, project.id, project.revision, onSaved]
+    [online, undo, redo, project.id, project.revision, onSaved]
   );
 
   useEffect(() => {
@@ -61,18 +63,18 @@ export default function HistoryControls({ project, onSaved }: { project: Project
         <button
           type="button"
           className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-          disabled={busy || !undo}
+          disabled={!online || busy || !undo}
           onClick={() => run('undo')}
-          title={undo ? `Undo: ${changeSummary(undo)} (Ctrl+Z)` : 'Nothing to undo'}
+          title={!online ? 'Offline' : undo ? `Undo: ${changeSummary(undo)} (Ctrl+Z)` : 'Nothing to undo'}
         >
           Undo
         </button>
         <button
           type="button"
           className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-          disabled={busy || !redo}
+          disabled={!online || busy || !redo}
           onClick={() => run('redo')}
-          title={redo ? `Redo: ${changeSummary(redo)} (Ctrl+Shift+Z)` : 'Nothing to redo'}
+          title={!online ? 'Offline' : redo ? `Redo: ${changeSummary(redo)} (Ctrl+Shift+Z)` : 'Nothing to redo'}
         >
           Redo
         </button>

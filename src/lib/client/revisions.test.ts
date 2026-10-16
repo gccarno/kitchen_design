@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { submitRevision } from './revisions';
+import { submitRevision, submitUndo, STALE_MESSAGE, STALE_EVENT } from './revisions';
 
 const proposal = { patch: [{ op: 'replace' as const, path: '/name', value: 'N' }], baseRevision: 3, summary: 's', source: 'user' as const, confidence: 0.4 };
 const json = (body: unknown, status = 200) =>
@@ -24,7 +24,20 @@ describe('submitRevision', () => {
 
   it('reports a stale base revision', async () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'plan changed' }, 409));
-    expect(await submitRevision('p', proposal)).toEqual({ ok: false, stale: true, error: 'plan changed' });
+    expect(await submitRevision('p', proposal)).toEqual({ ok: false, stale: true, error: STALE_MESSAGE });
+  });
+
+  it('asks the editor to reload the latest project on a 409', async () => {
+    const heard = vi.fn();
+    window.addEventListener(STALE_EVENT, heard);
+    fetchMock.mockResolvedValueOnce(json({ error: 'plan changed' }, 409));
+    await submitRevision('p', proposal);
+    fetchMock.mockResolvedValueOnce(json({ error: 'plan changed' }, 409));
+    await submitUndo('p', 'undo', 3);
+    window.removeEventListener(STALE_EVENT, heard);
+    expect(heard).toHaveBeenCalledTimes(2);
+    expect((heard.mock.calls[0][0] as CustomEvent).detail).toEqual({ projectId: 'p' });
+    expect(STALE_MESSAGE).toBe('This project changed elsewhere — reloading the latest version; re-apply your change once it loads');
   });
 
   it('reports the server reason for a rejected edit', async () => {

@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
+import { act as actOffline } from '@testing-library/react';
 
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
@@ -115,8 +117,8 @@ describe('ProjectList', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename Our kitchen' }));
     fireEvent.change(screen.getByLabelText('New name for Our kitchen'), { target: { value: 'Home' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect((await screen.findByRole('alert')).textContent).toContain('changed in another tab');
-    expect(refresh).not.toHaveBeenCalled();
+    expect((await screen.findByRole('alert')).textContent).toContain('changed elsewhere');
+    expect(refresh).toHaveBeenCalled();
   });
 
   it('asks before deleting, and only then deletes and refreshes', async () => {
@@ -134,6 +136,21 @@ describe('ProjectList', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetchMock).toHaveBeenCalledWith(`/api/projects/${B}`, { method: 'DELETE' });
+  });
+
+  it('purges the deleted project from the offline caches', async () => {
+    const del = vi.fn();
+    const keys = [{ url: `http://h/project/${B}` }, { url: `http://h/api/projects/${B}/photos/x` }, { url: `http://h/project/${A}` }];
+    vi.stubGlobal('caches', { open: async () => ({ keys: async () => keys, delete: del }) });
+    fetchMock.mockResolvedValueOnce(json({ deleted: true }));
+    render(<ProjectList projects={projects} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Cabin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    const gone = del.mock.calls.map((c) => c[0].url);
+    expect(gone).toContain(`http://h/project/${B}`);
+    expect(gone).toContain(`http://h/api/projects/${B}/photos/x`);
+    expect(gone).not.toContain(`http://h/project/${A}`);
   });
 
   it('shows why a delete failed, and treats an already-deleted project as done', async () => {
@@ -161,5 +178,18 @@ describe('ProjectList', () => {
     expect(within(cards[1]).getByText('Option')).toBeTruthy();
     expect(within(cards[0]).queryByText('Option')).toBeNull();
     expect(within(cards[2]).queryByText('Option')).toBeNull();
+  });
+});
+
+describe('ProjectList offline', () => {
+  afterEach(() => actOffline(() => markOnline()));
+  it('disables Rename and Delete while offline', () => {
+    render(<ProjectList projects={projects} />);
+    actOffline(() => markOffline());
+    for (const name of ['Rename Our kitchen', 'Delete Our kitchen']) {
+      const b = screen.getByRole('button', { name }) as HTMLButtonElement;
+      expect(b.disabled).toBe(true);
+      expect(b.title).toBe('Offline');
+    }
   });
 });

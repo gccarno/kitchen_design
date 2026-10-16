@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { markOffline, markOnline } from '@/lib/client/online';
 import React from 'react';
 import EstimatePanel from './EstimatePanel';
 import { ProjectSchema, type Pricing, type Project } from '@/lib/plan/schemas';
@@ -135,5 +136,18 @@ describe('EstimatePanel', () => {
   it('says so when there is nothing to price', () => {
     setup(kitchen({ items: [] }));
     expect(screen.getByText(/Nothing to price yet/)).toBeTruthy();
+  });
+});
+
+describe('EstimatePanel offline', () => {
+  afterEach(() => act(() => markOnline()));
+  it('makes price and rate inputs read-only while offline', () => {
+    const onSave = setup(kitchen());
+    act(() => markOffline());
+    const price = screen.getByLabelText(`Unit price: ${RANGE}`) as HTMLInputElement;
+    expect(price.disabled).toBe(true);
+    expect(price.title).toBe('Offline');
+    for (const l of ['Installation %', 'Tax %', 'Currency']) expect((screen.getByLabelText(l) as HTMLInputElement).disabled).toBe(true);
+    expect(onSave).not.toHaveBeenCalled();
   });
 });
