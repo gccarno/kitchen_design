@@ -24,7 +24,7 @@ import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
 import type { Pricing, Project } from '@/lib/plan/schemas';
 import { useOnline } from '@/lib/client/online';
-import { submitRevision } from '@/lib/client/revisions';
+import { STALE_EVENT, submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
 
 /**
@@ -60,6 +60,15 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
+  // A save was rejected because the project changed elsewhere: reload the latest version from the server.
+  useEffect(() => {
+    const onStale = (e: Event) => {
+      if ((e as CustomEvent<{ projectId?: string }>).detail?.projectId === initialProject.id) router.refresh();
+    };
+    window.addEventListener(STALE_EVENT, onStale);
+    return () => window.removeEventListener(STALE_EVENT, onStale);
+  }, [router, initialProject.id]);
+
   // Bring each new proposal (from photos, chat, or the sketch) into view for review.
   useEffect(() => {
     if (proposal) reviewRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
@@ -89,7 +98,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
       saved(result.project);
       return null;
     }
-    return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
+    return result.error;
   }
 
   // Price edits save straight away too, the same way.
@@ -102,7 +111,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
       saved(result.project);
       return null;
     }
-    return result.stale ? 'the plan changed in another tab — reload the page' : result.error;
+    return result.error;
   }
 
   // Copy the design as a new option and open the copy. The button stays

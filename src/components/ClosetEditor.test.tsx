@@ -1,6 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
 import ClosetEditor from './ClosetEditor';
 import { closetFootprint, newCloset, newComponent } from '@/lib/closet/catalog';
 import { commitRevision } from '@/lib/plan/diff';
@@ -126,5 +127,31 @@ describe('ClosetEditor', () => {
   it('shows closet warnings', () => {
     setup(closetProject([newComponent('rod', 'r', 0, { yMm: 800 })]));
     expect(screen.getByRole('list', { name: 'Closet warnings' }).textContent).toContain('would touch the floor');
+  });
+});
+
+describe('ClosetEditor offline', () => {
+  afterEach(() => act(() => markOnline()));
+  it('disables palette, component and size edits while offline', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const project = closetProject([newComponent('shelf', 's', 0)]);
+    render(<ClosetEditor project={project} onSaved={vi.fn()} onProposal={vi.fn()} />);
+    const svg = sizeSvg();
+    fireEvent.pointerDown(svg.querySelector('[data-component="s"]')!, { pointerId: 1, ...at(100, 2134) });
+    fireEvent.pointerUp(svg, { pointerId: 1, ...at(100, 2134) });
+    act(() => markOffline());
+    for (const name of ['Hanging rod', 'Remove shelf']) {
+      const b = screen.getByRole('button', { name }) as HTMLButtonElement;
+      expect(b.disabled).toBe(true);
+      expect(b.title).toBe('Offline');
+    }
+    fireEvent.change(screen.getByLabelText('Inside width (mm)'), { target: { value: '1000' } });
+    const save = screen.getByRole('button', { name: 'Save size and doors' }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(save.title).toBe('Offline');
+    expect((screen.getByLabelText('Width (mm)') as HTMLInputElement).disabled).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

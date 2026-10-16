@@ -124,7 +124,7 @@ describe('HistoryControls', () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'stale', currentRevision: 5 }, 409));
     render(<HistoryControls project={renamed} onSaved={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect((await screen.findByRole('alert')).textContent).toMatch('the plan changed in another tab — reload the page');
+    expect((await screen.findByRole('alert')).textContent).toMatch('changed elsewhere');
   });
 });
 

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ClosetElevation from './ClosetElevation';
 import PlanThumbnail from './PlanThumbnail';
+import KeepOfflineButton from './KeepOfflineButton';
 import { useOnline } from '@/lib/client/online';
 import { submitRevision } from '@/lib/client/revisions';
 import { groupForList } from '@/lib/plan/options';
@@ -41,7 +42,8 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
       setRenaming(null);
       router.refresh();
     } else {
-      setError({ id: p.id, message: result.stale ? 'this project changed in another tab — reload the page' : result.error });
+      if (result.stale) router.refresh();
+      setError({ id: p.id, message: result.error });
     }
   }
 
@@ -157,6 +159,7 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
               >
                 Delete
               </button>
+              <KeepOfflineButton projectId={p.id} projectName={p.name} />
             </div>
           )}
 

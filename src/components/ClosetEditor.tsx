@@ -8,6 +8,7 @@ import { CLOSET_COMPONENT_KINDS, CLOSET_COMPONENTS, componentRef } from '@/lib/c
 import { CommandError } from '@/lib/plan/commands';
 import { compileClosetCommands, type ClosetCommand } from '@/lib/closet/commands';
 import { newId } from '@/lib/id';
+import { useOnline } from '@/lib/client/online';
 import { submitRevision } from '@/lib/client/revisions';
 import { proposalForCloset, type Proposal } from '@/lib/plan/proposal';
 import { validatePlan } from '@/lib/plan/validate';
@@ -38,6 +39,7 @@ const DOOR_STYLES: { value: ClosetDoorStyle; label: string }[] = [
  */
 export default function ClosetEditor({ project, onSaved, onProposal, estimate }: ClosetEditorProps) {
   const closet = project.closet;
+  const online = useOnline();
   const [placing, setPlacing] = useState<ClosetComponentKind | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -52,6 +54,7 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate }:
   }, [selectedId, selectedIndex]);
 
   async function save(next: Closet, summary: string): Promise<string | null> {
+    if (!online) return 'offline — editing is disabled';
     const proposal = proposalForCloset(project, next, summary);
     if (proposal.patch.length === 0) return null;
     const result = await submitRevision(project.id, proposal);
@@ -59,7 +62,7 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate }:
       onSaved(result.project);
       return null;
     }
-    return result.stale ? 'the closet changed in another tab — reload the page' : result.error;
+    return result.error;
   }
 
   /** Apply commands (clamped and validated like the chat's) and save them. */
@@ -110,6 +113,7 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate }:
             component={selected}
             ref_={componentRef(selectedIndex)}
             units={project.units}
+            online={online}
             onChange={(cmd, summary) => run([cmd], summary)}
             onRemove={() =>
               run([{ type: 'removeComponent', component: componentRef(selectedIndex) }], `Remove ${CLOSET_COMPONENTS[selected.kind].name.toLowerCase()}`)
@@ -150,9 +154,10 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate }:
             <button
               key={kind}
               type="button"
-              title={CLOSET_COMPONENTS[kind].hint}
+              disabled={!online}
+              title={online ? CLOSET_COMPONENTS[kind].hint : 'Offline'}
               aria-pressed={placing === kind}
-              className={`rounded border px-3 py-2 text-left text-sm ${placing === kind ? 'bg-blue-600 text-white' : 'bg-white'}`}
+              className={`rounded border px-3 py-2 text-left text-sm disabled:opacity-40 ${placing === kind ? 'bg-blue-600 text-white' : 'bg-white'}`}
               onClick={() => {
                 setPlacing((p) => (p === kind ? null : kind));
                 setSelectedId(null);
@@ -168,7 +173,7 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate }:
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Size and doors</h2>
-        <ClosetSettings closet={closet} onSave={(cmds) => run(cmds, 'Change closet size and doors')} />
+        <ClosetSettings closet={closet} online={online} onSave={(cmds) => run(cmds, 'Change closet size and doors')} />
       </section>
 
       {estimate && (
@@ -182,7 +187,7 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate }:
 }
 
 /** A millimetre input that commits on Enter or when it loses focus. */
-function MmField({ label, value, onCommit, min = 0 }: { label: string; value: number; onCommit: (v: number) => void; min?: number }) {
+function MmField({ label, value, onCommit, min = 0, disabled }: { label: string; value: number; onCommit: (v: number) => void; min?: number; disabled?: boolean }) {
   const [text, setText] = useState(String(Math.round(value)));
   useEffect(() => setText(String(Math.round(value))), [value]);
   const commit = () => {
@@ -194,7 +199,9 @@ function MmField({ label, value, onCommit, min = 0 }: { label: string; value: nu
     <label className="flex flex-col gap-1 text-sm">
       <span>{label}</span>
       <input
-        className="w-24 rounded border px-2 py-1"
+        className="w-24 rounded border px-2 py-1 disabled:opacity-40"
+        disabled={disabled}
+        title={disabled ? 'Offline' : undefined}
         inputMode="numeric"
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -209,12 +216,14 @@ function ComponentDetails({
   component: c,
   ref_,
   units,
+  online,
   onChange,
   onRemove,
 }: {
   component: ClosetComponent;
   ref_: string;
   units: 'mm' | 'in';
+  online: boolean;
   onChange: (cmd: ClosetCommand, summary: string) => void;
   onRemove: () => void;
 }) {
@@ -230,10 +239,10 @@ function ComponentDetails({
         {c.heightMm !== undefined ? ` × ${formatLength(c.heightMm, units)} high` : ''} · {formatLength(c.yMm, units)} up
       </p>
       <div className="flex flex-wrap items-end gap-2">
-        <MmField label="From left (mm)" value={c.xMm} onCommit={(xMm) => move({ xMm })} />
-        <MmField label={spec.box ? 'Bottom height (mm)' : 'Height (mm)'} value={c.yMm} onCommit={(yMm) => move({ yMm })} />
-        <MmField label="Width (mm)" value={c.widthMm} min={1} onCommit={(widthMm) => resize({ widthMm })} />
-        {spec.box && <MmField label="Box height (mm)" value={c.heightMm ?? 0} min={1} onCommit={(heightMm) => resize({ heightMm })} />}
+        <MmField disabled={!online} label="From left (mm)" value={c.xMm} onCommit={(xMm) => move({ xMm })} />
+        <MmField disabled={!online} label={spec.box ? 'Bottom height (mm)' : 'Height (mm)'} value={c.yMm} onCommit={(yMm) => move({ yMm })} />
+        <MmField disabled={!online} label="Width (mm)" value={c.widthMm} min={1} onCommit={(widthMm) => resize({ widthMm })} />
+        {spec.box && <MmField disabled={!online} label="Box height (mm)" value={c.heightMm ?? 0} min={1} onCommit={(heightMm) => resize({ heightMm })} />}
         {spec.count && (
           <MmField
             label={c.kind === 'drawers' ? 'Drawers' : 'Shelves'}
@@ -242,7 +251,7 @@ function ComponentDetails({
             onCommit={(count) => resize({ count: Math.round(count) })}
           />
         )}
-        <button type="button" className="rounded border px-3 py-1 text-sm text-red-700" onClick={onRemove}>
+        <button type="button" className="rounded border px-3 py-1 text-sm text-red-700 disabled:opacity-40" disabled={!online} title={online ? undefined : 'Offline'} onClick={onRemove}>
           Remove {name}
         </button>
       </div>
@@ -250,7 +259,7 @@ function ComponentDetails({
   );
 }
 
-function ClosetSettings({ closet, onSave }: { closet: Closet; onSave: (cmds: ClosetCommand[]) => void }) {
+function ClosetSettings({ closet, online, onSave }: { closet: Closet; online: boolean; onSave: (cmds: ClosetCommand[]) => void }) {
   const [form, setForm] = useState(() => toForm(closet));
   useEffect(() => setForm(toForm(closet)), [closet]);
   const set = (k: keyof ReturnType<typeof toForm>) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -264,7 +273,7 @@ function ClosetSettings({ closet, onSave }: { closet: Closet; onSave: (cmds: Clo
       className="flex flex-wrap items-end gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!valid) return;
+        if (!valid || !online) return;
         // A full-width opening stays full width when only the closet's width is changed.
         const wasFull = closet.opening.leftMm === 0 && Math.round(closet.opening.widthMm) === Math.round(closet.widthMm);
         const openingUntouched = form.leftMm === toForm(closet).leftMm && form.openingMm === toForm(closet).openingMm;
@@ -305,7 +314,7 @@ function ClosetSettings({ closet, onSave }: { closet: Closet; onSave: (cmds: Clo
         <span>Opening width (mm)</span>
         <input className="w-24 rounded border px-2 py-1" inputMode="numeric" value={form.openingMm} onChange={set('openingMm')} />
       </label>
-      <button type="submit" className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-40" disabled={!valid || !changed}>
+      <button type="submit" className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-40" disabled={!online || !valid || !changed} title={online ? undefined : 'Offline'}>
         Save size and doors
       </button>
     </form>

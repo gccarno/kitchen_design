@@ -32,7 +32,7 @@ export default function HistoryControls({ project, onSaved }: { project: Project
       inFlight.current = false;
       setBusy(false);
       if (result.ok) onSaved(result.project);
-      else setError(result.stale ? 'the plan changed in another tab — reload the page' : result.error);
+      else setError(result.error);
     },
     [online, undo, redo, project.id, project.revision, onSaved]
   );

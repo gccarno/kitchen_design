@@ -117,8 +117,8 @@ describe('ProjectList', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename Our kitchen' }));
     fireEvent.change(screen.getByLabelText('New name for Our kitchen'), { target: { value: 'Home' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect((await screen.findByRole('alert')).textContent).toContain('changed in another tab');
-    expect(refresh).not.toHaveBeenCalled();
+    expect((await screen.findByRole('alert')).textContent).toContain('changed elsewhere');
+    expect(refresh).toHaveBeenCalled();
   });
 
   it('asks before deleting, and only then deletes and refreshes', async () => {
