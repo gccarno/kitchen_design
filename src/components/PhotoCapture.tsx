@@ -122,6 +122,7 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
               imageUrl={`/api/projects/${projectId}/photos/${p.id}`}
               value={toInput(p.referenceObject)}
               onChange={(v) => saveReference(p.id, v)}
+              disabled={!online}
             />
             {state && (
               <p className={`text-xs ${typeof state === 'object' ? 'text-red-600' : 'text-gray-500'}`}>

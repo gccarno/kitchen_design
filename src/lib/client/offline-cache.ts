@@ -3,8 +3,11 @@ const PREFIX = 'hd-';
 const PAGES = 'hd-pages-v1';
 const PHOTOS = 'hd-photos-v1';
 
-/** Deletes every hd- cache and asks the active worker to do the same. Never throws. */
-export async function clearOfflineCaches(): Promise<void> {
+const MAX_PHOTOS = 300;
+const MAX_PAGES = 100;
+const ACK_TIMEOUT_MS = 1000;
+
+async function deleteHdCaches(): Promise<void> {
   try {
     if (typeof caches !== 'undefined' && caches) {
       const names = await caches.keys();
@@ -13,11 +16,57 @@ export async function clearOfflineCaches(): Promise<void> {
   } catch {
     /* best effort */
   }
+}
+
+/** Asks the active worker to clear its caches and waits (briefly) for its reply. Never throws. */
+function clearViaWorker(): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const controller = typeof navigator !== 'undefined' ? navigator.serviceWorker?.controller : undefined;
+      if (!controller) return resolve();
+      const channel = new MessageChannel();
+      const timer = setTimeout(resolve, ACK_TIMEOUT_MS);
+      channel.port1.onmessage = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      controller.postMessage({ type: 'clear' }, [channel.port2]);
+    } catch {
+      resolve();
+    }
+  });
+}
+
+/**
+ * Deletes every hd- cache and has the active worker do the same, waiting for it
+ * so an in-flight worker write cannot repopulate the cache afterwards. Never throws.
+ */
+export async function clearOfflineCaches(): Promise<void> {
+  await deleteHdCaches();
+  await clearViaWorker();
+  await deleteHdCaches();
+}
+
+/** Drops one project's cached page, document and photos (after it is deleted). Never throws. */
+export async function purgeProjectCache(projectId: string): Promise<void> {
   try {
-    if (typeof navigator !== 'undefined') navigator.serviceWorker?.controller?.postMessage({ type: 'clear' });
+    if (typeof caches === 'undefined' || !caches) return;
+    const doc = `/api/projects/${projectId}`;
+    for (const name of [PAGES, PHOTOS]) {
+      const cache = await caches.open(name);
+      for (const req of await cache.keys()) {
+        const path = new URL(req.url, 'http://x').pathname;
+        if (path === `/project/${projectId}` || path === doc || path.startsWith(`${doc}/`)) await cache.delete(req);
+      }
+    }
   } catch {
     /* best effort */
   }
+}
+
+async function trim(cache: Cache, max: number): Promise<void> {
+  const keys = await cache.keys();
+  for (const k of keys.slice(0, Math.max(0, keys.length - max))) await cache.delete(k);
 }
 
 const isPhotoUrl = (url: string) => /\/api\/projects\/[^/]+\/photos\/[^/?#]+/.test(url);
@@ -36,6 +85,7 @@ export async function cacheUrls(urls: string[]): Promise<{ cached: number; faile
       }
       const cache = await caches.open(isPhotoUrl(url) ? PHOTOS : PAGES);
       await cache.put(url, res);
+      await trim(cache, isPhotoUrl(url) ? MAX_PHOTOS : MAX_PAGES);
       cached++;
     } catch {
       failed++;

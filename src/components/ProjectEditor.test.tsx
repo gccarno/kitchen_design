@@ -393,7 +393,7 @@ describe('ProjectEditor stale save', () => {
     await act(async () => {
       msg = await editRoom({ ...project.room, polygon: [[0, 0], [3500, 0], [3500, 4000], [0, 4000]] }, 'Resize');
     });
-    expect(msg).toBe('This project changed elsewhere — loaded the latest version; re-apply your change');
+    expect(msg).toBe('This project changed elsewhere — reloading the latest version; re-apply your change once it loads');
     expect(refresh).toHaveBeenCalled();
     vi.unstubAllGlobals();
   });

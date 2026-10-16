@@ -79,6 +79,7 @@ describe('LoginForm', () => {
     fill();
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
     expect(clearOfflineCaches).toHaveBeenCalledTimes(1);
+    expect(clearOfflineCaches.mock.invocationCallOrder[0]).toBeLessThan(assign.mock.invocationCallOrder[0]);
   });
 
   it('does not clear the caches when sign-in fails', async () => {

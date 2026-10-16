@@ -37,7 +37,7 @@ describe('submitRevision', () => {
     window.removeEventListener(STALE_EVENT, heard);
     expect(heard).toHaveBeenCalledTimes(2);
     expect((heard.mock.calls[0][0] as CustomEvent).detail).toEqual({ projectId: 'p' });
-    expect(STALE_MESSAGE).toBe('This project changed elsewhere — loaded the latest version; re-apply your change');
+    expect(STALE_MESSAGE).toBe('This project changed elsewhere — reloading the latest version; re-apply your change once it loads');
   });
 
   it('reports the server reason for a rejected edit', async () => {

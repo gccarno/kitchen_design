@@ -28,9 +28,16 @@ describe('ServiceWorkerRegistrar', () => {
   it('does not throw when serviceWorker is missing or registration rejects', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     expect(() => render(<ServiceWorkerRegistrar />)).not.toThrow();
-    const register = vi.fn().mockRejectedValue(new Error('nope'));
+    const rejection = Promise.reject(new Error('nope'));
+    const register = vi.fn().mockReturnValue(rejection);
     Object.defineProperty(navigator, 'serviceWorker', { value: { register }, configurable: true });
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
     expect(() => render(<ServiceWorkerRegistrar />)).not.toThrow();
-    await Promise.resolve();
+    expect(register).toHaveBeenCalledTimes(1);
+    // The rejection must have a handler attached (the component's catch), so it settles cleanly.
+    await new Promise((r) => setTimeout(r, 20));
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
   });
 });

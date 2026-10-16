@@ -3,7 +3,7 @@ import type { Proposal } from '../plan/proposal';
 import { markOffline, markOnline } from './online';
 
 /** Shown when the server rejects an edit because the project changed elsewhere (HTTP 409). */
-export const STALE_MESSAGE = 'This project changed elsewhere — loaded the latest version; re-apply your change';
+export const STALE_MESSAGE = 'This project changed elsewhere — reloading the latest version; re-apply your change once it loads';
 /** Fired on `window` after a 409 so the open editor can reload the latest project. */
 export const STALE_EVENT = 'hd:project-stale';
 

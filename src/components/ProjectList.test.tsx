@@ -138,6 +138,21 @@ describe('ProjectList', () => {
     expect(fetchMock).toHaveBeenCalledWith(`/api/projects/${B}`, { method: 'DELETE' });
   });
 
+  it('purges the deleted project from the offline caches', async () => {
+    const del = vi.fn();
+    const keys = [{ url: `http://h/project/${B}` }, { url: `http://h/api/projects/${B}/photos/x` }, { url: `http://h/project/${A}` }];
+    vi.stubGlobal('caches', { open: async () => ({ keys: async () => keys, delete: del }) });
+    fetchMock.mockResolvedValueOnce(json({ deleted: true }));
+    render(<ProjectList projects={projects} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Cabin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    const gone = del.mock.calls.map((c) => c[0].url);
+    expect(gone).toContain(`http://h/project/${B}`);
+    expect(gone).toContain(`http://h/api/projects/${B}/photos/x`);
+    expect(gone).not.toContain(`http://h/project/${A}`);
+  });
+
   it('shows why a delete failed, and treats an already-deleted project as done', async () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'disk on fire' }, 500)).mockResolvedValueOnce(json({ error: 'project not found' }, 404));
     render(<ProjectList projects={projects} />);

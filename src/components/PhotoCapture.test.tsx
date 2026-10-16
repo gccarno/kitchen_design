@@ -140,3 +140,18 @@ describe('PhotoCapture offline', () => {
     inputs.forEach((i) => expect((i as HTMLInputElement).disabled).toBe(true));
   });
 });
+
+describe('PhotoCapture offline reference marker', () => {
+  afterEach(() => actOffline(() => markOnline()));
+  it('makes the reference marker read-only and saves nothing', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a')]} />);
+    actOffline(() => markOffline());
+    expect((screen.getByLabelText('Reference object') as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Edge in the box') as HTMLSelectElement).disabled).toBe(true);
+    drawBox();
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});

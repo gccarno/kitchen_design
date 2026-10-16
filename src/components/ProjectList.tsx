@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import ClosetElevation from './ClosetElevation';
 import PlanThumbnail from './PlanThumbnail';
 import KeepOfflineButton from './KeepOfflineButton';
+import { purgeProjectCache } from '@/lib/client/offline-cache';
 import { useOnline } from '@/lib/client/online';
 import { submitRevision } from '@/lib/client/revisions';
 import { groupForList } from '@/lib/plan/options';
@@ -58,6 +59,7 @@ export default function ProjectList({ projects }: { projects: ProjectSummary[] }
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `could not delete (${res.status})`);
       }
+      await purgeProjectCache(p.id);
       setConfirming(null);
       router.refresh();
     } catch (err) {

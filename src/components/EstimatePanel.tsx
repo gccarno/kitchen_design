@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { loadCatalog } from '@/lib/catalog/loader';
 import { buildEstimate, type EstimateLine } from '@/lib/estimate/estimate';
 import { moneyFormat } from '@/lib/estimate/money';
+import { useOnline } from '@/lib/client/online';
 import { DEFAULT_CURRENCY, DEFAULT_RATES } from '@/lib/estimate/prices';
 import { projectKind, type Pricing, type Project } from '@/lib/plan/schemas';
 
@@ -37,11 +38,13 @@ function tidy(p: Pricing): Pricing | undefined {
 export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
   const estimate = useMemo(() => buildEstimate(project, loadCatalog()), [project]);
   const money = moneyFormat(estimate.currency);
+  const online = useOnline();
   const [error, setError] = useState<string | null>(null);
   const closet = projectKind(project) === 'closet';
   const base: Pricing = project.pricing ?? { currency: DEFAULT_CURRENCY, unitPrices: {} };
 
   async function save(next: Pricing, summary: string) {
+    if (!online) return setError('Not saved: offline — editing is disabled');
     setError(null);
     const err = await onSave(tidy(next), summary);
     if (err) setError(`Not saved: ${err}`);
@@ -90,6 +93,7 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
                           value={l.unitPrice}
                           onCommit={(v) => setPrice(l, v)}
                           onInvalid={setError}
+                          disabled={!online}
                         />
                         {l.overridden && (
                           <button
@@ -97,6 +101,7 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
                             className="rounded border px-1 text-xs text-gray-700"
                             aria-label={`Reset the price of ${l.label}`}
                             title="Back to the default price"
+                            disabled={!online}
                             onClick={() => resetPrice(l)}
                           >
                             reset
@@ -138,6 +143,7 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
             value={project.pricing?.hardwareEach ?? DEFAULT_RATES.hardwareEach}
             onCommit={(v) => setRate('hardwareEach', v, `Set hardware to ${money.format(v)} each`)}
             onInvalid={setError}
+            disabled={!online}
           />
         ) : (
           <NumberField
@@ -151,6 +157,7 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
             value={project.pricing?.countertopPerM2 ?? DEFAULT_RATES.countertopPerM2}
             onCommit={(v) => setRate('countertopPerM2', v, `Set the countertop price to ${money.format(v)} per m²`)}
             onInvalid={setError}
+            disabled={!online}
           />
         )}
         <NumberField
@@ -160,6 +167,7 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
           value={estimate.installPct}
           onCommit={(v) => setRate('installPct', v, `Set installation to ${v}%`)}
           onInvalid={setError}
+          disabled={!online}
         />
         <NumberField
           label="Tax %"
@@ -168,11 +176,13 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
           value={estimate.taxPct}
           onCommit={(v) => setRate('taxPct', v, `Set tax to ${v}%`)}
           onInvalid={setError}
+          disabled={!online}
         />
         <CurrencyField
           value={estimate.currency}
           onCommit={(c) => save({ ...base, currency: c }, `Set the currency to ${c}`)}
           onInvalid={setError}
+          disabled={!online}
         />
       </div>
 
@@ -195,6 +205,7 @@ function NumberField({
   max,
   visibleLabel = false,
   hint,
+  disabled,
 }: {
   label: string;
   value: number;
@@ -203,6 +214,7 @@ function NumberField({
   max?: number;
   visibleLabel?: boolean;
   hint?: string;
+  disabled?: boolean;
 }) {
   const shown = String(round2(value));
   const [text, setText] = useState(shown);
@@ -220,7 +232,9 @@ function NumberField({
   };
   const input = (
     <input
-      className="w-24 rounded border px-2 py-1"
+      className="w-24 rounded border px-2 py-1 disabled:opacity-40"
+      disabled={disabled}
+      title={disabled ? 'Offline' : undefined}
       inputMode="decimal"
       aria-label={visibleLabel ? undefined : label}
       value={text}
@@ -241,7 +255,7 @@ function NumberField({
   );
 }
 
-function CurrencyField({ value, onCommit, onInvalid }: { value: string; onCommit: (c: string) => void; onInvalid: (m: string) => void }) {
+function CurrencyField({ value, onCommit, onInvalid, disabled }: { value: string; onCommit: (c: string) => void; onInvalid: (m: string) => void; disabled?: boolean }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   const commit = () => {
@@ -257,7 +271,9 @@ function CurrencyField({ value, onCommit, onInvalid }: { value: string; onCommit
     <label className="flex flex-col gap-1">
       <span>Currency</span>
       <input
-        className="w-20 rounded border px-2 py-1 uppercase"
+        className="w-20 rounded border px-2 py-1 uppercase disabled:opacity-40"
+        disabled={disabled}
+        title={disabled ? 'Offline' : undefined}
         maxLength={3}
         value={text}
         onChange={(e) => setText(e.target.value)}

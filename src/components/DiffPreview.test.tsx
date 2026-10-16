@@ -1,6 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { markOffline, markOnline } from '@/lib/client/online';
 import DiffPreview, { type Proposal } from './DiffPreview';
 import { planToJsonPatch } from '@/lib/plan/diff';
 import { ProjectSchema, type Project, type Room } from '@/lib/plan/schemas';
@@ -145,7 +146,7 @@ describe('DiffPreview', () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'plan changed', currentRevision: 3 }, 409));
     const { onApplied } = setup();
     fireEvent.click(screen.getByRole('button', { name: /apply/i }));
-    expect(await screen.findByText(/plan changed since this was proposed/i)).not.toBeNull();
+    expect(await screen.findByText(/changed elsewhere/i)).not.toBeNull();
     expect((screen.getByRole('button', { name: /apply/i }) as HTMLButtonElement).disabled).toBe(true);
     expect(onApplied).not.toHaveBeenCalled();
   });
@@ -192,5 +193,21 @@ describe('DiffPreview', () => {
     fireEvent.click(screen.getByRole('button', { name: /discard/i }));
     expect(onDiscard).toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('DiffPreview offline', () => {
+  afterEach(() => act(() => markOnline()));
+  it('disables Apply while offline and never calls the server', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    setup();
+    act(() => markOffline());
+    const apply = screen.getByRole('button', { name: /apply/i }) as HTMLButtonElement;
+    expect(apply.disabled).toBe(true);
+    expect(apply.title).toBe('Offline');
+    fireEvent.click(apply);
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
