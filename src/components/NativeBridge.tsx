@@ -26,8 +26,10 @@ export default function NativeBridge() {
         return;
       }
       remove = () => void handle.remove();
-      await StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
-      await StatusBar.setBackgroundColor({ color: '#111827' }).catch(() => {});
+      // Dark icons on white, matching the pages: Android 15+ ignores the bar colour (edge-to-edge),
+      // so light icons would sit on the white page.
+      await StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+      await StatusBar.setBackgroundColor({ color: '#ffffff' }).catch(() => {});
     })().catch(() => {});
     return () => {
       cancelled = true;

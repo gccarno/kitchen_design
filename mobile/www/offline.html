@@ -17,9 +17,13 @@
   <h1 id="title">Waking up the server&hellip;</h1>
   <p id="msg">Retrying automatically.</p>
 </main>
+<script src="server-url.js"></script>
 <script>
 (function () {
-  var target = (window.Capacitor && window.Capacitor.getServerUrl && window.Capacitor.getServerUrl()) || '';
+  // The bridge isn't injected into this error page, so fall back to the url that
+  // scripts/inline-server-url.mjs writes in place of the server-url.js tag on cap sync.
+  var target = (window.Capacitor && window.Capacitor.getServerUrl && window.Capacitor.getServerUrl()) ||
+    window.CAP_SERVER_URL || '';
   try { var sp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen; if (sp && sp.hide) sp.hide(); } catch (e) {}
   var title = document.getElementById('title');
   var msg = document.getElementById('msg');

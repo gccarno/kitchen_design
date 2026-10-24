@@ -15,6 +15,7 @@ For LAN dev use `http://<lan-ip>:3000` (cleartext is enabled automatically for `
 
 ## Errors inside the app
 Capacitor's `errorPath` (`offline.html`) also shows for main-frame HTTP errors (404, 500, 401 pages), not only network failures. The page then retries the server root every 5 s, so a deep link that errors bounces to `/`.
+Capacitor injects no bridge into this page, so it can't ask for the server url; `cap sync` runs `scripts/inline-server-url.mjs` (the `capacitor:copy:after` npm script), which writes `CAP_SERVER_URL` into the copied page. Always sync with `CAP_SERVER_URL` set.
 
 ## Install
 ```

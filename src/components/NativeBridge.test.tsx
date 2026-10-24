@@ -15,7 +15,7 @@ const setStyle = vi.fn(async () => {});
 const setBackgroundColor = vi.fn(async () => {});
 vi.mock('@capacitor/app', () => ({ App: { addListener, exitApp } }));
 vi.mock('@capacitor/splash-screen', () => ({ SplashScreen: { hide } }));
-vi.mock('@capacitor/status-bar', () => ({ StatusBar: { setStyle, setBackgroundColor }, Style: { Dark: 'DARK' } }));
+vi.mock('@capacitor/status-bar', () => ({ StatusBar: { setStyle, setBackgroundColor }, Style: { Dark: 'DARK', Light: 'LIGHT' } }));
 
 import NativeBridge from './NativeBridge';
 
@@ -41,7 +41,7 @@ describe('NativeBridge', () => {
     const back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
     const { unmount } = render(<NativeBridge />);
     await waitFor(() => expect(hide).toHaveBeenCalled());
-    expect(setStyle).toHaveBeenCalled();
+    await waitFor(() => expect(setStyle).toHaveBeenCalledWith({ style: 'LIGHT' }));
     window.history.pushState({}, '', '/projects/1');
     backHandler!({ canGoBack: true });
     expect(back).toHaveBeenCalledTimes(1);
