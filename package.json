@@ -16,7 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "import:local": "tsx --env-file-if-exists=.env.local scripts/import-local-data.ts",
-    "create-user": "tsx --env-file-if-exists=.env.local scripts/create-user.ts"
+    "create-user": "tsx --env-file-if-exists=.env.local scripts/create-user.ts",
+    "capacitor:copy:after": "node scripts/inline-server-url.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
