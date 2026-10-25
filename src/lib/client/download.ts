@@ -34,6 +34,11 @@ export async function saveAndShare(url: string, filename: string): Promise<boole
   const { Filesystem, Directory } = await import('@capacitor/filesystem');
   const { Share } = await import('@capacitor/share');
   const { uri } = await Filesystem.writeFile({ path: name, data, directory: Directory.Cache });
-  await Share.share({ title: name, url: uri });
+  try {
+    await Share.share({ title: name, url: uri });
+  } catch (err) {
+    // Closing the sheet rejects ("Share canceled"), and so does a second tap while one is open. Neither is a failure.
+    if (!/cancel|in progress/i.test(err instanceof Error ? err.message : String(err))) throw err;
+  }
   return true;
 }

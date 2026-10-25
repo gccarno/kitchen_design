@@ -19,7 +19,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // Capacitor's SystemBars plugin sets --safe-area-inset-* on <html> before hydration.
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <ServiceWorkerRegistrar />
         <OfflineBanner />
