@@ -17,7 +17,8 @@ export default function NativeBridge() {
       ]);
       await SplashScreen.hide().catch(() => {});
       const handle = await App.addListener('backButton', ({ canGoBack }) => {
-        if (window.location.pathname === '/') void App.exitApp();
+        // /login is the root for a signed-out user: `/` redirects there, so going "home" would loop.
+        if (window.location.pathname === '/' || window.location.pathname === '/login') void App.exitApp();
         else if (canGoBack) window.history.back();
         else window.location.assign('/');
       });
