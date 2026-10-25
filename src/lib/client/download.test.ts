@@ -64,6 +64,20 @@ describe('native download', () => {
     await expect(saveAndShare('/api/x', 'x.csv')).rejects.toThrow(/401/);
   });
 
+  it.each(['Share canceled', "Can't share while sharing is in progress"])('treats "%s" from the share sheet as done', async (message) => {
+    setNative(true);
+    vi.stubGlobal('fetch', respond({ type: 'text/csv' }));
+    share.mockRejectedValue(new Error(message));
+    expect(await saveAndShare('/api/x', 'x.csv')).toBe(true);
+  });
+
+  it('still reports other share failures', async () => {
+    setNative(true);
+    vi.stubGlobal('fetch', respond({ type: 'text/csv' }));
+    share.mockRejectedValue(new Error('No app can share this'));
+    await expect(saveAndShare('/api/x', 'x.csv')).rejects.toThrow(/No app/);
+  });
+
   it('writes the bytes and shares the written URI', async () => {
     setNative(true);
     vi.stubGlobal('fetch', respond({ type: 'text/csv', body: 'abc', cd: 'attachment; filename="estimate.csv"' }));
