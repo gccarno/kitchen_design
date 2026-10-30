@@ -319,6 +319,8 @@ export function checkAccessibility(project: Project): LayoutRule[] {
 const TURNING_STEP_MM = 10;
 /** The grid never has more than this many points along a side, however big the room: the work is bounded. */
 const TURNING_GRID_MAX = 400;
+/** Roughly how many point-to-edge distances the check may compute, at most. */
+const TURNING_WORK_BUDGET = 20_000_000;
 
 /**
  * The room's largest clear floor circle. Its centre is tried on a grid, so the
@@ -336,7 +338,10 @@ function turningSpace(project: Project, floor: PlacedItem[]): LayoutRule {
   const from = (p: Point, list: [Point, Point][]) => Math.min(...list.map(([a, b]) => pointToSegmentDistance(p, a, b)));
 
   const { minX, minY, maxX, maxY } = polygonBounds(poly);
-  const step = Math.max(TURNING_STEP_MM, Math.ceil(Math.max(maxX - minX, maxY - minY) / TURNING_GRID_MAX));
+  // Bound the total work (grid points × edges), not just the grid: many items or a many-sided room get a coarser grid.
+  const edgeCount = wallEdges.length + blockEdges.reduce((n, e) => n + e.length, 0);
+  const side = Math.max(20, Math.min(TURNING_GRID_MAX, Math.floor(Math.sqrt(TURNING_WORK_BUDGET / edgeCount))));
+  const step = Math.max(TURNING_STEP_MM, Math.ceil(Math.max(maxX - minX, maxY - minY) / side));
   let best = 0;
   for (let x = minX; x <= maxX; x += step) {
     for (let y = minY; y <= maxY; y += step) {

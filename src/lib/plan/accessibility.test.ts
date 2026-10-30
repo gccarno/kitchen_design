@@ -70,6 +70,17 @@ describe('space to turn a wheelchair', () => {
     expect(r.status).toBe('pass');
   });
 
+  it('stays fast with thousands of items and a many-sided room', () => {
+    const base = room(6000, 6000, [{ type: 'addRun', wall: 'w1', items: ['base-600x560x720'] }]);
+    const item = base.items[0];
+    const items = Array.from({ length: 3000 }, (_, i) => ({ ...item, id: `i${i}`, position: { x: 300 + (i % 50) * 100, y: 1000 + Math.floor(i / 50) * 70 } }));
+    const ring = Array.from({ length: 500 }, (_, i): [number, number] => [3000 + 2900 * Math.cos((i / 500) * 2 * Math.PI), 3000 + 2900 * Math.sin((i / 500) * 2 * Math.PI)]);
+    const crowded = { ...base, items, room: { ...base.room, polygon: ring, walls: ring.map((_, i) => ({ id: `w${i}`, thicknessMm: 100 })) } };
+    const started = Date.now();
+    expect(['pass', 'fail']).toContain(rule(crowded, 'access-turning').status);
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
   it('ignores wall cabinets, which hang above the circle', () => {
     const cabinets = room(1800, 3000, [{ type: 'addRun', wall: 'w1', items: ['wall-600x320x720', 'wall-600x320x720'] }]);
     expect(rule(cabinets, 'access-turning').status).toBe('pass');
