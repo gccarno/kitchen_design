@@ -7,80 +7,75 @@ exports[`elevationsToSvg > stacks every elevation at 1:50 with a heading each an
 <text x="200" y="310" font-size="110" font-weight="bold" fill="#111827">Wall 1 — north, 4200 mm</text>
 <g transform="translate(650 710)">
 <rect x="0" y="0" width="4200" height="2400" fill="#f9fafb" stroke="#9ca3af" stroke-width="4"/>
-<rect x="1040" y="150" width="900" height="1200" fill="#ffffff" stroke="#6b7280" stroke-width="6" stroke-dasharray="40 30"/>
-<line x1="1490" y1="150" x2="1490" y2="1350" stroke="#6b7280" stroke-width="4"/>
-<rect x="50" y="620" width="910" height="1780" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
-<text x="505" y="1510" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Refrigerator</text>
-<rect x="1040" y="1540" width="900" height="860" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
-<rect x="1040" y="2300" width="900" height="100" fill="#9ca3af"/>
-<rect x="1055" y="1555" width="420" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
-<rect x="1505" y="1555" width="420" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
-<rect x="1940" y="1540" width="600" height="860" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
-<text x="2240" y="1970" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Dishwasher</text>
-<rect x="2540" y="1540" width="450" height="860" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
-<rect x="2540" y="2300" width="450" height="100" fill="#9ca3af"/>
-<rect x="2555" y="1555" width="420" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
-<rect x="2990" y="1500" width="760" height="900" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
-<text x="3370" y="1950" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Range (760 mm / 30&quot;)</text>
-<rect x="3750" y="1540" width="450" height="860" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
-<rect x="3750" y="2300" width="450" height="100" fill="#9ca3af"/>
-<rect x="3765" y="1555" width="420" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
-<rect x="1040" y="1500" width="1950" height="40" fill="#374151"/>
-<rect x="3750" y="1500" width="450" height="40" fill="#374151"/>
-<rect x="1940" y="230" width="600" height="720" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
-<rect x="1955" y="245" width="270" height="690" fill="none" stroke="#8a6a3b" stroke-width="3"/>
-<rect x="2255" y="245" width="270" height="690" fill="none" stroke="#8a6a3b" stroke-width="3"/>
-<rect x="2540" y="230" width="450" height="720" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
-<rect x="2555" y="245" width="420" height="690" fill="none" stroke="#8a6a3b" stroke-width="3"/>
-<rect x="2990" y="500" width="760" height="300" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
-<text x="3370" y="650" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Range hood (760 mm)</text>
-<rect x="3750" y="230" width="450" height="720" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
-<rect x="3765" y="245" width="420" height="690" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="1300" y="150" width="900" height="1200" fill="#ffffff" stroke="#6b7280" stroke-width="6" stroke-dasharray="40 30"/>
+<line x1="1750" y1="150" x2="1750" y2="1350" stroke="#6b7280" stroke-width="4"/>
+<rect x="50" y="550" width="600" height="1850" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
+<text x="350" y="1475" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Refrigerator</text>
+<rect x="700" y="1540" width="600" height="860" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
+<rect x="700" y="2300" width="600" height="100" fill="#9ca3af"/>
+<rect x="715" y="1555" width="270" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="1015" y="1555" width="270" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="1300" y="1540" width="900" height="860" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
+<rect x="1300" y="2300" width="900" height="100" fill="#9ca3af"/>
+<rect x="1315" y="1555" width="420" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="1765" y="1555" width="420" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="2200" y="1540" width="450" height="860" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
+<text x="2425" y="1970" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Dishwasher</text>
+<rect x="2650" y="1500" width="760" height="900" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
+<text x="3030" y="1950" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Range (760 mm / 30&quot;)</text>
+<rect x="3410" y="1540" width="450" height="860" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
+<rect x="3410" y="2300" width="450" height="100" fill="#9ca3af"/>
+<rect x="3425" y="1555" width="420" height="730" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="700" y="1500" width="1950" height="40" fill="#374151"/>
+<rect x="3410" y="1500" width="450" height="40" fill="#374151"/>
+<rect x="700" y="230" width="600" height="720" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
+<rect x="715" y="245" width="270" height="690" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="1015" y="245" width="270" height="690" fill="none" stroke="#8a6a3b" stroke-width="3"/>
+<rect x="2650" y="500" width="760" height="300" fill="#e5e7eb" stroke="#4b5563" stroke-width="6"/>
+<text x="3030" y="650" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">Range hood (760 mm)</text>
+<rect x="3410" y="230" width="450" height="720" fill="#f3e8d2" stroke="#8a6a3b" stroke-width="6"/>
+<rect x="3425" y="245" width="420" height="690" fill="none" stroke="#8a6a3b" stroke-width="3"/>
 <line x1="-100" y1="2400" x2="4300" y2="2400" stroke="#111827" stroke-width="12"/>
-<line x1="50" y1="2550" x2="960" y2="2550" stroke="#374151" stroke-width="4"/>
+<line x1="50" y1="2550" x2="650" y2="2550" stroke="#374151" stroke-width="4"/>
 <line x1="50" y1="2520" x2="50" y2="2580" stroke="#374151" stroke-width="4"/>
-<line x1="960" y1="2520" x2="960" y2="2580" stroke="#374151" stroke-width="4"/>
-<text x="505" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">910 mm</text>
-<line x1="1040" y1="2550" x2="1940" y2="2550" stroke="#374151" stroke-width="4"/>
-<line x1="1040" y1="2520" x2="1040" y2="2580" stroke="#374151" stroke-width="4"/>
-<line x1="1940" y1="2520" x2="1940" y2="2580" stroke="#374151" stroke-width="4"/>
-<text x="1490" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">900 mm</text>
-<line x1="1940" y1="2550" x2="2540" y2="2550" stroke="#374151" stroke-width="4"/>
-<line x1="1940" y1="2520" x2="1940" y2="2580" stroke="#374151" stroke-width="4"/>
-<line x1="2540" y1="2520" x2="2540" y2="2580" stroke="#374151" stroke-width="4"/>
-<text x="2240" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">600 mm</text>
-<line x1="2540" y1="2550" x2="2990" y2="2550" stroke="#374151" stroke-width="4"/>
-<line x1="2540" y1="2520" x2="2540" y2="2580" stroke="#374151" stroke-width="4"/>
-<line x1="2990" y1="2520" x2="2990" y2="2580" stroke="#374151" stroke-width="4"/>
-<text x="2765" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">450 mm</text>
-<line x1="2990" y1="2550" x2="3750" y2="2550" stroke="#374151" stroke-width="4"/>
-<line x1="2990" y1="2520" x2="2990" y2="2580" stroke="#374151" stroke-width="4"/>
-<line x1="3750" y1="2520" x2="3750" y2="2580" stroke="#374151" stroke-width="4"/>
-<text x="3370" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">760 mm</text>
-<line x1="3750" y1="2550" x2="4200" y2="2550" stroke="#374151" stroke-width="4"/>
-<line x1="3750" y1="2520" x2="3750" y2="2580" stroke="#374151" stroke-width="4"/>
-<line x1="4200" y1="2520" x2="4200" y2="2580" stroke="#374151" stroke-width="4"/>
-<text x="3975" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">450 mm</text>
+<line x1="650" y1="2520" x2="650" y2="2580" stroke="#374151" stroke-width="4"/>
+<text x="350" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">600 mm</text>
+<line x1="700" y1="2550" x2="1300" y2="2550" stroke="#374151" stroke-width="4"/>
+<line x1="700" y1="2520" x2="700" y2="2580" stroke="#374151" stroke-width="4"/>
+<line x1="1300" y1="2520" x2="1300" y2="2580" stroke="#374151" stroke-width="4"/>
+<text x="1000" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">600 mm</text>
+<line x1="1300" y1="2550" x2="2200" y2="2550" stroke="#374151" stroke-width="4"/>
+<line x1="1300" y1="2520" x2="1300" y2="2580" stroke="#374151" stroke-width="4"/>
+<line x1="2200" y1="2520" x2="2200" y2="2580" stroke="#374151" stroke-width="4"/>
+<text x="1750" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">900 mm</text>
+<line x1="2200" y1="2550" x2="2650" y2="2550" stroke="#374151" stroke-width="4"/>
+<line x1="2200" y1="2520" x2="2200" y2="2580" stroke="#374151" stroke-width="4"/>
+<line x1="2650" y1="2520" x2="2650" y2="2580" stroke="#374151" stroke-width="4"/>
+<text x="2425" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">450 mm</text>
+<line x1="2650" y1="2550" x2="3410" y2="2550" stroke="#374151" stroke-width="4"/>
+<line x1="2650" y1="2520" x2="2650" y2="2580" stroke="#374151" stroke-width="4"/>
+<line x1="3410" y1="2520" x2="3410" y2="2580" stroke="#374151" stroke-width="4"/>
+<text x="3030" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">760 mm</text>
+<line x1="3410" y1="2550" x2="3860" y2="2550" stroke="#374151" stroke-width="4"/>
+<line x1="3410" y1="2520" x2="3410" y2="2580" stroke="#374151" stroke-width="4"/>
+<line x1="3860" y1="2520" x2="3860" y2="2580" stroke="#374151" stroke-width="4"/>
+<text x="3635" y="2505" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">450 mm</text>
 <line x1="0" y1="2750" x2="4200" y2="2750" stroke="#374151" stroke-width="4"/>
 <line x1="0" y1="2720" x2="0" y2="2780" stroke="#374151" stroke-width="4"/>
 <line x1="4200" y1="2720" x2="4200" y2="2780" stroke="#374151" stroke-width="4"/>
 <text x="2100" y="2705" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">4200 mm</text>
-<line x1="1940" y1="-150" x2="2540" y2="-150" stroke="#374151" stroke-width="4"/>
-<line x1="1940" y1="-180" x2="1940" y2="-120" stroke="#374151" stroke-width="4"/>
-<line x1="2540" y1="-180" x2="2540" y2="-120" stroke="#374151" stroke-width="4"/>
-<text x="2240" y="-195" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">600 mm</text>
-<line x1="2540" y1="-150" x2="2990" y2="-150" stroke="#374151" stroke-width="4"/>
-<line x1="2540" y1="-180" x2="2540" y2="-120" stroke="#374151" stroke-width="4"/>
-<line x1="2990" y1="-180" x2="2990" y2="-120" stroke="#374151" stroke-width="4"/>
-<text x="2765" y="-195" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">450 mm</text>
-<line x1="2990" y1="-150" x2="3750" y2="-150" stroke="#374151" stroke-width="4"/>
-<line x1="2990" y1="-180" x2="2990" y2="-120" stroke="#374151" stroke-width="4"/>
-<line x1="3750" y1="-180" x2="3750" y2="-120" stroke="#374151" stroke-width="4"/>
-<text x="3370" y="-195" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">760 mm</text>
-<line x1="3750" y1="-150" x2="4200" y2="-150" stroke="#374151" stroke-width="4"/>
-<line x1="3750" y1="-180" x2="3750" y2="-120" stroke="#374151" stroke-width="4"/>
-<line x1="4200" y1="-180" x2="4200" y2="-120" stroke="#374151" stroke-width="4"/>
-<text x="3975" y="-195" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">450 mm</text>
+<line x1="700" y1="-150" x2="1300" y2="-150" stroke="#374151" stroke-width="4"/>
+<line x1="700" y1="-180" x2="700" y2="-120" stroke="#374151" stroke-width="4"/>
+<line x1="1300" y1="-180" x2="1300" y2="-120" stroke="#374151" stroke-width="4"/>
+<text x="1000" y="-195" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">600 mm</text>
+<line x1="2650" y1="-150" x2="3410" y2="-150" stroke="#374151" stroke-width="4"/>
+<line x1="2650" y1="-180" x2="2650" y2="-120" stroke="#374151" stroke-width="4"/>
+<line x1="3410" y1="-180" x2="3410" y2="-120" stroke="#374151" stroke-width="4"/>
+<text x="3030" y="-195" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">760 mm</text>
+<line x1="3410" y1="-150" x2="3860" y2="-150" stroke="#374151" stroke-width="4"/>
+<line x1="3410" y1="-180" x2="3410" y2="-120" stroke="#374151" stroke-width="4"/>
+<line x1="3860" y1="-180" x2="3860" y2="-120" stroke="#374151" stroke-width="4"/>
+<text x="3635" y="-195" font-size="60" text-anchor="middle" dominant-baseline="middle" fill="#111827">450 mm</text>
 <line x1="-80" y1="2400" x2="-80" y2="230" stroke="#374151" stroke-width="4"/>
 <line x1="-110" y1="1500" x2="-50" y2="1500" stroke="#374151" stroke-width="4"/>
 <text x="-120" y="1500" font-size="60" text-anchor="end" dominant-baseline="middle" fill="#111827">900 mm</text>

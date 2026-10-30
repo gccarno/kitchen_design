@@ -23,6 +23,8 @@ interface ClosetEditorProps {
   onProposal: (proposal: Proposal) => void;
   /** The priced parts list, shown after the closet's settings. */
   estimate?: React.ReactNode;
+  /** Shown under the warnings. */
+  accessibility?: React.ReactNode;
 }
 
 const DOOR_STYLES: { value: ClosetDoorStyle; label: string }[] = [
@@ -37,7 +39,7 @@ const DOOR_STYLES: { value: ClosetDoorStyle; label: string }[] = [
  * chat, the component palette, and the closet's size and doors. Direct
  * edits save straight away as revisions (undoable); chat edits are reviewed.
  */
-export default function ClosetEditor({ project, onSaved, onProposal, estimate }: ClosetEditorProps) {
+export default function ClosetEditor({ project, onSaved, onProposal, estimate, accessibility }: ClosetEditorProps) {
   const closet = project.closet;
   const online = useOnline();
   const [placing, setPlacing] = useState<ClosetComponentKind | null>(null);
@@ -135,6 +137,7 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate }:
             </ul>
           </div>
         )}
+        {accessibility}
       </section>
 
       <section className="flex flex-col gap-3">

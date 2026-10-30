@@ -4,10 +4,21 @@
  */
 
 import type { Catalog } from '../catalog/loader';
-import type { ClosetComponentKind } from '../plan/schemas';
+import type { ClosetComponentKind, CountertopMaterial, DoorStyle } from '../plan/schemas';
 
 export const DEFAULT_CURRENCY = 'USD';
 export const DEFAULT_RATES = { countertopPerM2: 350, installPct: 30, taxPct: 0, hardwareEach: 4 };
+
+/** Countertop price per m² by material. Quartz is the standard (`DEFAULT_RATES.countertopPerM2`). */
+export const COUNTERTOP_RATES: Record<CountertopMaterial, number> = {
+  laminate: 150,
+  'butcher-block': 250,
+  quartz: DEFAULT_RATES.countertopPerM2,
+  granite: 450,
+};
+
+/** What a cabinet costs against the standard (shaker) door. Appliances, and prices you set yourself, don't change. */
+export const DOOR_STYLE_FACTOR: Record<DoorStyle, number> = { slab: 0.9, shaker: 1, glass: 1.25 };
 
 /** Appliances, fixtures and furniture from the seed catalog, by id. */
 export const SEED_PRICES: Record<string, number> = {
@@ -55,23 +66,24 @@ export const CLOSET_PRICES: Record<ClosetComponentKind, { price: number; unit: C
 export const closetKey = (kind: ClosetComponentKind) => `closet:${kind}`;
 
 /** The default unit price for a line key: a catalog id, or `closet:<kind>`. 0 when unknown. */
-export function defaultUnitPrice(key: string, catalog: Catalog): number {
+export function defaultUnitPrice(key: string, catalog: Catalog, doorStyle: DoorStyle = 'shaker'): number {
   if (key.startsWith('closet:')) return CLOSET_PRICES[key.slice(7) as ClosetComponentKind]?.price ?? 0;
   if (key in SEED_PRICES) return SEED_PRICES[key];
   const item = catalog.byId.get(key);
   if (!item) return 0;
   const w = item.sizeMm.w;
+  const cabinet = (price: number) => Math.round(price * DOOR_STYLE_FACTOR[doorStyle] * 100) / 100;
   switch (item.tags[0]) {
     case 'base':
-      return 120 + 0.25 * w;
+      return cabinet(120 + 0.25 * w);
     case 'wall':
-      return 90 + 0.2 * w;
+      return cabinet(90 + 0.2 * w);
     case 'tall':
-      return 300 + 0.5 * w;
+      return cabinet(300 + 0.5 * w);
     case 'corner':
-      return item.mount === 'wall' ? 220 : 350;
+      return cabinet(item.mount === 'wall' ? 220 : 350);
     case 'filler':
-      return 25;
+      return cabinet(25);
     default:
       return 0;
   }

@@ -11,8 +11,9 @@ import type { Catalog } from '../catalog/loader';
 import { planToJsonPatch } from './diff';
 import { addOpening, alongWallMm, removeOpening } from './openings';
 import { placedFromCatalog, positionItem } from './placement';
+import { DEFAULT_FINISHES, FINISH_COLORS, resolveColor } from './finishes';
 import { packRun } from './runs';
-import { OpeningKindSchema, type JsonPatchOp, type Project } from './schemas';
+import { COUNTERTOP_MATERIALS, DOOR_STYLES, OpeningKindSchema, type Finishes, type JsonPatchOp, type Project } from './schemas';
 import { validateRoom } from './validate';
 import type { Point } from './geometry';
 
@@ -50,6 +51,13 @@ export const CommandSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('removeOpening'), opening: z.string() }),
   z.object({ type: z.literal('renameProject'), name: z.string().trim().min(1).max(200) }),
+  z.object({
+    type: z.literal('setFinishes'),
+    /** A preset name ("white") or a "#rrggbb" code. Fields left out stay as they are. */
+    cabinetColor: z.string().optional(),
+    doorStyle: z.enum(DOOR_STYLES).optional(),
+    countertop: z.enum(COUNTERTOP_MATERIALS).optional(),
+  }),
 ]);
 export type Command = z.infer<typeof CommandSchema>;
 
@@ -94,6 +102,7 @@ export function compileCommands(
   let room = project.room;
   let items = project.items;
   let name = project.name;
+  let finishes: Finishes | undefined = project.finishes;
 
   commands.forEach((cmd, k) => {
     const fail = (msg: string): never => {
@@ -219,6 +228,23 @@ export function compileCommands(
       case 'renameProject':
         name = cmd.name;
         break;
+      case 'setFinishes': {
+        if (cmd.cabinetColor === undefined && cmd.doorStyle === undefined && cmd.countertop === undefined) {
+          fail('needs a cabinetColor, doorStyle or countertop');
+        }
+        const color =
+          cmd.cabinetColor === undefined
+            ? undefined
+            : (resolveColor(cmd.cabinetColor) ??
+              fail(`unknown colour "${cmd.cabinetColor}" — use ${FINISH_COLORS.map((c) => c.name).join(', ')}, or a #rrggbb code`));
+        finishes = {
+          ...(finishes ?? DEFAULT_FINISHES),
+          ...(color ? { cabinetColor: color } : {}),
+          ...(cmd.doorStyle ? { doorStyle: cmd.doorStyle } : {}),
+          ...(cmd.countertop ? { countertop: cmd.countertop } : {}),
+        };
+        break;
+      }
     }
 
     // Stop at the first command that breaks the plan, so the error points at it.
@@ -226,6 +252,6 @@ export function compileCommands(
     if (!check.valid) fail(`the result would be invalid: ${check.errors.join('; ')}`);
   });
 
-  const next: Project = { ...project, name, room, items };
+  const next: Project = { ...project, name, room, items, ...(finishes ? { finishes } : {}) };
   return { project: next, patch: planToJsonPatch(project, next) };
 }

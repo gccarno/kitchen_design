@@ -4,9 +4,18 @@ import React, { useState } from 'react';
 import DrawingShape from './DrawingShape';
 import type { WallElevation } from '@/lib/plan/elevation';
 import { elevationDrawing, elevationFrame } from '@/lib/plan/elevation-drawing';
+import type { Finishes } from '@/lib/plan/schemas';
 
 /** The kitchen's walls as front elevations, one at a time, worked out from the plan. */
-export default function KitchenElevations({ elevations, units }: { elevations: WallElevation[]; units: 'mm' | 'in' }) {
+export default function KitchenElevations({
+  elevations,
+  units,
+  finishes,
+}: {
+  elevations: WallElevation[];
+  units: 'mm' | 'in';
+  finishes?: Finishes;
+}) {
   const [picked, setPicked] = useState<number | null>(null);
   if (elevations.length === 0) {
     return <p className="text-sm text-gray-600">Place cabinets or appliances against a wall to see its elevation.</p>;
@@ -36,7 +45,7 @@ export default function KitchenElevations({ elevations, units }: { elevations: W
         aria-label={`Elevation of ${shown.label}`}
         fontFamily="Helvetica, Arial, sans-serif"
       >
-        {elevationDrawing(shown, units).map((s, i) => (
+        {elevationDrawing(shown, units, finishes).map((s, i) => (
           <DrawingShape key={i} shape={s} />
         ))}
       </svg>

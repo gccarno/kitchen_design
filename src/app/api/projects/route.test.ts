@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { loadProject } from '@/lib/storage/projects';
 import { validatePlan } from '@/lib/plan/validate';
 import type { Project } from '@/lib/plan/schemas';
+import { TEMPLATE_INFO } from '@/lib/templates';
 import { GET, POST } from './route';
 
 function post(body: unknown): Promise<Response> {
@@ -70,6 +71,35 @@ describe('POST /api/projects', () => {
     expect(project.closet?.components.length).toBeGreaterThan(3);
     expect(loadProject(dataDir, project.id)).toEqual(project);
     expect(validatePlan(project).warnings).toEqual([]);
+  });
+
+  it.each(TEMPLATE_INFO.map((t) => [t.id, t.kind] as const))('creates a project from template %s', async (templateId, kind) => {
+    const res = await post({ name: 'From template', kind, templateId });
+    expect(res.status).toBe(201);
+    const { project } = (await res.json()) as { project: Project };
+    expect(project.kind).toBe(kind);
+    expect(project.name).toBe('From template');
+    expect(project.items.length + (project.closet?.components.length ?? 0)).toBeGreaterThan(4);
+    expect(loadProject(dataDir, project.id)).toEqual(project);
+    expect(validatePlan(project).errors).toEqual([]);
+    expect(validatePlan(project).warnings).toEqual([]);
+  });
+
+  it('rejects an unknown template with 400 and creates nothing', async () => {
+    const res = await post({ name: 'x', templateId: 'kitchen-nope' });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toMatch(/unknown template/);
+    expect(await (await GET()).json()).toEqual([]);
+  });
+
+  it('rejects a template of the other kind with 400', async () => {
+    expect((await post({ name: 'x', kind: 'closet', templateId: 'kitchen-galley' })).status).toBe(400);
+    expect((await post({ name: 'x', kind: 'kitchen', templateId: 'closet-kids' })).status).toBe(400);
+  });
+
+  it('prefers templateId over sample', async () => {
+    const { project } = (await (await post({ name: 'x', sample: true, templateId: 'kitchen-galley' })).json()) as { project: Project };
+    expect(project.room.polygon[2]).toEqual([2600, 4200]);
   });
 
   it.each([{}, { name: '' }, { name: '   ' }, { name: 42 }, { name: 'x', kind: 'garage' }, 'not json'])('rejects %j with 400', async (body) => {

@@ -5,13 +5,14 @@
  */
 
 import { describeClosetChanges } from '../closet/changes';
+import { DEFAULT_FINISHES, finishChanges } from './finishes';
 import { polygonAreaMm2, polygonBounds, type Point } from './geometry';
 import type { Opening, PlacedItem, Project, Room } from './schemas';
 import { wallLengthMm } from './validate';
 
 export interface PlanChange {
   kind: 'added' | 'removed' | 'changed';
-  subject: 'name' | 'room' | 'wall' | 'opening' | 'measurement' | 'item';
+  subject: 'name' | 'room' | 'wall' | 'opening' | 'measurement' | 'item' | 'finish';
   text: string;
 }
 
@@ -19,6 +20,11 @@ export function describePlanChanges(before: Project, after: Project): PlanChange
   const out: PlanChange[] = [];
   if (before.name !== after.name) {
     out.push({ kind: 'changed', subject: 'name', text: `Rename "${before.name}" → "${after.name}"` });
+  }
+  if (before.finishes || after.finishes) {
+    for (const text of finishChanges(before.finishes ?? DEFAULT_FINISHES, after.finishes ?? DEFAULT_FINISHES)) {
+      out.push({ kind: 'changed', subject: 'finish', text });
+    }
   }
   // A closet's room is only its footprint, derived from the closet.
   if (before.closet && after.closet) {

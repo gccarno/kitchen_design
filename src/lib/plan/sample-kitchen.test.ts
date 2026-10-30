@@ -43,7 +43,7 @@ describe('buildSampleKitchen', () => {
 
   it('has the core kitchen pieces', () => {
     const ids = sample.items.map((it) => it.catalogId);
-    for (const id of ['sink-base-900', 'range-760', 'dishwasher-600', 'fridge-counter-depth-910', 'range-hood-760', 'island-1800x900']) {
+    for (const id of ['sink-base-900', 'range-760', 'dishwasher-450', 'fridge-600', 'range-hood-760', 'island-1800x900']) {
       expect(ids).toContain(id);
     }
   });
@@ -53,6 +53,10 @@ describe('buildSampleKitchen', () => {
     expect(layout).toHaveLength(9);
     expect(layout.filter((r) => r.id.startsWith('triangle-')).map((r) => r.status)).not.toContain('n/a');
     expect(Object.fromEntries(layout.map((r) => [r.id, `${r.status}: ${r.detail}`]))).toMatchSnapshot();
+  });
+
+  it('passes every counted layout check', () => {
+    expect(checkLayout(sample).filter((r) => r.status === 'fail' && !r.info)).toEqual([]);
   });
 
   it('has a door and a window', () => {

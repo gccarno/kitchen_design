@@ -14,8 +14,9 @@ import { moneyFormat } from '../estimate/money';
 import { wallElevations } from '../plan/elevation';
 import { elevationFrame } from '../plan/elevation-drawing';
 import { wallElevationSvg } from '../plan/elevation-svg';
+import { colorName, COUNTERTOP_LABEL, DOOR_STYLE_LABEL } from '../plan/finishes';
 import { polygonAreaMm2, polygonBounds, type Point } from '../plan/geometry';
-import { checkLayout, layoutDetail, layoutSummary } from '../plan/layout-check';
+import { checkAccessibility, checkLayout, layoutDetail, layoutSummary } from '../plan/layout-check';
 import { projectKind, type Project } from '../plan/schemas';
 import { planToSvg, SVG_SCALE } from '../plan/svg';
 import { formatLength } from '../plan/viewport';
@@ -91,12 +92,20 @@ async function kitchenPages(sheet: Sheet, project: Project, catalog: Catalog, es
   const areaM2 = polygonAreaMm2(poly) / 1e6;
   const area = units === 'in' ? `${(areaM2 * FT2_PER_M2).toFixed(1)} ft²` : `${areaM2.toFixed(2)} m²`;
   const layout = layoutSummary(checkLayout(project));
+  const access = layoutSummary(checkAccessibility(project));
 
   cover(sheet, project, 'Kitchen spec sheet', [
     ['Room', `${formatLength(b.maxX - b.minX, units)} × ${formatLength(b.maxY - b.minY, units)} · ${area}`],
     ['Items', String(project.items.length)],
+    ...(project.finishes
+      ? ([
+          ['Cabinets', `${colorName(project.finishes.cabinetColor)}, ${DOOR_STYLE_LABEL[project.finishes.doorStyle].toLowerCase()} doors`],
+          ['Countertop', COUNTERTOP_LABEL[project.finishes.countertop]],
+        ] as [string, string][])
+      : []),
     ['Estimate total', money.format(estimate.total)],
     ['Layout check', layout.counted > 0 ? `${layout.passed} of ${layout.counted} passed` : 'nothing to check yet'],
+    ['Accessibility', access.counted > 0 ? `${access.passed} of ${access.counted} passed` : 'nothing to check yet'],
   ]);
   const labels = Object.fromEntries(project.items.map((it) => [it.id, catalog.byId.get(it.catalogId)?.name ?? it.catalogId]));
   await placeDrawing(sheet, planToSvg(project, { labels, titleBlock: false }), 'Floor plan', { w: sheet.width, h: sheet.remaining - LINE * 2 });
@@ -111,7 +120,7 @@ async function kitchenPages(sheet: Sheet, project: Project, catalog: Catalog, es
     const box = { w: sheet.width, h: sheet.remaining / 3 - (4 + SMALL * 1.4 + 8) };
     const scale = pickScale({ w: Math.max(...frames.map((f) => f.w)), h: Math.max(...frames.map((f) => f.h)) }, box);
     for (const e of elevations) {
-      await placeDrawing(sheet, wallElevationSvg(e, units), e.label, box, scale);
+      await placeDrawing(sheet, wallElevationSvg(e, units, project.finishes), e.label, box, scale);
       sheet.gap(8);
     }
   }
@@ -128,6 +137,15 @@ async function kitchenPages(sheet: Sheet, project: Project, catalog: Catalog, es
     [{ header: 'Status', width: 0.12 }, { header: 'Rule', width: 0.3 }, { header: 'Detail', width: 0.58 }],
     layout.ordered.map((r) => [r.info && r.status !== 'n/a' ? 'Info' : STATUS[r.status], r.title, layoutDetail(r.detail, units)])
   );
+  if (access.ordered.length > 0) {
+    sheet.gap(12);
+    sheet.line(access.counted > 0 ? `Accessibility — ${access.passed} of ${access.counted} passed` : 'Accessibility — nothing to check yet', { size: H2, bold: true });
+    sheet.gap(4);
+    sheet.table(
+      [{ header: 'Status', width: 0.12 }, { header: 'Rule', width: 0.3 }, { header: 'Detail', width: 0.58 }],
+      access.ordered.map((r) => [r.info && r.status !== 'n/a' ? 'Info' : STATUS[r.status], r.title, layoutDetail(r.detail, units)])
+    );
+  }
 }
 
 async function closetPages(sheet: Sheet, project: Project, estimate: Estimate): Promise<void> {

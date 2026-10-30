@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOnline } from '@/lib/client/online';
 import type { ProjectKind } from '@/lib/plan/schemas';
+import { templatesForKind } from '@/lib/templates/info';
 
 /** Create a project and go straight to its page. */
 export default function NewProjectForm() {
@@ -11,16 +12,22 @@ export default function NewProjectForm() {
   const online = useOnline();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ProjectKind>('kitchen');
+  const [templateId, setTemplateId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const templates = templatesForKind(kind);
+  const template = templates.find((t) => t.id === templateId);
+  // A template names the project when the user hasn't.
+  const projectName = name.trim() || template?.defaultProjectName || '';
+
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
-    await submit({ name: name.trim(), kind });
+    if (!projectName) return;
+    await submit({ name: projectName, kind, ...(template ? { templateId: template.id } : {}) });
   }
 
-  async function submit(request: { name: string; kind: ProjectKind; sample?: boolean }) {
+  async function submit(request: { name: string; kind: ProjectKind; sample?: boolean; templateId?: string }) {
     if (busy || !online) return;
     setBusy(true);
     setError(null);
@@ -57,7 +64,10 @@ export default function NewProjectForm() {
                 value={value}
                 className="sr-only"
                 checked={kind === value}
-                onChange={() => setKind(value)}
+                onChange={() => {
+                  setKind(value);
+                  setTemplateId('');
+                }}
               />
               {label}
             </label>
@@ -74,7 +84,18 @@ export default function NewProjectForm() {
           onChange={(e) => setName(e.target.value)}
         />
       </label>
-      <button type="submit" className="rounded bg-black px-4 py-2 text-white disabled:opacity-40" disabled={!online || busy || !name.trim()} title={online ? undefined : 'Offline'}>
+      <label className="flex flex-col gap-1 text-sm">
+        <span>Start from</span>
+        <select className="w-64 rounded border px-2 py-1" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+          <option value="">{kind === 'closet' ? 'An empty closet' : 'An empty room'}</option>
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="submit" className="rounded bg-black px-4 py-2 text-white disabled:opacity-40" disabled={!online || busy || !projectName} title={online ? undefined : 'Offline'}>
         {busy ? 'Creating…' : 'Create project'}
       </button>
       <button
@@ -86,6 +107,7 @@ export default function NewProjectForm() {
       >
         {kind === 'closet' ? 'Try a sample cleaning closet' : 'Try a sample kitchen'}
       </button>
+      {template && <p className="w-full text-sm text-gray-600">{template.description}</p>}
       {error && (
         <p role="alert" className="w-full text-sm text-red-700">
           {error}

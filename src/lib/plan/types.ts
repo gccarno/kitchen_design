@@ -23,4 +23,7 @@ export type {
   ClosetComponent,
   ClosetComponentKind,
   ClosetDoorStyle,
+  Finishes,
+  DoorStyle,
+  CountertopMaterial,
 } from './schemas';

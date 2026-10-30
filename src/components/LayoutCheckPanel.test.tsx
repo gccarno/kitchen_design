@@ -34,6 +34,15 @@ describe('LayoutCheckPanel', () => {
     expect(screen.queryByText(/\d mm/)).toBeNull();
   });
 
+  it('can show another set of rules under its own title and empty message', () => {
+    const { unmount } = render(<LayoutCheckPanel rules={rules} units="mm" title="Accessibility" />);
+    expect(screen.getByRole('heading', { name: 'Accessibility — 1 of 2 passed' })).toBeTruthy();
+    expect(screen.getByRole('list', { name: 'Accessibility' })).toBeTruthy();
+    unmount();
+    render(<LayoutCheckPanel rules={[rules[1]]} units="mm" title="Accessibility" empty="place cabinets to start" />);
+    expect(screen.getByRole('heading', { name: 'Accessibility — place cabinets to start' })).toBeTruthy();
+  });
+
   it('asks for the main appliances when nothing can be checked yet', () => {
     render(<LayoutCheckPanel rules={[rules[1]]} units="mm" />);
     expect(screen.getByRole('heading', { name: 'Layout check — place a fridge, sink and range to start' })).toBeTruthy();

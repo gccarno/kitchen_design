@@ -19,8 +19,9 @@ export async function optionGroup(storage: Storage, groupId: string): Promise<Pr
  * Copy a project as a new design option: a new id and a fresh history,
  * linked to its group's original by `optionOf`, named "<group> — Option <L>",
  * with its photos copied. The source is not changed. Null for an unknown source.
+ * `items`, when given, replace the source's items on the copy (a suggested layout).
  */
-export async function duplicateAsOption(storage: Storage, sourceId: string): Promise<Project | null> {
+export async function duplicateAsOption(storage: Storage, sourceId: string, items?: Project['items']): Promise<Project | null> {
   const source = await storage.projects.load(sourceId);
   if (!source) return null;
   const groupId = optionGroupId(source);
@@ -31,6 +32,7 @@ export async function duplicateAsOption(storage: Storage, sourceId: string): Pro
   const photos = source.photos.filter((photo) => PHOTO_ID.test(photo.id));
   const copy: Project = ProjectSchema.parse({
     ...rest,
+    ...(items ? { items } : {}),
     photos,
     id,
     name: nextOptionName(groupName(group), group.map((p) => p.name)),

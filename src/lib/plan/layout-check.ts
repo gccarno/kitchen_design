@@ -7,7 +7,18 @@
  * floor items count. Pure functions; lengths in mm.
  */
 
-import { convexPolygonsOverlap, distance, pointToSegmentDistance, rotateAround, rotatedRectFootprint, type Point } from './geometry';
+import { checkClosetAccessibility } from '../closet/accessibility';
+import { ELEVATION } from './elevation';
+import {
+  convexPolygonsOverlap,
+  distance,
+  pointInPolygon,
+  pointToSegmentDistance,
+  polygonBounds,
+  rotateAround,
+  rotatedRectFootprint,
+  type Point,
+} from './geometry';
 import { TALL_ITEM_MM } from './runs';
 import { projectKind, type PlacedItem, type Project } from './schemas';
 import { formatLength } from './viewport';
@@ -56,6 +67,18 @@ export const GUIDE = {
   dishwasher: 900,
   aisle: 1067,
   frontage: 3350,
+} as const;
+
+/** Universal-design guidelines (ADA and NKBA universal design, in mm). */
+export const ACCESS = {
+  /** Between a working front and what stands across from it, for a wheelchair to pass. */
+  aisle: 1220,
+  /** Diameter of the clear floor circle a wheelchair turns in. */
+  turning: 1525,
+  /** Clear width of a door; the opening has to be at least this. */
+  door: 815,
+  /** Highest comfortable reach from a seated position. */
+  reachMax: 1220,
 } as const;
 
 /** Tags whose top is usable counter. */
@@ -230,13 +253,10 @@ function dishwasherSink(dishwashers: PlacedItem[], sinks: PlacedItem[]): LayoutR
   };
 }
 
-/** The narrowest gap from a working front to whatever stands across from it. */
-function workAisle(floor: PlacedItem[]): LayoutRule {
-  const rule = { id: 'work-aisle', title: 'Work aisle width' };
-  const fronts = floor.filter((it) => WORKING_FRONT.has(it.tag ?? ''));
-  if (fronts.length === 0) return { ...rule, status: 'n/a', detail: 'no counters' };
+/** The narrowest gap from a working front to whatever stands across from it; null when no counters face each other. */
+function narrowestAisle(floor: PlacedItem[]): { gap: number; from: PlacedItem; to: PlacedItem } | null {
   let narrowest: { gap: number; from: PlacedItem; to: PlacedItem } | null = null;
-  for (const it of fronts) {
+  for (const it of floor.filter((x) => WORKING_FRONT.has(x.tag ?? ''))) {
     // Inset so the items beside it in its own run don't count.
     const zone = frontZone(it, AISLE_LOOK_MM, 10);
     const n = normal(it);
@@ -249,13 +269,24 @@ function workAisle(floor: PlacedItem[]): LayoutRule {
       if (!narrowest || gap < narrowest.gap) narrowest = { gap, from: it, to: other };
     }
   }
+  return narrowest;
+}
+
+/** A rule that the narrowest aisle is at least `min` wide. */
+function aisleRule(rule: { id: string; title: string }, floor: PlacedItem[], min: number): LayoutRule {
+  if (!floor.some((it) => WORKING_FRONT.has(it.tag ?? ''))) return { ...rule, status: 'n/a', detail: 'no counters' };
+  const narrowest = narrowestAisle(floor);
   if (!narrowest) return { ...rule, status: 'pass', detail: 'no counters face each other' };
-  const ok = narrowest.gap >= GUIDE.aisle;
+  const ok = narrowest.gap >= min;
   return {
     ...rule,
     status: ok ? 'pass' : 'fail',
-    detail: `${mm(narrowest.gap)} from ${label(narrowest.from)} to ${label(narrowest.to)} (needs ${mm(GUIDE.aisle)})`,
+    detail: `${mm(narrowest.gap)} from ${label(narrowest.from)} to ${label(narrowest.to)} (needs ${mm(min)})`,
   };
+}
+
+function workAisle(floor: PlacedItem[]): LayoutRule {
+  return aisleRule({ id: 'work-aisle', title: 'Work aisle width' }, floor, GUIDE.aisle);
 }
 
 function counterFrontage(floor: PlacedItem[]): LayoutRule {
@@ -264,6 +295,91 @@ function counterFrontage(floor: PlacedItem[]): LayoutRule {
   if (counters.length === 0) return { ...rule, status: 'n/a', detail: 'no counters' };
   const total = sum(counters.map((it) => it.sizeMm.w));
   return { ...rule, status: total >= GUIDE.frontage ? 'pass' : 'fail', detail: `${mm(total)} of counter (guideline ${mm(GUIDE.frontage)})` };
+}
+
+// --- accessibility ---
+
+/**
+ * A kitchen (or closet) against universal-design guidelines a wheelchair user
+ * needs: a wider aisle, room to turn, doors wide enough, things within reach.
+ * Kept apart from `checkLayout` so the NKBA count doesn't change. Only what
+ * the plan records can be checked: knee space, handles and lighting can't.
+ */
+export function checkAccessibility(project: Project): LayoutRule[] {
+  if (projectKind(project) === 'closet') return project.closet ? checkClosetAccessibility(project.closet) : [];
+  const floor = project.items.filter((it) => (it.mount ?? 'floor') === 'floor' && it.tag);
+  return [
+    aisleRule({ id: 'access-aisle', title: 'Aisle wide enough for a wheelchair' }, floor, ACCESS.aisle),
+    turningSpace(project, floor),
+    doorWidth(project),
+    wallCabinetReach(project),
+  ];
+}
+
+const TURNING_STEP_MM = 10;
+/** The grid never has more than this many points along a side, however big the room: the work is bounded. */
+const TURNING_GRID_MAX = 400;
+/** Roughly how many point-to-edge distances the check may compute, at most. */
+const TURNING_WORK_BUDGET = 20_000_000;
+
+/**
+ * The room's largest clear floor circle. Its centre is tried on a grid, so the
+ * diameter reads up to about 1.5 grid steps short: 15 mm for a room up to 4 m,
+ * a little more in a bigger one (the step grows so the grid stays bounded).
+ */
+function turningSpace(project: Project, floor: PlacedItem[]): LayoutRule {
+  const rule = { id: 'access-turning', title: 'Space to turn a wheelchair' };
+  if (project.items.length === 0) return { ...rule, status: 'n/a', detail: 'nothing placed yet' };
+  const poly = project.room.polygon as Point[];
+  const blocks = floor.map(footprint);
+  const edges = (p: Point[]) => p.map((a, i): [Point, Point] => [a, p[(i + 1) % p.length]]);
+  const wallEdges = edges(poly);
+  const blockEdges = blocks.map(edges);
+  const from = (p: Point, list: [Point, Point][]) => Math.min(...list.map(([a, b]) => pointToSegmentDistance(p, a, b)));
+
+  const { minX, minY, maxX, maxY } = polygonBounds(poly);
+  // Bound the total work (grid points × edges), not just the grid: many items or a many-sided room get a coarser grid.
+  const edgeCount = wallEdges.length + blockEdges.reduce((n, e) => n + e.length, 0);
+  const side = Math.max(20, Math.min(TURNING_GRID_MAX, Math.floor(Math.sqrt(TURNING_WORK_BUDGET / edgeCount))));
+  const step = Math.max(TURNING_STEP_MM, Math.ceil(Math.max(maxX - minX, maxY - minY) / side));
+  let best = 0;
+  for (let x = minX; x <= maxX; x += step) {
+    for (let y = minY; y <= maxY; y += step) {
+      const p: Point = [x, y];
+      if (!pointInPolygon(p, poly)) continue;
+      let clear = from(p, wallEdges);
+      for (let k = 0; k < blocks.length && clear > best; k++) {
+        clear = pointInPolygon(p, blocks[k]) ? 0 : Math.min(clear, from(p, blockEdges[k]));
+      }
+      best = Math.max(best, clear);
+    }
+  }
+  const diameter = 2 * best;
+  return {
+    ...rule,
+    status: diameter >= ACCESS.turning ? 'pass' : 'fail',
+    detail: `largest clear circle ${mm(diameter)} across (needs ${mm(ACCESS.turning)})`,
+  };
+}
+
+function doorWidth(project: Project): LayoutRule {
+  const rule = { id: 'access-door', title: 'Door wide enough' };
+  const doors = project.room.openings.filter((o) => o.kind === 'door');
+  if (doors.length === 0) return { ...rule, status: 'n/a', detail: 'no doors' };
+  const widest = Math.max(...doors.map((o) => o.widthMm));
+  return { ...rule, status: widest >= ACCESS.door ? 'pass' : 'fail', detail: `widest door ${mm(widest)} (needs ${mm(ACCESS.door)})` };
+}
+
+/** Wall cabinets hang at a standard height in the elevations, so this can be said but not changed here. */
+function wallCabinetReach(project: Project): LayoutRule {
+  const rule = { id: 'access-wall-cabinets', title: 'Wall cabinets within reach', info: true };
+  if (!project.items.some((it) => it.mount === 'wall' && it.tag === 'wall')) return { ...rule, status: 'n/a', detail: 'no wall cabinets' };
+  const bottom = ELEVATION.wallCabinetBottomMm;
+  return {
+    ...rule,
+    status: bottom <= ACCESS.reachMax ? 'pass' : 'fail',
+    detail: `wall cabinets start ${mm(bottom)} up (seated reach is ${mm(ACCESS.reachMax)})`,
+  };
 }
 
 // --- geometry ---

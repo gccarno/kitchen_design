@@ -1,0 +1,1251 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`closet template closet-cleaning > summarises as expected 1`] = `
+{
+  "components": [
+    [
+      "shelf",
+      0,
+      2134,
+      1219,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      0,
+      1829,
+      610,
+      null,
+      null,
+    ],
+    [
+      "hooks",
+      0,
+      1524,
+      610,
+      null,
+      null,
+    ],
+    [
+      "tower",
+      610,
+      356,
+      609,
+      1371,
+      4,
+    ],
+    [
+      "basket",
+      610,
+      76,
+      559,
+      254,
+      null,
+    ],
+  ],
+  "opening": {
+    "leftMm": 0,
+    "style": "hinged",
+    "widthMm": 1219,
+  },
+  "size": [
+    1219,
+    2438,
+    610,
+  ],
+}
+`;
+
+exports[`closet template closet-double-hang > summarises as expected 1`] = `
+{
+  "components": [
+    [
+      "shelf",
+      0,
+      2134,
+      1829,
+      null,
+      null,
+    ],
+    [
+      "rod",
+      0,
+      2057,
+      1219,
+      null,
+      null,
+    ],
+    [
+      "rod",
+      0,
+      1067,
+      1219,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      1219,
+      152,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      1219,
+      457,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      1219,
+      762,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      1219,
+      1219,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      1219,
+      1676,
+      610,
+      null,
+      null,
+    ],
+  ],
+  "opening": {
+    "leftMm": 0,
+    "style": "bifold",
+    "widthMm": 1829,
+  },
+  "size": [
+    1829,
+    2438,
+    610,
+  ],
+}
+`;
+
+exports[`closet template closet-hang-and-drawers > summarises as expected 1`] = `
+{
+  "components": [
+    [
+      "shelf",
+      0,
+      2134,
+      1829,
+      null,
+      null,
+    ],
+    [
+      "rod",
+      0,
+      1727,
+      610,
+      null,
+      null,
+    ],
+    [
+      "rod",
+      610,
+      2057,
+      559,
+      null,
+      null,
+    ],
+    [
+      "rod",
+      610,
+      1067,
+      559,
+      null,
+      null,
+    ],
+    [
+      "drawers",
+      1169,
+      0,
+      610,
+      914,
+      4,
+    ],
+    [
+      "shelf",
+      1169,
+      1219,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      1169,
+      1676,
+      610,
+      null,
+      null,
+    ],
+  ],
+  "opening": {
+    "leftMm": 0,
+    "style": "hinged",
+    "widthMm": 1829,
+  },
+  "size": [
+    1829,
+    2438,
+    610,
+  ],
+}
+`;
+
+exports[`closet template closet-kids > summarises as expected 1`] = `
+{
+  "components": [
+    [
+      "shelf",
+      0,
+      2134,
+      1524,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      0,
+      1676,
+      762,
+      null,
+      null,
+    ],
+    [
+      "rod",
+      0,
+      1100,
+      762,
+      null,
+      null,
+    ],
+    [
+      "tower",
+      762,
+      0,
+      610,
+      1219,
+      4,
+    ],
+    [
+      "shelf",
+      762,
+      1524,
+      762,
+      null,
+      null,
+    ],
+    [
+      "hooks",
+      1372,
+      1067,
+      152,
+      null,
+      null,
+    ],
+  ],
+  "opening": {
+    "leftMm": 0,
+    "style": "hinged",
+    "widthMm": 1524,
+  },
+  "size": [
+    1524,
+    2438,
+    610,
+  ],
+}
+`;
+
+exports[`closet template closet-shelving > summarises as expected 1`] = `
+{
+  "components": [
+    [
+      "tower",
+      0,
+      0,
+      610,
+      2134,
+      6,
+    ],
+    [
+      "basket",
+      660,
+      76,
+      559,
+      254,
+      null,
+    ],
+    [
+      "shelf",
+      610,
+      457,
+      914,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      610,
+      838,
+      914,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      610,
+      1219,
+      914,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      610,
+      1600,
+      914,
+      null,
+      null,
+    ],
+    [
+      "shelf",
+      610,
+      1981,
+      914,
+      null,
+      null,
+    ],
+  ],
+  "opening": {
+    "leftMm": 0,
+    "style": "open",
+    "widthMm": 1524,
+  },
+  "size": [
+    1524,
+    2438,
+    610,
+  ],
+}
+`;
+
+exports[`closet template closet-shoes-accessories > summarises as expected 1`] = `
+{
+  "components": [
+    [
+      "shelf",
+      0,
+      2134,
+      1219,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      0,
+      152,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      0,
+      457,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      0,
+      762,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      0,
+      1067,
+      610,
+      null,
+      null,
+    ],
+    [
+      "shoe_shelf",
+      0,
+      1372,
+      610,
+      null,
+      null,
+    ],
+    [
+      "hooks",
+      610,
+      1829,
+      300,
+      null,
+      null,
+    ],
+    [
+      "hooks",
+      910,
+      1524,
+      300,
+      null,
+      null,
+    ],
+    [
+      "valet_rod",
+      1150,
+      1219,
+      50,
+      null,
+      null,
+    ],
+    [
+      "basket",
+      640,
+      76,
+      559,
+      254,
+      null,
+    ],
+  ],
+  "opening": {
+    "leftMm": 0,
+    "style": "sliding",
+    "widthMm": 1219,
+  },
+  "size": [
+    1219,
+    2438,
+    406,
+  ],
+}
+`;
+
+exports[`kitchen template kitchen-compact-l > summarises as expected 1`] = `
+{
+  "items": [
+    [
+      "corner-base-900x900x720",
+      450,
+      450,
+      0,
+    ],
+    [
+      "sink-base-800",
+      1300,
+      300,
+      0,
+    ],
+    [
+      "dishwasher-450",
+      1925,
+      290,
+      0,
+    ],
+    [
+      "fridge-600",
+      2550,
+      325,
+      0,
+    ],
+    [
+      "range-600",
+      300,
+      1200,
+      270,
+    ],
+    [
+      "base-450x560x720",
+      280,
+      1725,
+      270,
+    ],
+    [
+      "base-600x560x720",
+      280,
+      2250,
+      270,
+    ],
+    [
+      "wall-450x320x720",
+      1925,
+      160,
+      0,
+    ],
+    [
+      "range-hood-760",
+      250,
+      1200,
+      270,
+    ],
+  ],
+  "layout": {
+    "counter-frontage": "fail: 3200 mm of counter (guideline 3350 mm)",
+    "dishwasher-sink": "pass: 0 mm from "dishwasher-450" to "sink-base-800" (at most 900 mm)",
+    "fridge-landing": "pass: 2150 mm beside "fridge-600"",
+    "range-landing": "pass: 1050 mm and 900 mm beside "range-600" (needs 380 mm and 300 mm)",
+    "sink-landing": "pass: 900 mm and 450 mm beside "sink-base-800" (needs 600 mm and 450 mm)",
+    "triangle-clear": "pass: nothing in the way",
+    "triangle-legs": "pass: fridge ↔ sink 1250 mm, sink ↔ range 1345 mm, range ↔ fridge 2414 mm (each 1200 mm to 2700 mm)",
+    "triangle-total": "pass: 5010 mm (4000 mm to 7900 mm)",
+    "work-aisle": "pass: no counters face each other",
+  },
+  "openings": [
+    [
+      "window",
+      900,
+      800,
+    ],
+    [
+      "door",
+      150,
+      900,
+    ],
+  ],
+  "room": [
+    [
+      0,
+      0,
+    ],
+    [
+      3000,
+      0,
+    ],
+    [
+      3000,
+      3000,
+    ],
+    [
+      0,
+      3000,
+    ],
+  ],
+}
+`;
+
+exports[`kitchen template kitchen-galley > summarises as expected 1`] = `
+{
+  "items": [
+    [
+      "base-450x560x720",
+      2320,
+      225,
+      90,
+    ],
+    [
+      "sink-base-900",
+      2300,
+      900,
+      90,
+    ],
+    [
+      "dishwasher-600",
+      2310,
+      1650,
+      90,
+    ],
+    [
+      "fridge-600",
+      2275,
+      2300,
+      90,
+    ],
+    [
+      "base-450x560x720",
+      280,
+      225,
+      270,
+    ],
+    [
+      "range-760",
+      325,
+      830,
+      270,
+    ],
+    [
+      "base-450x560x720",
+      280,
+      1435,
+      270,
+    ],
+    [
+      "wall-450x320x720",
+      2440,
+      225,
+      90,
+    ],
+    [
+      "wall-600x320x720",
+      2440,
+      1650,
+      90,
+    ],
+    [
+      "wall-450x320x720",
+      160,
+      225,
+      270,
+    ],
+    [
+      "range-hood-760",
+      250,
+      830,
+      270,
+    ],
+    [
+      "wall-450x320x720",
+      160,
+      1435,
+      270,
+    ],
+  ],
+  "layout": {
+    "counter-frontage": "fail: 2850 mm of counter (guideline 3350 mm)",
+    "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+    "fridge-landing": "pass: 1950 mm beside "fridge-600"",
+    "range-landing": "pass: 450 mm and 450 mm beside "range-760" (needs 380 mm and 300 mm)",
+    "sink-landing": "pass: 450 mm and 600 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+    "triangle-clear": "pass: nothing in the way",
+    "triangle-legs": "pass: fridge ↔ sink 1400 mm, sink ↔ range 1976 mm, range ↔ fridge 2442 mm (each 1200 mm to 2700 mm)",
+    "triangle-total": "pass: 5818 mm (4000 mm to 7900 mm)",
+    "work-aisle": "pass: 1350 mm from "sink-base-900" to "range-760" (needs 1067 mm)",
+  },
+  "openings": [
+    [
+      "window",
+      850,
+      900,
+    ],
+    [
+      "door",
+      850,
+      900,
+    ],
+  ],
+  "room": [
+    [
+      0,
+      0,
+    ],
+    [
+      2600,
+      0,
+    ],
+    [
+      2600,
+      4200,
+    ],
+    [
+      0,
+      4200,
+    ],
+  ],
+}
+`;
+
+exports[`kitchen template kitchen-l-island > summarises as expected 1`] = `
+{
+  "items": [
+    [
+      "corner-base-900x900x720",
+      450,
+      450,
+      0,
+    ],
+    [
+      "sink-base-900",
+      1350,
+      300,
+      0,
+    ],
+    [
+      "dishwasher-600",
+      2100,
+      290,
+      0,
+    ],
+    [
+      "fridge-600",
+      2750,
+      325,
+      0,
+    ],
+    [
+      "range-760",
+      325,
+      1280,
+      270,
+    ],
+    [
+      "base-450x560x720",
+      280,
+      1885,
+      270,
+    ],
+    [
+      "base-600x560x720",
+      280,
+      2410,
+      270,
+    ],
+    [
+      "wall-600x320x720",
+      2100,
+      160,
+      0,
+    ],
+    [
+      "range-hood-760",
+      250,
+      1280,
+      270,
+    ],
+    [
+      "island-1800x900",
+      3000,
+      2150,
+      180,
+    ],
+    [
+      "stool-counter-650",
+      2400,
+      2850,
+      0,
+    ],
+    [
+      "stool-counter-650",
+      3000,
+      2850,
+      0,
+    ],
+    [
+      "stool-counter-650",
+      3600,
+      2850,
+      0,
+    ],
+  ],
+  "layout": {
+    "counter-frontage": "pass: 5250 mm of counter (guideline 3350 mm)",
+    "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+    "fridge-landing": "pass: 2400 mm beside "fridge-600"",
+    "range-landing": "pass: 1050 mm and 900 mm beside "range-760" (needs 380 mm and 300 mm)",
+    "sink-landing": "pass: 900 mm and 600 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+    "triangle-clear": "pass: nothing in the way",
+    "triangle-legs": "pass: fridge ↔ sink 1400 mm, sink ↔ range 1418 mm, range ↔ fridge 2606 mm (each 1200 mm to 2700 mm)",
+    "triangle-total": "pass: 5425 mm (4000 mm to 7900 mm)",
+    "work-aisle": "pass: 1120 mm from "dishwasher-600" to "island-1800x900" (needs 1067 mm)",
+  },
+  "openings": [
+    [
+      "window",
+      900,
+      900,
+    ],
+    [
+      "door",
+      350,
+      900,
+    ],
+  ],
+  "room": [
+    [
+      0,
+      0,
+    ],
+    [
+      5000,
+      0,
+    ],
+    [
+      5000,
+      4000,
+    ],
+    [
+      0,
+      4000,
+    ],
+  ],
+}
+`;
+
+exports[`kitchen template kitchen-l-shape > summarises as expected 1`] = `
+{
+  "items": [
+    [
+      "corner-base-900x900x720",
+      450,
+      450,
+      0,
+    ],
+    [
+      "sink-base-900",
+      1350,
+      300,
+      0,
+    ],
+    [
+      "dishwasher-600",
+      2100,
+      290,
+      0,
+    ],
+    [
+      "fridge-600",
+      2750,
+      325,
+      0,
+    ],
+    [
+      "range-760",
+      325,
+      1280,
+      270,
+    ],
+    [
+      "base-450x560x720",
+      280,
+      1885,
+      270,
+    ],
+    [
+      "base-600x560x720",
+      280,
+      2410,
+      270,
+    ],
+    [
+      "wall-600x320x720",
+      2100,
+      160,
+      0,
+    ],
+    [
+      "range-hood-760",
+      250,
+      1280,
+      270,
+    ],
+  ],
+  "layout": {
+    "counter-frontage": "pass: 3450 mm of counter (guideline 3350 mm)",
+    "dishwasher-sink": "pass: 0 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+    "fridge-landing": "pass: 2400 mm beside "fridge-600"",
+    "range-landing": "pass: 1050 mm and 900 mm beside "range-760" (needs 380 mm and 300 mm)",
+    "sink-landing": "pass: 900 mm and 600 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+    "triangle-clear": "pass: nothing in the way",
+    "triangle-legs": "pass: fridge ↔ sink 1400 mm, sink ↔ range 1418 mm, range ↔ fridge 2606 mm (each 1200 mm to 2700 mm)",
+    "triangle-total": "pass: 5425 mm (4000 mm to 7900 mm)",
+    "work-aisle": "pass: no counters face each other",
+  },
+  "openings": [
+    [
+      "window",
+      900,
+      900,
+    ],
+    [
+      "door",
+      350,
+      900,
+    ],
+  ],
+  "room": [
+    [
+      0,
+      0,
+    ],
+    [
+      3300,
+      0,
+    ],
+    [
+      3300,
+      3300,
+    ],
+    [
+      0,
+      3300,
+    ],
+  ],
+}
+`;
+
+exports[`kitchen template kitchen-one-wall > summarises as expected 1`] = `
+{
+  "items": [
+    [
+      "fridge-600",
+      350,
+      325,
+      0,
+    ],
+    [
+      "base-600x560x720",
+      1000,
+      280,
+      0,
+    ],
+    [
+      "sink-base-900",
+      1750,
+      300,
+      0,
+    ],
+    [
+      "dishwasher-450",
+      2425,
+      290,
+      0,
+    ],
+    [
+      "range-760",
+      3030,
+      325,
+      0,
+    ],
+    [
+      "base-450x560x720",
+      3635,
+      280,
+      0,
+    ],
+    [
+      "wall-600x320x720",
+      1000,
+      160,
+      0,
+    ],
+    [
+      "range-hood-760",
+      3030,
+      250,
+      0,
+    ],
+    [
+      "wall-450x320x720",
+      3635,
+      160,
+      0,
+    ],
+  ],
+  "layout": {
+    "counter-frontage": "fail: 2400 mm of counter (guideline 3350 mm)",
+    "dishwasher-sink": "pass: 0 mm from "dishwasher-450" to "sink-base-900" (at most 900 mm)",
+    "fridge-landing": "pass: 1950 mm beside "fridge-600"",
+    "range-landing": "pass: 1950 mm and 450 mm beside "range-760" (needs 380 mm and 300 mm)",
+    "sink-landing": "pass: 600 mm and 450 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+    "triangle-clear": "pass: nothing in the way",
+    "triangle-legs": "pass: fridge ↔ sink 1400 mm, sink ↔ range 1280 mm, range ↔ fridge 2680 mm (each 1200 mm to 2700 mm)",
+    "triangle-total": "pass: 5360 mm (4000 mm to 7900 mm)",
+    "work-aisle": "pass: no counters face each other",
+  },
+  "openings": [
+    [
+      "window",
+      1300,
+      900,
+    ],
+    [
+      "door",
+      350,
+      900,
+    ],
+  ],
+  "room": [
+    [
+      0,
+      0,
+    ],
+    [
+      4400,
+      0,
+    ],
+    [
+      4400,
+      3000,
+    ],
+    [
+      0,
+      3000,
+    ],
+  ],
+}
+`;
+
+exports[`kitchen template kitchen-sample > summarises as expected 1`] = `
+{
+  "items": [
+    [
+      "fridge-600",
+      350,
+      325,
+      0,
+    ],
+    [
+      "base-600x560x720",
+      1000,
+      280,
+      0,
+    ],
+    [
+      "sink-base-900",
+      1750,
+      300,
+      0,
+    ],
+    [
+      "dishwasher-450",
+      2425,
+      290,
+      0,
+    ],
+    [
+      "range-760",
+      3030,
+      325,
+      0,
+    ],
+    [
+      "base-450x560x720",
+      3635,
+      280,
+      0,
+    ],
+    [
+      "wall-600x320x720",
+      1000,
+      160,
+      0,
+    ],
+    [
+      "range-hood-760",
+      3030,
+      250,
+      0,
+    ],
+    [
+      "wall-450x320x720",
+      3635,
+      160,
+      0,
+    ],
+    [
+      "island-1800x900",
+      2100,
+      2170,
+      180,
+    ],
+    [
+      "stool-counter-650",
+      1600,
+      2870,
+      0,
+    ],
+    [
+      "stool-counter-650",
+      2100,
+      2870,
+      0,
+    ],
+    [
+      "stool-counter-650",
+      2600,
+      2870,
+      0,
+    ],
+  ],
+  "layout": {
+    "counter-frontage": "pass: 4200 mm of counter (guideline 3350 mm)",
+    "dishwasher-sink": "pass: 0 mm from "dishwasher-450" to "sink-base-900" (at most 900 mm)",
+    "fridge-landing": "pass: 1950 mm beside "fridge-600"",
+    "range-landing": "pass: 1950 mm and 450 mm beside "range-760" (needs 380 mm and 300 mm)",
+    "sink-landing": "pass: 600 mm and 450 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+    "triangle-clear": "pass: nothing in the way",
+    "triangle-legs": "pass: fridge ↔ sink 1400 mm, sink ↔ range 1280 mm, range ↔ fridge 2680 mm (each 1200 mm to 2700 mm)",
+    "triangle-total": "pass: 5360 mm (4000 mm to 7900 mm)",
+    "work-aisle": "pass: 1070 mm from "range-760" to "island-1800x900" (needs 1067 mm)",
+  },
+  "openings": [
+    [
+      "window",
+      1300,
+      900,
+    ],
+    [
+      "door",
+      3300,
+      800,
+    ],
+  ],
+  "room": [
+    [
+      0,
+      0,
+    ],
+    [
+      4200,
+      0,
+    ],
+    [
+      4200,
+      3600,
+    ],
+    [
+      0,
+      3600,
+    ],
+  ],
+}
+`;
+
+exports[`kitchen template kitchen-u-shape > summarises as expected 1`] = `
+{
+  "items": [
+    [
+      "corner-base-900x900x720",
+      450,
+      450,
+      0,
+    ],
+    [
+      "sink-base-900",
+      1350,
+      300,
+      0,
+    ],
+    [
+      "base-450x560x720",
+      2025,
+      280,
+      0,
+    ],
+    [
+      "corner-base-900x900x720",
+      2750,
+      450,
+      0,
+    ],
+    [
+      "dishwasher-600",
+      290,
+      1200,
+      270,
+    ],
+    [
+      "range-760",
+      325,
+      1880,
+      270,
+    ],
+    [
+      "base-450x560x720",
+      280,
+      2485,
+      270,
+    ],
+    [
+      "base-600x560x720",
+      280,
+      3010,
+      270,
+    ],
+    [
+      "fridge-600",
+      2875,
+      1250,
+      90,
+    ],
+    [
+      "base-450x560x720",
+      2920,
+      1825,
+      90,
+    ],
+    [
+      "base-600x560x720",
+      2920,
+      2350,
+      90,
+    ],
+    [
+      "wall-450x320x720",
+      2025,
+      160,
+      0,
+    ],
+    [
+      "range-hood-760",
+      250,
+      1880,
+      270,
+    ],
+  ],
+  "layout": {
+    "counter-frontage": "pass: 5850 mm of counter (guideline 3350 mm)",
+    "dishwasher-sink": "pass: 439 mm from "dishwasher-600" to "sink-base-900" (at most 900 mm)",
+    "fridge-landing": "pass: 1050 mm beside "fridge-600"",
+    "range-landing": "pass: 1050 mm and 1500 mm beside "range-760" (needs 380 mm and 300 mm)",
+    "sink-landing": "pass: 900 mm and 1350 mm beside "sink-base-900" (needs 600 mm and 450 mm)",
+    "triangle-clear": "pass: nothing in the way",
+    "triangle-legs": "pass: fridge ↔ sink 1797 mm, sink ↔ range 1883 mm, range ↔ fridge 2627 mm (each 1200 mm to 2700 mm)",
+    "triangle-total": "pass: 6307 mm (4000 mm to 7900 mm)",
+    "work-aisle": "pass: 1900 mm from "range-760" to "fridge-600" (needs 1067 mm)",
+  },
+  "openings": [
+    [
+      "window",
+      900,
+      900,
+    ],
+    [
+      "door",
+      1150,
+      900,
+    ],
+  ],
+  "room": [
+    [
+      0,
+      0,
+    ],
+    [
+      3200,
+      0,
+    ],
+    [
+      3200,
+      3400,
+    ],
+    [
+      0,
+      3400,
+    ],
+  ],
+}
+`;

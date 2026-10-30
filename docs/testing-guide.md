@@ -20,8 +20,8 @@ npm run dev                    # http://localhost:3000
 |---|---|
 | `npm run lint` | no warnings or errors |
 | `npm run typecheck` | no output |
-| `npm test` | 55 files / 582 tests pass (includes a live dev-server suite against a fake LLM) |
-| `npm run e2e` | 31 Playwright tests pass (~2 min; own port 3310 and a temp data dir, so it never touches `./data`) |
+| `npm test` | every test passes (includes a live dev-server suite against a fake LLM). If workers run out of memory, see [`INSTALL.md`](INSTALL.md) troubleshooting. |
+| `npm run e2e` | every Playwright test passes (a few minutes; own port 3310 and a temp data dir, so it never touches `./data`). Run `npx playwright install chromium` once first. |
 
 The whole journey is `tests/e2e/happy-path.spec.ts` (photo → measured wall → extract → apply → place cabinet → export SVG, with the LLM mocked).
 

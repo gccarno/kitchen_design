@@ -5,7 +5,8 @@ import { loadCatalog } from '@/lib/catalog/loader';
 import { buildEstimate, type EstimateLine } from '@/lib/estimate/estimate';
 import { moneyFormat } from '@/lib/estimate/money';
 import { useOnline } from '@/lib/client/online';
-import { DEFAULT_CURRENCY, DEFAULT_RATES } from '@/lib/estimate/prices';
+import { COUNTERTOP_RATES, DEFAULT_CURRENCY, DEFAULT_RATES } from '@/lib/estimate/prices';
+import { finishesOf } from '@/lib/plan/finishes';
 import { projectKind, type Pricing, type Project } from '@/lib/plan/schemas';
 
 export { moneyFormat };
@@ -42,6 +43,8 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
   const [error, setError] = useState<string | null>(null);
   const closet = projectKind(project) === 'closet';
   const base: Pricing = project.pricing ?? { currency: DEFAULT_CURRENCY, unitPrices: {} };
+  /** The countertop rate for the chosen material, until the user sets their own. */
+  const countertopRate = project.pricing?.countertopPerM2 ?? COUNTERTOP_RATES[finishesOf(project).countertop];
 
   async function save(next: Pricing, summary: string) {
     if (!online) return setError('Not saved: offline — editing is disabled');
@@ -151,10 +154,10 @@ export default function EstimatePanel({ project, onSave }: EstimatePanelProps) {
             visibleLabel
             hint={
               project.units === 'in'
-                ? `${money.format((project.pricing?.countertopPerM2 ?? DEFAULT_RATES.countertopPerM2) / 10.7639)}/ft²`
+                ? `${money.format(countertopRate / 10.7639)}/ft²`
                 : undefined
             }
-            value={project.pricing?.countertopPerM2 ?? DEFAULT_RATES.countertopPerM2}
+            value={countertopRate}
             onCommit={(v) => setRate('countertopPerM2', v, `Set the countertop price to ${money.format(v)} per m²`)}
             onInvalid={setError}
             disabled={!online}

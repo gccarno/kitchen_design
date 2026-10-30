@@ -13,18 +13,19 @@ import PhotoCapture from './PhotoCapture';
 import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
 import HistoryControls from './HistoryControls';
 import KitchenElevations from './KitchenElevations';
+import FinishesPanel from './FinishesPanel';
 import LayoutCheckPanel from './LayoutCheckPanel';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
-import { proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
-import { checkLayout } from '@/lib/plan/layout-check';
+import { proposalForFinishes, proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
+import { checkAccessibility, checkLayout } from '@/lib/plan/layout-check';
 import { isNative } from '@/lib/client/native';
 import { saveAndShare } from '@/lib/client/download';
 import { wallElevations } from '@/lib/plan/elevation';
 import { validatePlan } from '@/lib/plan/validate';
 import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
-import type { Pricing, Project } from '@/lib/plan/schemas';
+import type { Finishes, Pricing, Project } from '@/lib/plan/schemas';
 import { useOnline } from '@/lib/client/online';
 import { STALE_EVENT, submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
@@ -61,6 +62,9 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   const online = useOnline();
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestNote, setSuggestNote] = useState<string | null>(null);
 
   // A save was rejected because the project changed elsewhere: reload the latest version from the server.
   useEffect(() => {
@@ -81,6 +85,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   );
   const warnings = useMemo(() => validatePlan(project).warnings, [project]);
   const layout = useMemo(() => checkLayout(project), [project]);
+  const access = useMemo(() => checkAccessibility(project), [project]);
   const elevations = useMemo(() => (project.closet ? [] : wallElevations(project, catalog)), [project, catalog]);
 
   function pickFromCatalog(item: CatalogItem) {
@@ -116,6 +121,19 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
     return result.error;
   }
 
+  // Finishes save straight away too, the same way.
+  async function saveFinishes(finishes: Finishes | undefined, summary: string): Promise<string | null> {
+    if (!online) return 'offline — editing is disabled';
+    const proposal = proposalForFinishes(project, finishes, summary);
+    if (proposal.patch.length === 0) return null;
+    const result = await submitRevision(project.id, proposal);
+    if (result.ok) {
+      saved(result.project);
+      return null;
+    }
+    return result.error;
+  }
+
   // Copy the design as a new option and open the copy. The button stays
   // disabled until the page changes, so a double click makes one copy.
   async function duplicate() {
@@ -130,6 +148,29 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
     } catch (err) {
       setDuplicateError((err as Error).message);
       setDuplicating(false);
+    }
+  }
+
+  // Make suggested layouts as new options and open their comparison. The
+  // project itself is untouched; with no layout to offer, say why.
+  async function suggestLayouts() {
+    if (suggesting || !online) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    setSuggestNote(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/propose-layouts`, { method: 'POST' });
+      const body = (await res.json().catch(() => ({}))) as { groupId?: string; options?: unknown[]; reason?: string; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `could not suggest layouts (${res.status})`);
+      if (!body.options?.length || !body.groupId) {
+        setSuggestNote(body.reason ?? 'No layouts to suggest for this room.');
+        setSuggesting(false);
+        return;
+      }
+      router.push(`/compare/${body.groupId}`);
+    } catch (err) {
+      setSuggestError((err as Error).message);
+      setSuggesting(false);
     }
   }
 
@@ -185,6 +226,17 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           >
             Duplicate as option
           </button>
+          {!project.closet && (
+            <button
+              type="button"
+              className="rounded border px-3 py-1 disabled:opacity-40"
+              disabled={!online || suggesting}
+              title={online ? 'Make up to three layouts for this room as new options' : 'Offline'}
+              onClick={() => void suggestLayouts()}
+            >
+              {suggesting ? 'Suggesting…' : 'Suggest layouts'}
+            </button>
+          )}
           {groupId && (optionCount ?? 0) >= 2 && (
             <Link className="text-blue-700 underline" href={`/compare/${groupId}`}>
               Compare options
@@ -196,6 +248,12 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
             Couldn’t duplicate: {duplicateError}
           </p>
         )}
+        {suggestError && (
+          <p role="alert" className="text-sm text-red-700">
+            Couldn’t suggest layouts: {suggestError}
+          </p>
+        )}
+        {suggestNote && <p className="text-sm text-gray-700">{suggestNote}</p>}
       </header>
 
       {proposal && (
@@ -216,6 +274,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           onSaved={saved}
           onProposal={propose}
           estimate={<EstimatePanel project={project} onSave={savePricing} />}
+          accessibility={<LayoutCheckPanel rules={access} units={project.units} title="Accessibility" empty="add a rod or shelves to start" />}
         />
       ) : (
         <>
@@ -246,11 +305,17 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
               </div>
             )}
             <LayoutCheckPanel rules={layout} units={project.units} />
+            <LayoutCheckPanel rules={access} units={project.units} title="Accessibility" empty="place cabinets to start" />
           </section>
 
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Wall elevations</h2>
-            <KitchenElevations elevations={elevations} units={project.units} />
+            <KitchenElevations elevations={elevations} units={project.units} finishes={project.finishes} />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Finishes</h2>
+            <FinishesPanel project={project} onSave={saveFinishes} />
           </section>
 
           <section className="flex flex-col gap-3">

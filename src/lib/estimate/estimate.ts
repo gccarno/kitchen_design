@@ -8,7 +8,8 @@
 import type { Catalog } from '../catalog/loader';
 import { CLOSET_COMPONENTS } from '../closet/catalog';
 import { ClosetComponentKindSchema, projectKind, type Closet, type Pricing, type Project } from '../plan/schemas';
-import { CLOSET_PRICES, closetKey, DEFAULT_CURRENCY, DEFAULT_RATES, defaultUnitPrice } from './prices';
+import { COUNTERTOP_LABEL, finishesOf } from '../plan/finishes';
+import { CLOSET_PRICES, closetKey, COUNTERTOP_RATES, DEFAULT_CURRENCY, DEFAULT_RATES, defaultUnitPrice } from './prices';
 
 export type EstimateUnit = 'each' | 'm' | 'drawer' | 'm²' | 'ft²';
 
@@ -55,7 +56,7 @@ export function buildEstimate(project: Project, catalog: Catalog): Estimate {
     return { key, label, quantity, unit, unitPrice, overridden: override !== undefined, total: quantity * unitPrice };
   };
   const part = (key: string, label: string, quantity: number, unit: EstimateUnit) =>
-    priced(key, label, quantity, unit, defaultUnitPrice(key, catalog), project.pricing?.unitPrices[key]);
+    priced(key, label, quantity, unit, defaultUnitPrice(key, catalog, finishesOf(project).doorStyle), project.pricing?.unitPrices[key]);
 
   const lines: EstimateLine[] = [];
   if (projectKind(project) === 'closet' && project.closet) {
@@ -71,13 +72,15 @@ export function buildEstimate(project: Project, catalog: Catalog): Estimate {
     if (areaM2 > 0) {
       const inches = project.units === 'in';
       const perM2 = project.pricing?.countertopPerM2;
+      const material = finishesOf(project).countertop;
+      const rate = COUNTERTOP_RATES[material];
       lines.push(
         priced(
           'countertop',
-          'Countertop',
+          project.finishes ? `Countertop (${COUNTERTOP_LABEL[material].toLowerCase()})` : 'Countertop',
           round2(inches ? areaM2 * FT2_PER_M2 : areaM2),
           inches ? 'ft²' : 'm²',
-          inches ? DEFAULT_RATES.countertopPerM2 / FT2_PER_M2 : DEFAULT_RATES.countertopPerM2,
+          inches ? rate / FT2_PER_M2 : rate,
           perM2 === undefined ? undefined : inches ? perM2 / FT2_PER_M2 : perM2
         )
       );

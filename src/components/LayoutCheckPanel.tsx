@@ -3,16 +3,29 @@ import { layoutDetail, layoutSummary, type LayoutRule } from '@/lib/plan/layout-
 
 const MARK: Record<LayoutRule['status'], string> = { pass: '✓', fail: '✗', 'n/a': '–' };
 
-/** The kitchen against the NKBA planning guidelines: what passes, what fails, what doesn't apply yet. */
-export default function LayoutCheckPanel({ rules, units }: { rules: LayoutRule[]; units: 'mm' | 'in' }) {
+/**
+ * A set of planning guidelines (by default the kitchen against the NKBA ones): what passes, what
+ * fails, what doesn't apply yet. `title` and `empty` let it show another set, such as accessibility.
+ */
+export default function LayoutCheckPanel({
+  rules,
+  units,
+  title = 'Layout check',
+  empty = 'place a fridge, sink and range to start',
+}: {
+  rules: LayoutRule[];
+  units: 'mm' | 'in';
+  title?: string;
+  empty?: string;
+}) {
   const { passed, counted, ordered } = layoutSummary(rules);
 
   return (
     <div className="rounded border border-gray-200 p-2 text-sm">
       <h3 className="font-medium">
-        {counted > 0 ? `Layout check — ${passed} of ${counted} passed` : 'Layout check — place a fridge, sink and range to start'}
+        {counted > 0 ? `${title} — ${passed} of ${counted} passed` : `${title} — ${empty}`}
       </h3>
-      <ul aria-label="Layout check" className="mt-1 flex flex-col gap-0.5">
+      <ul aria-label={title} className="mt-1 flex flex-col gap-0.5">
         {ordered.map((r) => (
           <li
             key={r.id}
