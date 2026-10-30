@@ -31,7 +31,7 @@ A web app (mobile-friendly PWA) that turns a few room photos into an editable 2D
 - [x] Task 18 — Parametric catalog generator
 - [x] Task 19 — Place items on the plan — **milestone 2 reached** (manual editor with the catalog)
 - [x] Task 20 — Chat panel + refinement endpoint (verified against OpenRouter free models)
-- [ ] **Next: Task 21 — Layout proposals**
+- [x] Task 21 — Layout proposals (LLM-driven `addRun` layouts through chat; deterministic "suggest layouts" is a later addition)
 - [x] Phase 6 — Closets (Tasks 27–34; see below and `docs/superpowers/specs/2026-10-04-closet-design.md`)
 - [x] Phase 7 — Example layouts and the layout bugs they found (Tasks 35–39; see below)
 - [x] Phase 8 — Layout check against NKBA guidelines (Tasks 40–45; see below)

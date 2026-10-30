@@ -37,6 +37,8 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (6 phases), 
 
 ## Development
 
+New here? See [`docs/INSTALL.md`](docs/INSTALL.md) for prerequisites, first run, running without an LLM key, and troubleshooting.
+
 ```bash
 npm install
 npm run dev
