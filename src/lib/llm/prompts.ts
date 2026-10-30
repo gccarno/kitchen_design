@@ -94,7 +94,7 @@ export function buildExtractRoomPrompt(input: ExtractPromptInput): { system: str
   return { system, user: lines.join('\n') };
 }
 
-export const REFINE_PROMPT_VERSION = '1.1.0';
+export const REFINE_PROMPT_VERSION = '1.2.0';
 
 export interface RefinePromptInput {
   /** From describePlanForLLM. */
@@ -136,6 +136,7 @@ export function buildRefinePrompt(input: RefinePromptInput): { system: string; u
     '- {"type":"removeOpening","opening":"o1"}',
     '- {"type":"setWallThickness","wall":"w2","thicknessMm":150}',
     '- {"type":"renameProject","name":"..."}',
+    '- {"type":"setFinishes","cabinetColor":"white","doorStyle":"shaker","countertop":"quartz"}   // the kitchen\'s look; every field is optional, left out = unchanged. cabinetColor: Natural wood, White, Light grey, Sage green, Navy, Charcoal, or a #rrggbb code; doorStyle: slab, shaker, glass; countertop: laminate, butcher-block, quartz, granite',
     '',
     'Rules:',
     '- Refer to walls, openings, and items ONLY by the refs in the plan (w1, o1, i1, ...). Use catalog ids ONLY from the catalog list.',

@@ -1,6 +1,6 @@
 import { withCloset } from '../closet/commands';
 import { planToJsonPatch } from './diff';
-import type { Closet, JsonPatchOp, PlacedItem, Pricing, Project, Room } from './schemas';
+import type { Closet, Finishes, JsonPatchOp, PlacedItem, Pricing, Project, Room } from './schemas';
 
 /** A proposed edit awaiting the user's confirmation in the diff preview. */
 export interface Proposal {
@@ -34,6 +34,13 @@ export function proposalForCloset(project: Project, closet: Closet, summary: str
 export function proposalForPricing(project: Project, pricing: Pricing | undefined, summary: string): Proposal {
   const { pricing: _old, ...rest } = project;
   const next: Project = pricing ? { ...rest, pricing } : rest;
+  return { patch: planToJsonPatch(project, next), baseRevision: project.revision, summary, source: 'user' };
+}
+
+/** Propose a user edit to the kitchen's finishes; `undefined` goes back to the standard look. */
+export function proposalForFinishes(project: Project, finishes: Finishes | undefined, summary: string): Proposal {
+  const { finishes: _old, ...rest } = project;
+  const next: Project = finishes ? { ...rest, finishes } : rest;
   return { patch: planToJsonPatch(project, next), baseRevision: project.revision, summary, source: 'user' };
 }
 

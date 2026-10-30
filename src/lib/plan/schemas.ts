@@ -173,6 +173,21 @@ const PricingSchema = z.object({
 });
 export type Pricing = z.infer<typeof PricingSchema>;
 
+// --- Finishes ---
+// Kitchen look and price: cabinet colour, door style, countertop material.
+// Absent means the standard look (`plan/finishes.ts`).
+export const DOOR_STYLES = ['slab', 'shaker', 'glass'] as const;
+export const COUNTERTOP_MATERIALS = ['laminate', 'butcher-block', 'quartz', 'granite'] as const;
+const FinishesSchema = z.object({
+  /** Cabinet front colour, "#rrggbb". */
+  cabinetColor: z.string().regex(/^#[0-9a-f]{6}$/i),
+  doorStyle: z.enum(DOOR_STYLES),
+  countertop: z.enum(COUNTERTOP_MATERIALS),
+});
+export type Finishes = z.infer<typeof FinishesSchema>;
+export type DoorStyle = Finishes['doorStyle'];
+export type CountertopMaterial = Finishes['countertop'];
+
 /** What a project designs. Absent (projects from before closets) means 'kitchen'. */
 export const ProjectKindSchema = z.enum(['kitchen', 'closet']);
 export type ProjectKind = z.infer<typeof ProjectKindSchema>;
@@ -213,6 +228,8 @@ export const ProjectSchema = z.object({
   closet: ClosetSchema.optional(),
   /** Price overrides for the estimate; absent means the defaults. */
   pricing: PricingSchema.optional(),
+  /** Kitchen finishes; absent means the standard look. */
+  finishes: FinishesSchema.optional(),
   history: z.array(PlanRevisionSchema),
 });
 export type Project = z.infer<typeof ProjectSchema>;

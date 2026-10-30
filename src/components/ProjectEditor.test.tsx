@@ -180,10 +180,29 @@ describe('ProjectEditor', () => {
     expect(screen.queryByRole('heading', { name: 'Photos' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Catalog' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Suggest layouts' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Finishes' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Accessibility — add a rod or shelves to start' })).not.toBeNull();
     expect(screen.getByRole('link', { name: 'SVG' })).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Estimate' })).not.toBeNull();
     expect(screen.getByLabelText('Hardware each')).not.toBeNull();
+  });
+
+  it('has a Finishes section for a kitchen', () => {
+    render(<ProjectEditor initialProject={project} />);
+    expect(screen.getByRole('heading', { name: 'Finishes' })).not.toBeNull();
+    expect(screen.getByLabelText('Cabinet colour')).not.toBeNull();
+  });
+
+  it('saves a finish pick as a revision', async () => {
+    fetchMock.mockResolvedValueOnce(json({ project: { ...project, revision: 1, finishes: { cabinetColor: '#f5f5f4', doorStyle: 'shaker', countertop: 'quartz' } } }));
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.change(screen.getByLabelText('Cabinet colour'), { target: { value: '#f5f5f4' } });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`/api/projects/${project.id}/revisions`);
+    expect(JSON.parse(init.body as string).patch).toEqual([
+      { op: 'add', path: '/finishes', value: { cabinetColor: '#f5f5f4', doorStyle: 'shaker', countertop: 'quartz' } },
+    ]);
   });
 
   it('shows the accessibility check next to the layout check for a kitchen', () => {

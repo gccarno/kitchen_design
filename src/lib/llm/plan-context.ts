@@ -9,6 +9,7 @@ import { nearestWallPoint } from '../plan/openings';
 import { rotateAround, type Point } from '../plan/geometry';
 import { compass } from '../plan/compass';
 import { checkAccessibility, checkLayout } from '../plan/layout-check';
+import { describeFinishes } from '../plan/finishes';
 import type { Project } from '../plan/schemas';
 import { wallLengthMm } from '../plan/validate';
 import { inwardNormal } from '../plan/walls';
@@ -60,6 +61,8 @@ export function describePlanForLLM(project: Project, catalog: Catalog): string {
     if (it.mount && it.mount !== 'floor') line += `, ${it.mount}-mounted`;
     lines.push(line);
   });
+
+  if (project.finishes) lines.push('', `Finishes: ${describeFinishes(project.finishes)}`);
 
   // So "fix the layout check" has something to act on.
   const failures = checkLayout(project).filter((rule) => rule.status === 'fail' && !rule.info);

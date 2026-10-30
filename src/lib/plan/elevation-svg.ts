@@ -8,7 +8,7 @@ import type { Catalog } from '../catalog/loader';
 import { INK, shapeToSvg } from '../drawing/shapes';
 import { wallElevations, type WallElevation } from './elevation';
 import { elevationDrawing, elevationFrame } from './elevation-drawing';
-import type { Project } from './schemas';
+import type { Finishes, Project } from './schemas';
 import { escapeXml, SVG_SCALE } from './svg';
 
 const FONT = 'Helvetica, Arial, sans-serif';
@@ -28,7 +28,7 @@ export function elevationsToSvg(project: Project, catalog: Catalog, opts: { date
     const f = elevationFrame(e);
     body.push(`<text x="${pad}" y="${r(y + HEADING_MM)}" font-size="${HEADING_MM}" font-weight="bold" fill="${INK}">${escapeXml(e.label)}</text>`);
     y += HEADING_MM + 100;
-    body.push(`<g transform="translate(${r(pad - f.x)} ${r(y - f.y)})">`, ...elevationDrawing(e, project.units).map(shapeToSvg), '</g>');
+    body.push(`<g transform="translate(${r(pad - f.x)} ${r(y - f.y)})">`, ...elevationDrawing(e, project.units, project.finishes).map(shapeToSvg), '</g>');
     y += f.h + 150;
   }
   const date = (opts.date ?? project.updatedAt).slice(0, 10);
@@ -50,12 +50,12 @@ export function elevationsToSvg(project: Project, catalog: Catalog, opts: { date
 }
 
 /** One wall's elevation alone, framed by `elevationFrame` and sized to print at 1:SVG_SCALE (for the spec sheet). */
-export function wallElevationSvg(e: WallElevation, units: 'mm' | 'in'): string {
+export function wallElevationSvg(e: WallElevation, units: 'mm' | 'in', finishes?: Finishes): string {
   const f = elevationFrame(e);
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r(f.x)} ${r(f.y)} ${r(f.w)} ${r(f.h)}" width="${r(f.w / SVG_SCALE)}mm" height="${r(f.h / SVG_SCALE)}mm" font-family="${FONT}">`,
     `<rect x="${r(f.x)}" y="${r(f.y)}" width="${r(f.w)}" height="${r(f.h)}" fill="#ffffff"/>`,
-    ...elevationDrawing(e, units).map(shapeToSvg),
+    ...elevationDrawing(e, units, finishes).map(shapeToSvg),
     '</svg>',
   ].join('\n');
 }

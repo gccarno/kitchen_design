@@ -34,7 +34,7 @@ export type { JsonPatchOp } from './schemas';
 export const HISTORY_LIMIT = 200;
 
 /** Top-level fields a patch may touch. Everything else is server-managed. */
-const EDITABLE_ROOTS = ['/name', '/room', '/items', '/closet', '/pricing'];
+const EDITABLE_ROOTS = ['/name', '/room', '/items', '/closet', '/pricing', '/finishes'];
 
 function isEditablePath(path: string): boolean {
   return EDITABLE_ROOTS.some((root) => path === root || path.startsWith(`${root}/`));

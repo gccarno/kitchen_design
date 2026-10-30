@@ -6,6 +6,8 @@
 
 import { INK, type Shape } from '../drawing/shapes';
 import { CABINET_TAGS, ELEVATION, type ElevationPiece, type WallElevation } from './elevation';
+import { COUNTERTOP_COLOR, DEFAULT_FINISHES, edgeColor } from './finishes';
+import type { Finishes } from './schemas';
 import { formatLength } from './viewport';
 
 export const ELEVATION_MARGIN = { left: 450, right: 150, top: 300, bottom: 500 } as const;
@@ -18,6 +20,7 @@ const DIM = '#374151';
 const TEXT_MM = 60;
 const CHAR_MM = TEXT_MM * 0.55;
 const INSET_MM = 15;
+const GLASS = '#dbeafe';
 
 /** The drawing's extent, dimensions included. */
 export function elevationFrame(e: WallElevation) {
@@ -42,8 +45,10 @@ function fittingName(name: string, w: number): string | null {
   return short && fits(short) ? short : null;
 }
 
-export function elevationDrawing(e: WallElevation, units: 'mm' | 'in'): Shape[] {
+/** `finishes` sets the cabinet colour, door style and countertop; the default is the standard look. */
+export function elevationDrawing(e: WallElevation, units: 'mm' | 'in', finishes: Finishes = DEFAULT_FINISHES): Shape[] {
   const C = e.ceilingMm;
+  const edge = edgeColor(finishes.cabinetColor, WOOD_EDGE);
   const Y = (heightMm: number) => C - heightMm;
   const out: Shape[] = [];
 
@@ -64,20 +69,26 @@ export function elevationDrawing(e: WallElevation, units: 'mm' | 'in'): Shape[] 
     const id = p.itemId;
     const cabinet = !!p.tag && CABINET_TAGS.has(p.tag);
     const top = Y(p.y + p.h);
-    out.push({ componentId: id, type: 'rect', x: p.x, y: top, w: p.w, h: p.h, fill: cabinet ? WOOD : STEEL, stroke: cabinet ? WOOD_EDGE : METAL, strokeWidth: 6 });
+    out.push({ componentId: id, type: 'rect', x: p.x, y: top, w: p.w, h: p.h, fill: cabinet ? finishes.cabinetColor : STEEL, stroke: cabinet ? edge : METAL, strokeWidth: 6 });
     if (p.plinthMm > 0) out.push({ componentId: id, type: 'rect', x: p.x, y: Y(p.y + p.plinthMm), w: p.w, h: p.plinthMm, fill: PLINTH });
     const bodyBottom = Y(p.y + p.plinthMm);
     const bodyH = p.h - p.plinthMm;
     const { across, stacked } = doorCount(p);
+    // A door front: a framed panel (shaker), a framed glass panel, or, for a slab, just the joints between doors.
+    const panel = (x: number, y: number, w: number, h: number) =>
+      out.push({ componentId: id, type: 'rect', x: x + INSET_MM, y: y + INSET_MM, w: w - 2 * INSET_MM, h: h - 2 * INSET_MM, fill: finishes.doorStyle === 'glass' ? GLASS : 'none', stroke: edge, strokeWidth: 3 });
+    const joint = (x1: number, y1: number, x2: number, y2: number) =>
+      out.push({ componentId: id, type: 'line', x1, y1, x2, y2, stroke: edge, strokeWidth: 3 });
+    const slab = finishes.doorStyle === 'slab';
     if (stacked) {
       const lowH = (bodyH * 2) / 3;
-      for (const [y, h] of [[bodyBottom - lowH, lowH], [top, bodyH - lowH]] as const) {
-        out.push({ componentId: id, type: 'rect', x: p.x + INSET_MM, y: y + INSET_MM, w: p.w - 2 * INSET_MM, h: h - 2 * INSET_MM, fill: 'none', stroke: WOOD_EDGE, strokeWidth: 3 });
-      }
+      if (slab) joint(p.x, bodyBottom - lowH, p.x + p.w, bodyBottom - lowH);
+      else for (const [y, h] of [[bodyBottom - lowH, lowH], [top, bodyH - lowH]] as const) panel(p.x, y, p.w, h);
     } else {
+      const dw = p.w / Math.max(across, 1);
       for (let k = 0; k < across; k++) {
-        const dw = p.w / across;
-        out.push({ componentId: id, type: 'rect', x: p.x + k * dw + INSET_MM, y: top + INSET_MM, w: dw - 2 * INSET_MM, h: bodyH - 2 * INSET_MM, fill: 'none', stroke: WOOD_EDGE, strokeWidth: 3 });
+        if (!slab) panel(p.x + k * dw, top, dw, bodyH);
+        else if (k > 0) joint(p.x + k * dw, top, p.x + k * dw, bodyBottom);
       }
     }
     if (!cabinet) {
@@ -91,7 +102,7 @@ export function elevationDrawing(e: WallElevation, units: 'mm' | 'in'): Shape[] 
   const high = e.pieces.filter((p) => p.y > 0);
   low.forEach(drawPiece);
   for (const c of e.counters) {
-    out.push({ type: 'rect', x: c.x, y: Y(ELEVATION.counterTopMm), w: c.w, h: ELEVATION.counterThicknessMm, fill: '#374151' });
+    out.push({ type: 'rect', x: c.x, y: Y(ELEVATION.counterTopMm), w: c.w, h: ELEVATION.counterThicknessMm, fill: COUNTERTOP_COLOR[finishes.countertop] });
   }
   high.forEach(drawPiece);
 

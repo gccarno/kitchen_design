@@ -13,10 +13,11 @@ import PhotoCapture from './PhotoCapture';
 import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
 import HistoryControls from './HistoryControls';
 import KitchenElevations from './KitchenElevations';
+import FinishesPanel from './FinishesPanel';
 import LayoutCheckPanel from './LayoutCheckPanel';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
-import { proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
+import { proposalForFinishes, proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
 import { checkAccessibility, checkLayout } from '@/lib/plan/layout-check';
 import { isNative } from '@/lib/client/native';
 import { saveAndShare } from '@/lib/client/download';
@@ -24,7 +25,7 @@ import { wallElevations } from '@/lib/plan/elevation';
 import { validatePlan } from '@/lib/plan/validate';
 import type { CatalogItem } from '@/lib/catalog/schema';
 import { loadCatalog } from '@/lib/catalog/loader';
-import type { Pricing, Project } from '@/lib/plan/schemas';
+import type { Finishes, Pricing, Project } from '@/lib/plan/schemas';
 import { useOnline } from '@/lib/client/online';
 import { STALE_EVENT, submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
@@ -111,6 +112,19 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   async function savePricing(pricing: Pricing | undefined, summary: string): Promise<string | null> {
     if (!online) return 'offline — editing is disabled';
     const proposal = proposalForPricing(project, pricing, summary);
+    if (proposal.patch.length === 0) return null;
+    const result = await submitRevision(project.id, proposal);
+    if (result.ok) {
+      saved(result.project);
+      return null;
+    }
+    return result.error;
+  }
+
+  // Finishes save straight away too, the same way.
+  async function saveFinishes(finishes: Finishes | undefined, summary: string): Promise<string | null> {
+    if (!online) return 'offline — editing is disabled';
+    const proposal = proposalForFinishes(project, finishes, summary);
     if (proposal.patch.length === 0) return null;
     const result = await submitRevision(project.id, proposal);
     if (result.ok) {
@@ -296,7 +310,12 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
 
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Wall elevations</h2>
-            <KitchenElevations elevations={elevations} units={project.units} />
+            <KitchenElevations elevations={elevations} units={project.units} finishes={project.finishes} />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">Finishes</h2>
+            <FinishesPanel project={project} onSave={saveFinishes} />
           </section>
 
           <section className="flex flex-col gap-3">

@@ -14,6 +14,7 @@ import { moneyFormat } from '../estimate/money';
 import { wallElevations } from '../plan/elevation';
 import { elevationFrame } from '../plan/elevation-drawing';
 import { wallElevationSvg } from '../plan/elevation-svg';
+import { colorName, COUNTERTOP_LABEL, DOOR_STYLE_LABEL } from '../plan/finishes';
 import { polygonAreaMm2, polygonBounds, type Point } from '../plan/geometry';
 import { checkAccessibility, checkLayout, layoutDetail, layoutSummary } from '../plan/layout-check';
 import { projectKind, type Project } from '../plan/schemas';
@@ -96,6 +97,12 @@ async function kitchenPages(sheet: Sheet, project: Project, catalog: Catalog, es
   cover(sheet, project, 'Kitchen spec sheet', [
     ['Room', `${formatLength(b.maxX - b.minX, units)} × ${formatLength(b.maxY - b.minY, units)} · ${area}`],
     ['Items', String(project.items.length)],
+    ...(project.finishes
+      ? ([
+          ['Cabinets', `${colorName(project.finishes.cabinetColor)}, ${DOOR_STYLE_LABEL[project.finishes.doorStyle].toLowerCase()} doors`],
+          ['Countertop', COUNTERTOP_LABEL[project.finishes.countertop]],
+        ] as [string, string][])
+      : []),
     ['Estimate total', money.format(estimate.total)],
     ['Layout check', layout.counted > 0 ? `${layout.passed} of ${layout.counted} passed` : 'nothing to check yet'],
     ['Accessibility', access.counted > 0 ? `${access.passed} of ${access.counted} passed` : 'nothing to check yet'],
@@ -113,7 +120,7 @@ async function kitchenPages(sheet: Sheet, project: Project, catalog: Catalog, es
     const box = { w: sheet.width, h: sheet.remaining / 3 - (4 + SMALL * 1.4 + 8) };
     const scale = pickScale({ w: Math.max(...frames.map((f) => f.w)), h: Math.max(...frames.map((f) => f.h)) }, box);
     for (const e of elevations) {
-      await placeDrawing(sheet, wallElevationSvg(e, units), e.label, box, scale);
+      await placeDrawing(sheet, wallElevationSvg(e, units, project.finishes), e.label, box, scale);
       sheet.gap(8);
     }
   }
