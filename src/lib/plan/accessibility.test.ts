@@ -62,6 +62,14 @@ describe('space to turn a wheelchair', () => {
     expect(rule(empty, 'access-turning').status).toBe('pass');
   });
 
+  it('stays fast for an enormous room, still finding a circle that fits', () => {
+    const huge = room(100_000_000, 100_000_000, [{ type: 'addRun', wall: 'w1', items: ['base-600x560x720'] }]);
+    const started = Date.now();
+    const r = rule(huge, 'access-turning');
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(r.status).toBe('pass');
+  });
+
   it('ignores wall cabinets, which hang above the circle', () => {
     const cabinets = room(1800, 3000, [{ type: 'addRun', wall: 'w1', items: ['wall-600x320x720', 'wall-600x320x720'] }]);
     expect(rule(cabinets, 'access-turning').status).toBe('pass');

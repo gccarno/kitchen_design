@@ -317,8 +317,14 @@ export function checkAccessibility(project: Project): LayoutRule[] {
 }
 
 const TURNING_STEP_MM = 10;
+/** The grid never has more than this many points along a side, however big the room: the work is bounded. */
+const TURNING_GRID_MAX = 400;
 
-/** The room's largest clear floor circle. Its centre is tried on a grid, so the diameter reads up to about 15 mm short. */
+/**
+ * The room's largest clear floor circle. Its centre is tried on a grid, so the
+ * diameter reads up to about 1.5 grid steps short: 15 mm for a room up to 4 m,
+ * a little more in a bigger one (the step grows so the grid stays bounded).
+ */
 function turningSpace(project: Project, floor: PlacedItem[]): LayoutRule {
   const rule = { id: 'access-turning', title: 'Space to turn a wheelchair' };
   if (project.items.length === 0) return { ...rule, status: 'n/a', detail: 'nothing placed yet' };
@@ -330,9 +336,10 @@ function turningSpace(project: Project, floor: PlacedItem[]): LayoutRule {
   const from = (p: Point, list: [Point, Point][]) => Math.min(...list.map(([a, b]) => pointToSegmentDistance(p, a, b)));
 
   const { minX, minY, maxX, maxY } = polygonBounds(poly);
+  const step = Math.max(TURNING_STEP_MM, Math.ceil(Math.max(maxX - minX, maxY - minY) / TURNING_GRID_MAX));
   let best = 0;
-  for (let x = minX; x <= maxX; x += TURNING_STEP_MM) {
-    for (let y = minY; y <= maxY; y += TURNING_STEP_MM) {
+  for (let x = minX; x <= maxX; x += step) {
+    for (let y = minY; y <= maxY; y += step) {
       const p: Point = [x, y];
       if (!pointInPolygon(p, poly)) continue;
       let clear = from(p, wallEdges);
