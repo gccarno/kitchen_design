@@ -27,6 +27,7 @@ describe('CompareOptions', () => {
     expect(screen.getAllByText(/^Total /)).toHaveLength(2);
     expect(screen.getAllByText(/^Subtotal /)).toHaveLength(2);
     expect(screen.getAllByText(/^Layout check: /)).toHaveLength(2);
+    expect(screen.getAllByText(/^Accessibility: \d+ of \d+ passed$/)).toHaveLength(2);
     expect(screen.getByText('1 item')).toBeTruthy();
     expect(screen.getByText('3 items')).toBeTruthy();
   });

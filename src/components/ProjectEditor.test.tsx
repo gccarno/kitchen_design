@@ -180,9 +180,16 @@ describe('ProjectEditor', () => {
     expect(screen.queryByRole('heading', { name: 'Photos' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Catalog' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Suggest layouts' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Accessibility — add a rod or shelves to start' })).not.toBeNull();
     expect(screen.getByRole('link', { name: 'SVG' })).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Estimate' })).not.toBeNull();
     expect(screen.getByLabelText('Hardware each')).not.toBeNull();
+  });
+
+  it('shows the accessibility check next to the layout check for a kitchen', () => {
+    render(<ProjectEditor initialProject={project} />);
+    expect(screen.getByRole('heading', { name: 'Layout check — place a fridge, sink and range to start' })).not.toBeNull();
+    expect(screen.getByRole('heading', { name: 'Accessibility — place cabinets to start' })).not.toBeNull();
   });
 
   it('offers the plan as a drawing to download', () => {

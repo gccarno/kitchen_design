@@ -78,6 +78,18 @@ describe('describePlanForLLM', () => {
     expect(text).not.toContain('Layout check failures');
   });
 
+  it('adds the accessibility failures, telling the model to act only if asked', () => {
+    const narrowDoor: Project = {
+      ...project,
+      items: [{ id: 's', catalogId: 'sink-base-900', tag: 'sink', sizeMm: { w: 900, d: 560, h: 870 }, position: { x: 450, y: 280 }, rotationDeg: 0 }],
+      room: { ...project.room, openings: [{ id: 'd1', wallId: project.room.walls[0].id, kind: 'door', positionMm: 100, widthMm: 700, heightMm: 2100 }] },
+    };
+    expect(describePlanForLLM(narrowDoor, catalog)).toMatch(
+      /Accessibility check failures[^\n]*only fix if asked[^\n]*:\n- Door wide enough: widest door 700 mm \(needs 815 mm\)/
+    );
+    expect(describePlanForLLM({ ...narrowDoor, room: { ...narrowDoor.room, openings: [] } }, catalog)).not.toContain('Accessibility check failures');
+  });
+
   it('says so when there are no items or openings', () => {
     const empty = describePlanForLLM({ ...project, items: [], room: { ...project.room, openings: [] } }, catalog);
     expect(empty).toMatch(/Openings:\n\(none\)/);

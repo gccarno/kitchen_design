@@ -17,7 +17,7 @@ import LayoutCheckPanel from './LayoutCheckPanel';
 import RoomSketch from './RoomSketch';
 import { polygonAreaMm2, polygonBounds, type Point } from '@/lib/plan/geometry';
 import { proposalForPlan, proposalForPricing, proposalForRoom } from '@/lib/plan/proposal';
-import { checkLayout } from '@/lib/plan/layout-check';
+import { checkAccessibility, checkLayout } from '@/lib/plan/layout-check';
 import { isNative } from '@/lib/client/native';
 import { saveAndShare } from '@/lib/client/download';
 import { wallElevations } from '@/lib/plan/elevation';
@@ -84,6 +84,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   );
   const warnings = useMemo(() => validatePlan(project).warnings, [project]);
   const layout = useMemo(() => checkLayout(project), [project]);
+  const access = useMemo(() => checkAccessibility(project), [project]);
   const elevations = useMemo(() => (project.closet ? [] : wallElevations(project, catalog)), [project, catalog]);
 
   function pickFromCatalog(item: CatalogItem) {
@@ -259,6 +260,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           onSaved={saved}
           onProposal={propose}
           estimate={<EstimatePanel project={project} onSave={savePricing} />}
+          accessibility={<LayoutCheckPanel rules={access} units={project.units} title="Accessibility" empty="add a rod or shelves to start" />}
         />
       ) : (
         <>
@@ -289,6 +291,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
               </div>
             )}
             <LayoutCheckPanel rules={layout} units={project.units} />
+            <LayoutCheckPanel rules={access} units={project.units} title="Accessibility" empty="place cabinets to start" />
           </section>
 
           <section className="flex flex-col gap-3">

@@ -2,7 +2,7 @@
 
 Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON, SVG/PNG (plan and wall elevations), a CSV parts list, and a PDF spec sheet.
 
-A **layout check** scores the kitchen against the NKBA planning guidelines — work triangle, counter beside the sink, range and fridge, dishwasher next to the sink, aisle width — and the chat can fix what fails ("fix the layout check").
+A **layout check** scores the kitchen against the NKBA planning guidelines — work triangle, counter beside the sink, range and fridge, dishwasher next to the sink, aisle width — and the chat can fix what fails ("fix the layout check"). A separate **accessibility check** looks at what a wheelchair user needs — a 1220 mm aisle, room to turn a 1525 mm circle, a door of at least 815 mm, and (in a closet) a rod and storage within seated reach. It is kept apart from the NKBA count, and only checks what the plan records (not knee space, handles or lighting).
 
 An **estimate** prices the parts list — cabinets, appliances, countertop, closet parts and brackets, plus installation and tax — from rough default prices you can change per project, and exports it as CSV.
 

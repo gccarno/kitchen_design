@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { loadCatalog } from '../catalog/loader';
 import { newProject } from '../plan/new-project';
-import { checkLayout } from '../plan/layout-check';
+import { checkAccessibility, checkLayout } from '../plan/layout-check';
 import { pointInPolygon, type Point } from '../plan/geometry';
 import { ProjectSchema, type Project } from '../plan/schemas';
 import { validatePlan } from '../plan/validate';
@@ -171,5 +171,25 @@ describe.each(closets.map((t) => [t.id] as const))('closet template %s', (id) =>
       components: closet.components.map((c) => [c.kind, c.xMm, c.yMm, c.widthMm, c.heightMm ?? null, c.count ?? null]),
     };
     expect(summary).toMatchSnapshot();
+  });
+});
+
+/**
+ * Counted accessibility rules each template misses, by template id, and why.
+ * Listed exactly, so fixing one (or breaking another) fails the test.
+ */
+const ACCESS_MISSES: Record<string, { rules: string[]; why: string }> = {
+  'kitchen-l-island': { rules: ['access-aisle'], why: 'the island leaves 1120 mm, enough for the NKBA aisle (1067 mm) but not 1220 mm' },
+  'kitchen-sample': { rules: ['access-aisle', 'access-turning', 'access-door'], why: 'a demo packed tight around its island, with an 800 mm door' },
+};
+
+describe.each(TEMPLATE_INFO.map((t) => [t.id, t] as const))('accessibility of template %s', (id) => {
+  const project = build(id);
+
+  it('misses exactly the accessibility rules we expect', () => {
+    const missed = checkAccessibility(project)
+      .filter((r) => r.status === 'fail' && !r.info)
+      .map((r) => r.id);
+    expect(missed.sort()).toEqual([...(ACCESS_MISSES[id]?.rules ?? [])].sort());
   });
 });

@@ -34,6 +34,8 @@ describe('buildSpecSheet', () => {
       'Parts list and estimate',
       'Prices are estimates from default or edited unit prices, not quotes.',
       'Layout check — ',
+      'Accessibility — ',
+      'Accessibility',
       'Sample kitchen · 2026-02-03 · revision 0 · page 1 of 4',
       'page 4 of 4',
     ]) {

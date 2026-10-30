@@ -8,7 +8,7 @@ import type { Catalog } from '../catalog/loader';
 import { nearestWallPoint } from '../plan/openings';
 import { rotateAround, type Point } from '../plan/geometry';
 import { compass } from '../plan/compass';
-import { checkLayout } from '../plan/layout-check';
+import { checkAccessibility, checkLayout } from '../plan/layout-check';
 import type { Project } from '../plan/schemas';
 import { wallLengthMm } from '../plan/validate';
 import { inwardNormal } from '../plan/walls';
@@ -66,6 +66,11 @@ export function describePlanForLLM(project: Project, catalog: Catalog): string {
   if (failures.length > 0) {
     lines.push('', 'Layout check failures (kitchen planning guidelines the plan misses):');
     for (const rule of failures) lines.push(`- ${rule.title}: ${rule.detail}`);
+  }
+  const access = checkAccessibility(project).filter((rule) => rule.status === 'fail' && !rule.info);
+  if (access.length > 0) {
+    lines.push('', 'Accessibility check failures (wheelchair guidelines the plan misses; only fix if asked):');
+    for (const rule of access) lines.push(`- ${rule.title}: ${rule.detail}`);
   }
 
   return lines.join('\n');

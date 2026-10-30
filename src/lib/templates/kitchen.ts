@@ -51,7 +51,7 @@ const ONE_WALL: Command[] = [
   { type: 'addItem', catalogId: 'wall-600x320x720', wall: 'w1', alongMm: 1000 },
   { type: 'addItem', catalogId: 'range-hood-760', wall: 'w1', alongMm: 3030 },
   { type: 'addItem', catalogId: 'wall-450x320x720', wall: 'w1', alongMm: 3635 },
-  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 800 },
+  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 800, widthMm: 900 },
 ];
 
 /** Sink and dishwasher on the right wall, range opposite; the fridge sits on the sink's side so no leg passes 2.7 m. */
@@ -69,7 +69,7 @@ const GALLEY: Command[] = [
   { type: 'addItem', catalogId: 'wall-450x320x720', wall: 'w4', alongMm: 3975 },
   { type: 'addItem', catalogId: 'range-hood-760', wall: 'w4', alongMm: 3370 },
   { type: 'addItem', catalogId: 'wall-450x320x720', wall: 'w4', alongMm: 2765 },
-  { type: 'addOpening', wall: 'w3', kind: 'door' },
+  { type: 'addOpening', wall: 'w3', kind: 'door', widthMm: 900 },
 ];
 
 /** Corner cabinet at the top-left; sink and fridge along the top wall, range down the left wall. */
@@ -84,7 +84,7 @@ const COMPACT_L: Command[] = [
   { type: 'addOpening', wall: 'w1', kind: 'window', alongMm: 1300, widthMm: 800 },
   { type: 'addItem', catalogId: 'wall-450x320x720', wall: 'w1', alongMm: 1925 },
   { type: 'addItem', catalogId: 'range-hood-760', wall: 'w4', alongMm: 1800 },
-  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 600 },
+  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 600, widthMm: 900 },
 ];
 
 /** The same L as `L_SHAPE`, opened up to take an island. */
@@ -102,7 +102,7 @@ const l = (wall4Mm: number): Command[] => [
   { type: 'addItem', catalogId: 'range-hood-760', wall: 'w4', alongMm: wall4Mm - 900 - 380 },
 ];
 
-const L_SHAPE: Command[] = [...l(3300), { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 800 }];
+const L_SHAPE: Command[] = [...l(3300), { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 800, widthMm: 900 }];
 
 const L_ISLAND: Command[] = [
   ...l(4000),
@@ -111,7 +111,7 @@ const L_ISLAND: Command[] = [
   { type: 'addItem', catalogId: 'stool-counter-650', x: 2400, y: 2850 },
   { type: 'addItem', catalogId: 'stool-counter-650', x: 3000, y: 2850 },
   { type: 'addItem', catalogId: 'stool-counter-650', x: 3600, y: 2850 },
-  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 800 },
+  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 800, widthMm: 900 },
 ];
 
 /** Corner cabinets at both top corners; sink between them, dishwasher and range left, fridge right. */
@@ -130,7 +130,7 @@ const U_SHAPE: Command[] = [
   { type: 'addOpening', wall: 'w1', kind: 'window', alongMm: 1350, widthMm: 900 },
   { type: 'addItem', catalogId: 'wall-450x320x720', wall: 'w1', alongMm: 2025 },
   { type: 'addItem', catalogId: 'range-hood-760', wall: 'w4', alongMm: 1520 },
-  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 1600 },
+  { type: 'addOpening', wall: 'w3', kind: 'door', alongMm: 1600, widthMm: 900 },
 ];
 
 export const KITCHEN_BUILDERS: Record<string, KitchenBuilder> = {

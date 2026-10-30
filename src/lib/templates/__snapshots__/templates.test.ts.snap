@@ -523,8 +523,8 @@ exports[`kitchen template kitchen-compact-l > summarises as expected 1`] = `
     ],
     [
       "door",
-      200,
-      800,
+      150,
+      900,
     ],
   ],
   "room": [
@@ -643,8 +643,8 @@ exports[`kitchen template kitchen-galley > summarises as expected 1`] = `
     ],
     [
       "door",
+      850,
       900,
-      800,
     ],
   ],
   "room": [
@@ -769,8 +769,8 @@ exports[`kitchen template kitchen-l-island > summarises as expected 1`] = `
     ],
     [
       "door",
-      400,
-      800,
+      350,
+      900,
     ],
   ],
   "room": [
@@ -871,8 +871,8 @@ exports[`kitchen template kitchen-l-shape > summarises as expected 1`] = `
     ],
     [
       "door",
-      400,
-      800,
+      350,
+      900,
     ],
   ],
   "room": [
@@ -973,8 +973,8 @@ exports[`kitchen template kitchen-one-wall > summarises as expected 1`] = `
     ],
     [
       "door",
-      400,
-      800,
+      350,
+      900,
     ],
   ],
   "room": [
@@ -1225,8 +1225,8 @@ exports[`kitchen template kitchen-u-shape > summarises as expected 1`] = `
     ],
     [
       "door",
-      1200,
-      800,
+      1150,
+      900,
     ],
   ],
   "room": [

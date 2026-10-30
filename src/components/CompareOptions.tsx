@@ -6,7 +6,7 @@ import type { Catalog } from '@/lib/catalog/loader';
 import { partDifferences } from '@/lib/estimate/compare';
 import { buildEstimate } from '@/lib/estimate/estimate';
 import { moneyFormat } from '@/lib/estimate/money';
-import { checkLayout, layoutSummary } from '@/lib/plan/layout-check';
+import { checkAccessibility, checkLayout, layoutSummary } from '@/lib/plan/layout-check';
 import { groupName } from '@/lib/plan/options';
 import type { Project } from '@/lib/plan/schemas';
 
@@ -27,6 +27,7 @@ export default function CompareOptions({ projects, catalog }: { projects: Projec
           const money = moneyFormat(estimates[i].currency);
           const layout = p.closet ? null : layoutSummary(checkLayout(p));
           const failed = layout?.ordered.filter((r) => r.status === 'fail' && !r.info) ?? [];
+          const access = layoutSummary(checkAccessibility(p));
           return (
             <li key={p.id} className="flex min-w-[220px] flex-1 flex-col gap-2 rounded border p-3 text-sm">
               <Link href={`/project/${p.id}`} className="font-medium text-blue-700 underline">
@@ -53,6 +54,7 @@ export default function CompareOptions({ projects, catalog }: { projects: Projec
                   )}
                 </div>
               )}
+              {access.counted > 0 && <span>{`Accessibility: ${access.passed} of ${access.counted} passed`}</span>}
               <span>{count(p.closet ? p.closet.components.length : p.items.length)}</span>
             </li>
           );
