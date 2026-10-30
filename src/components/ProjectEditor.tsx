@@ -61,6 +61,9 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   const online = useOnline();
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestNote, setSuggestNote] = useState<string | null>(null);
 
   // A save was rejected because the project changed elsewhere: reload the latest version from the server.
   useEffect(() => {
@@ -133,6 +136,29 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
     }
   }
 
+  // Make suggested layouts as new options and open their comparison. The
+  // project itself is untouched; with no layout to offer, say why.
+  async function suggestLayouts() {
+    if (suggesting || !online) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    setSuggestNote(null);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/propose-layouts`, { method: 'POST' });
+      const body = (await res.json().catch(() => ({}))) as { groupId?: string; options?: unknown[]; reason?: string; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `could not suggest layouts (${res.status})`);
+      if (!body.options?.length || !body.groupId) {
+        setSuggestNote(body.reason ?? 'No layouts to suggest for this room.');
+        setSuggesting(false);
+        return;
+      }
+      router.push(`/compare/${body.groupId}`);
+    } catch (err) {
+      setSuggestError((err as Error).message);
+      setSuggesting(false);
+    }
+  }
+
   const bounds = polygonBounds(project.room.polygon as Point[]);
   const areaM2 = polygonAreaMm2(project.room.polygon as Point[]) / 1e6;
 
@@ -185,6 +211,17 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           >
             Duplicate as option
           </button>
+          {!project.closet && (
+            <button
+              type="button"
+              className="rounded border px-3 py-1 disabled:opacity-40"
+              disabled={!online || suggesting}
+              title={online ? 'Make up to three layouts for this room as new options' : 'Offline'}
+              onClick={() => void suggestLayouts()}
+            >
+              {suggesting ? 'Suggesting…' : 'Suggest layouts'}
+            </button>
+          )}
           {groupId && (optionCount ?? 0) >= 2 && (
             <Link className="text-blue-700 underline" href={`/compare/${groupId}`}>
               Compare options
@@ -196,6 +233,12 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
             Couldn’t duplicate: {duplicateError}
           </p>
         )}
+        {suggestError && (
+          <p role="alert" className="text-sm text-red-700">
+            Couldn’t suggest layouts: {suggestError}
+          </p>
+        )}
+        {suggestNote && <p className="text-sm text-gray-700">{suggestNote}</p>}
       </header>
 
       {proposal && (

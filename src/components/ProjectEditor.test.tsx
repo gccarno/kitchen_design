@@ -94,6 +94,53 @@ describe('ProjectEditor', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it('suggests layouts and opens the comparison of the new options', async () => {
+    fetchMock.mockResolvedValueOnce(json({ groupId: project.id, options: [{ id: 'o1', name: 'Our kitchen — Option B', label: 'L-shape', passed: 8, counted: 8 }] }, 201));
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest layouts' }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/compare/${project.id}`));
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`/api/projects/${project.id}/propose-layouts`);
+    expect(init.method).toBe('POST');
+  });
+
+  it('disables Suggest layouts while it works, so a double click makes one set', () => {
+    fetchMock.mockReturnValueOnce(new Promise(() => {}));
+    render(<ProjectEditor initialProject={project} />);
+    const button = screen.getByRole('button', { name: 'Suggest layouts' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('says why there are no suggestions, and stays on the page', async () => {
+    fetchMock.mockResolvedValueOnce(json({ options: [], reason: 'No standard layout fits this room well.' }));
+    render(<ProjectEditor initialProject={project} />);
+    const button = screen.getByRole('button', { name: 'Suggest layouts' });
+    fireEvent.click(button);
+    expect(await screen.findByText('No standard layout fits this room well.')).not.toBeNull();
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('says why suggesting failed and lets you try again', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: 'project not found' }, 404));
+    render(<ProjectEditor initialProject={project} />);
+    const button = screen.getByRole('button', { name: 'Suggest layouts' });
+    fireEvent.click(button);
+    expect((await screen.findByRole('alert')).textContent).toContain('project not found');
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('does not offer Suggest layouts offline', () => {
+    render(<ProjectEditor initialProject={project} />);
+    act(() => markOffline());
+    expect((screen.getByRole('button', { name: 'Suggest layouts' }) as HTMLButtonElement).disabled).toBe(true);
+    act(() => markOnline());
+  });
+
   it('links to the comparison only when the project has options', () => {
     const { unmount } = render(<ProjectEditor initialProject={project} />);
     expect(screen.queryByRole('link', { name: 'Compare options' })).toBeNull();
@@ -132,6 +179,7 @@ describe('ProjectEditor', () => {
     expect(screen.getByLabelText(/ask for a change/i).getAttribute('placeholder')).toMatch(/double hang/);
     expect(screen.queryByRole('heading', { name: 'Photos' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Catalog' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Suggest layouts' })).toBeNull();
     expect(screen.getByRole('link', { name: 'SVG' })).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Estimate' })).not.toBeNull();
     expect(screen.getByLabelText('Hardware each')).not.toBeNull();
