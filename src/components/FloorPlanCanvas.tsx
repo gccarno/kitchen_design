@@ -206,6 +206,7 @@ export default function FloorPlanCanvas({
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (pageScroll) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -484,6 +485,7 @@ export default function FloorPlanCanvas({
             selectedOpening={selected?.kind === 'opening' ? selected.id : null}
             selectedItem={selected?.kind === 'item' ? selected.id : null}
             itemLabels={itemLabels}
+            interactive={!pageScroll}
           />
         )}
         <div data-testid="ruler-x" aria-hidden className="pointer-events-none absolute inset-x-0 top-0 border-b bg-white/85 text-[10px] text-gray-600" style={{ height: RULER_PX }}>

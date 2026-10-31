@@ -46,3 +46,29 @@ test('"Scroll page" hands touch back to the page so a phone can scroll past the 
   await toggle.click();
   await expect(plan).toHaveClass(/touch-none/);
 });
+
+test('with "Scroll page" on, a finger swipe over the plan scrolls the page and leaves the plan alone', async ({ browser }) => {
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 800 } });
+  const page = await context.newPage();
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Try a sample kitchen' }).click();
+  await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
+  const plan = page.getByTestId('floor-plan');
+  await expect(plan.locator('canvas').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Scroll page' }).click();
+  await plan.scrollIntoViewIfNeeded();
+  const before = { x: await plan.getAttribute('data-x'), y: await plan.getAttribute('data-y'), scroll: await page.evaluate(() => window.scrollY) };
+  const box = (await plan.boundingBox())!;
+  const cdp = await context.newCDPSession(page);
+  const x = box.x + box.width / 2;
+  const from = Math.min(box.y + box.height - 20, 760);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from }] });
+  for (let i = 1; i <= 10; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: from - i * 30 }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before.scroll + 50);
+  expect(await plan.getAttribute('data-x')).toBe(before.x);
+  expect(await plan.getAttribute('data-y')).toBe(before.y);
+  await context.close();
+});
