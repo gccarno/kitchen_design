@@ -30,6 +30,12 @@ export interface FloorPlanStageProps {
 /** Wall label box, in screen pixels. */
 const LABEL_W = 110;
 const LABEL_H = 18;
+
+/** An item turned more than a quarter turn would draw its label upside down. */
+const upsideDown = (rotationDeg: number) => {
+  const r = ((rotationDeg % 360) + 360) % 360;
+  return r > 90 && r <= 270;
+};
 const LEVEL_ORDER = { floor: 0, counter: 1, wall: 2 } as const;
 
 /**
@@ -137,17 +143,20 @@ export default function FloorPlanStage({
               {/* Front edge: shows which way the item faces. */}
               <Line points={[-w / 2, d / 2, w / 2, d / 2]} stroke={onWall ? '#1d4ed8' : '#92400e'} strokeWidth={px(3)} />
               {label && w * scale >= 40 && (
-                <Text
-                  text={label}
-                  x={-w / 2}
-                  y={-px(7)}
-                  width={w}
-                  align="center"
-                  fontSize={px(11)}
-                  fill="#111827"
-                  wrap="none"
-                  ellipsis
-                />
+                // Turned back over when the item faces down, so the text is never upside down.
+                <Group rotation={upsideDown(it.rotationDeg) ? 180 : 0}>
+                  <Text
+                    text={label}
+                    x={-w / 2}
+                    y={-px(7)}
+                    width={w}
+                    align="center"
+                    fontSize={px(11)}
+                    fill="#111827"
+                    wrap="none"
+                    ellipsis
+                  />
+                </Group>
               )}
             </Group>
           );

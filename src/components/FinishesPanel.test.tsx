@@ -39,7 +39,7 @@ describe('FinishesPanel', () => {
     const onSave = vi.fn().mockResolvedValue(null);
     render(<FinishesPanel project={withFinishes({ cabinetColor: '#1e3a5f', doorStyle: 'slab', countertop: 'laminate' })} onSave={onSave} />);
     expect((screen.getByLabelText('Cabinet colour') as HTMLSelectElement).value).toBe('#1e3a5f');
-    expect(screen.getByText(/Navy cabinets, slab \(flat\) doors, laminate countertop/)).toBeTruthy();
+    expect(screen.getByText(/Navy cabinets, slab \(flat\) doors, laminate countertop\. Doors and countertop/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Reset to standard' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(undefined, 'Reset finishes to standard'));
   });

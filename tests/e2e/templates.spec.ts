@@ -32,3 +32,17 @@ test('a closet template furnishes the new project, named after the template when
   expect(kinds).toContain('drawers');
   expect(kinds.filter((k: string) => k === 'rod')).toHaveLength(3);
 });
+
+test('"Scroll page" hands touch back to the page so a phone can scroll past the plan', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Try a sample kitchen' }).click();
+  await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
+  const plan = page.getByTestId('floor-plan');
+  await expect(plan).toHaveClass(/touch-none/);
+  const toggle = page.getByRole('button', { name: 'Scroll page' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(plan).toHaveClass(/touch-pan-y/);
+  await toggle.click();
+  await expect(plan).toHaveClass(/touch-none/);
+});
