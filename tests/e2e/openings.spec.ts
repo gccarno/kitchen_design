@@ -12,6 +12,8 @@ async function dragWorld(page: Page, canvas: Locator, from: [number, number], to
 }
 
 async function clickWorld(page: Page, canvas: Locator, p: [number, number]) {
+  // Clicking a button above can scroll the canvas's top edge out of the viewport.
+  await canvas.scrollIntoViewIfNeeded();
   const [x, y] = await pagePoint(canvas, p);
   await page.mouse.click(x, y);
 }

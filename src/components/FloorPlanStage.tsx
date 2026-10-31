@@ -25,6 +25,11 @@ export interface FloorPlanStageProps {
   selectedItem?: string | null;
   /** Display names for placed items, by item id. */
   itemLabels?: Record<string, string>;
+  /**
+   * Let shapes receive touches. Konva cancels a touch that lands on one, which stops the page
+   * scrolling, so "Scroll page" turns this off; the wrapper's own pointer handlers still run.
+   */
+  interactive?: boolean;
 }
 
 /** Wall label box, in screen pixels. */
@@ -52,6 +57,7 @@ export default function FloorPlanStage({
   items,
   units,
   editing = false,
+  interactive = true,
   selectedCorner = null,
   selectedOpening = null,
   selectedItem = null,
@@ -78,7 +84,7 @@ export default function FloorPlanStage({
   const byLevel = [...items].sort((a, b) => LEVEL_ORDER[a.mount ?? 'floor'] - LEVEL_ORDER[b.mount ?? 'floor']);
 
   return (
-    <Stage width={width} height={height} x={viewport.x} y={viewport.y} scaleX={scale} scaleY={scale}>
+    <Stage listening={interactive} width={width} height={height} x={viewport.x} y={viewport.y} scaleX={scale} scaleY={scale}>
       <Layer listening={false}>{grid}</Layer>
       <Layer>
         <Line points={poly.flat()} closed fill="#f3f4f6" strokeEnabled={false} />
