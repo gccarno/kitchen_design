@@ -95,7 +95,7 @@ export default function FinishesPanel({ project, onSave }: FinishesPanelProps) {
         )}
       </div>
       <p className="text-gray-600">
-        {project.finishes ? describeFinishes(project.finishes) : 'Standard: natural wood cabinets, shaker doors, quartz countertop.'} Doors and countertop
+        {project.finishes ? `${describeFinishes(project.finishes)}.` : 'Standard: natural wood cabinets, shaker doors, quartz countertop.'} Doors and countertop
         change the estimate.
       </p>
       {error && (

@@ -106,6 +106,8 @@ export default function FloorPlanCanvas({
 
   const [editing, setEditing] = useState(false);
   const [snap, setSnap] = useState(true);
+  // On a phone the plan fills the width, so a finger on it can't scroll the page; this hands the touch back.
+  const [pageScroll, setPageScroll] = useState(false);
   const [selected, setSelected] = useState<Selection>(null);
   const [placing, setPlacing] = useState<OpeningKind | null>(null);
   // What's shown while dragging or saving; null means "show the props".
@@ -461,7 +463,7 @@ export default function FloorPlanCanvas({
         data-y={viewport?.y}
         role="img"
         aria-label={label}
-        className={`relative h-[60vh] max-h-[560px] min-h-[280px] w-full touch-none select-none overflow-hidden rounded border bg-white ${
+        className={`relative h-[60vh] max-h-[560px] min-h-[280px] w-full ${pageScroll ? 'touch-pan-y' : 'touch-none'} select-none overflow-hidden rounded border bg-white ${
           placingItem ? 'cursor-copy' : 'cursor-grab active:cursor-grabbing'
         }`}
         onPointerDown={onPointerDown}
@@ -520,6 +522,14 @@ export default function FloorPlanCanvas({
         </button>
         <button type="button" className="rounded border px-3 py-1" onClick={fit}>
           Fit
+        </button>
+        <button
+          type="button"
+          className={`rounded border px-3 py-1 ${pageScroll ? 'bg-black text-white' : ''}`}
+          aria-pressed={pageScroll}
+          onClick={() => setPageScroll((on) => !on)}
+        >
+          Scroll page
         </button>
         {onEdit && (
           <>
