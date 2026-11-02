@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOnline } from '@/lib/client/online';
 import type { ProjectKind } from '@/lib/plan/schemas';
@@ -15,6 +15,11 @@ export default function NewProjectForm() {
   const [templateId, setTemplateId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Coming back to the home page (history back, app resume) can show the router's cached list; re-read it.
+  useEffect(() => {
+    router.refresh();
+  }, [router]);
 
   const templates = templatesForKind(kind);
   const template = templates.find((t) => t.id === templateId);

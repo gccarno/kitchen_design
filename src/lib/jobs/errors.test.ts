@@ -13,7 +13,16 @@ describe('toJobError', () => {
   });
 
   it('maps LLMRequestError to 502 without issues', () => {
-    expect(toJobError(new LLMRequestError('upstream 429'))).toEqual({ status: 502, error: 'upstream 429' });
+    expect(toJobError(new LLMRequestError('upstream timeout'))).toEqual({ status: 502, error: 'upstream timeout' });
+  });
+
+  it('replaces a rate-limit (429) body with a plain message and the per-kind hint', () => {
+    const raw = new LLMRequestError('LLM request failed: 429 Too Many Requests — {"error":{"message":"x is temporarily rate-limited upstream"}}');
+    expect(toJobError(raw, 'extract')).toEqual({
+      status: 502,
+      error: 'The model is busy right now (rate-limited). Try again in a minute. You can still sketch the room by hand.',
+    });
+    expect(toJobError(raw, 'refine').error).toContain('You can still edit the plan by hand.');
   });
 
   it('maps LLMNotConfiguredError to 503 with the per-kind hint', () => {

@@ -4,8 +4,16 @@ import React from 'react';
 import { markOffline, markOnline } from '@/lib/client/online';
 import { templatesForKind } from '@/lib/templates/info';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
 import NewProjectForm from './NewProjectForm';
+
+describe('NewProjectForm freshness', () => {
+  it('re-reads the project list when the home page mounts', () => {
+    render(<NewProjectForm />);
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('NewProjectForm offline', () => {
   afterEach(() => act(() => markOnline()));
