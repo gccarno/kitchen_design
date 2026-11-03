@@ -10,6 +10,9 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn();
   globalThis.fetch = fetchMock as unknown as typeof fetch;
+  // The default call log writes to the console; keep test output quiet.
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -384,6 +387,100 @@ describe('rate limits (429)', () => {
     fetchMock.mockResolvedValue(errJson(500, {}));
     await expect(provider().completeText({ system: 's', user: 'u' })).rejects.toThrow(/500/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('call log (one event per attempt)', () => {
+  const schema = z.object({ a: z.number() });
+  const setup = (extra: Partial<ProviderConfig> = {}) => {
+    const log = vi.fn();
+    const onCall = vi.fn();
+    const p = new OpenAICompatibleProvider({
+      ...cfg,
+      fallbackModels: ['b/text'],
+      retryDelayMs: 1,
+      cooldown: new ModelCooldown(60_000),
+      log,
+      onCall,
+      ...extra,
+    });
+    return { p, log, onCall };
+  };
+  const tooMany = (body: string) =>
+    ({ ok: false, status: 429, statusText: 'Too Many Requests', headers: new Headers(), text: async () => body }) as unknown as Response;
+
+  it('logs a success with the model and provider that answered, and tells onCall too', async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ model: 'b/text', provider: 'Chutes', choices: [{ message: { content: '{"a":1}' } }] }));
+    const { p, log, onCall } = setup();
+    await p.completeJSON({ system: 's', user: 'u', schema });
+    expect(log).toHaveBeenCalledOnce();
+    expect(log.mock.calls[0][0]).toMatchObject({
+      event: 'llm_call',
+      op: 'json',
+      attempt: 0,
+      models: ['gpt-test', 'b/text'],
+      modelUsed: 'b/text',
+      provider: 'Chutes',
+      status: 200,
+      outcome: 'ok',
+    });
+    expect(typeof log.mock.calls[0][0].ms).toBe('number');
+    expect(onCall.mock.calls[0][0]).toEqual(log.mock.calls[0][0]);
+  });
+
+  it('logs each rate-limited attempt with the provider message and the wait, then the success', async () => {
+    const body = JSON.stringify({ error: { code: 429, message: 'Provider returned error', metadata: { raw: 'gpt-test is temporarily rate-limited upstream' } } });
+    fetchMock.mockResolvedValueOnce(tooMany(body)).mockResolvedValueOnce(okJson({ choices: [{ message: { content: 'x' } }] }));
+    const { p, log } = setup();
+    await p.completeText({ system: 's', user: 'u' });
+    expect(log.mock.calls.map((c) => c[0].outcome)).toEqual(['rate_limited', 'ok']);
+    expect(log.mock.calls[0][0]).toMatchObject({
+      status: 429,
+      rateLimitKind: 'upstream',
+      retryInMs: 1,
+      detail: 'Provider returned error (gpt-test is temporarily rate-limited upstream)',
+    });
+    expect(log.mock.calls[1][0]).toMatchObject({ attempt: 1, models: ['b/text', 'gpt-test'] });
+  });
+
+  it('logs the last rate-limited attempt without a wait', async () => {
+    fetchMock.mockResolvedValue(tooMany('busy'));
+    const { p, log } = setup({ maxRetries: 1 });
+    await p.completeText({ system: 's', user: 'u' }).catch(() => undefined);
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(log.mock.calls[1][0]).not.toHaveProperty('retryInMs');
+    expect(log.mock.calls[1][0].detail).toBe('busy');
+  });
+
+  it('logs HTTP errors, unreadable envelopes, bad JSON and timeouts with what went wrong', async () => {
+    const { p, log } = setup();
+    fetchMock.mockResolvedValueOnce(errJson(400, { error: { message: 'image too large' } }));
+    await p.completeText({ system: 's', user: 'u' }).catch(() => undefined);
+    fetchMock.mockResolvedValueOnce(okJson({ choices: [] }));
+    await p.completeText({ system: 's', user: 'u' }).catch(() => undefined);
+    fetchMock.mockResolvedValueOnce(okJson({ choices: [{ message: { content: 'nope' } }] }));
+    await p.chatWithVision({ system: 's', user: 'u', images: [{ mime: 'image/jpeg', dataBase64: 'AA' }], schema }).catch(() => undefined);
+    fetchMock.mockRejectedValueOnce(new DOMException('aborted', 'TimeoutError'));
+    await p.completeText({ system: 's', user: 'u' }).catch(() => undefined);
+    fetchMock.mockRejectedValueOnce(new TypeError('fetch failed'));
+    await p.completeText({ system: 's', user: 'u' }).catch(() => undefined);
+
+    const events = log.mock.calls.map((c) => c[0]);
+    expect(events.map((e) => e.outcome)).toEqual(['http_error', 'bad_envelope', 'bad_json', 'timeout', 'network_error']);
+    expect(events[0]).toMatchObject({ status: 400, detail: 'image too large' });
+    expect(events[1].detail).toMatch(/no choices/);
+    expect(events[2]).toMatchObject({ op: 'vision', images: 1, status: 200 });
+    expect(events[2].detail).toMatch(/non-JSON/);
+    expect(events[3].detail).toMatch(/timed out/);
+    expect(events[4].detail).toMatch(/fetch failed/);
+  });
+
+  it('never logs the prompt, the photos or the key', async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ choices: [{ message: { content: '{"a":1}' } }] }));
+    const { p, log } = setup();
+    await p.chatWithVision({ system: 'SECRET-SYSTEM', user: 'SECRET-USER', images: [{ mime: 'image/jpeg', dataBase64: 'SECRETPIXELS' }], schema });
+    const line = JSON.stringify(log.mock.calls);
+    for (const s of ['SECRET-SYSTEM', 'SECRET-USER', 'SECRETPIXELS', 'sk-test']) expect(line).not.toContain(s);
   });
 });
 

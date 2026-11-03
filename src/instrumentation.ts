@@ -1,12 +1,17 @@
+import type { Instrumentation } from 'next';
+
 /**
- * Runs once when the Next.js server starts. With a database configured,
- * apply pending migrations before any request is served: if one fails the
- * server fails to start, the health check fails, and the deploy is rolled back.
+ * Runs once when the Next.js server starts. Turns on error reporting (a no-op
+ * without SENTRY_DSN), then, with a database configured, applies pending
+ * migrations before any request is served: if one fails the server fails to
+ * start, the health check fails, and the deploy is rolled back.
  */
 export async function register(): Promise<void> {
   // The positive NEXT_RUNTIME check must wrap the import so Next drops the
   // Node-only migrator from the edge compilation of this file.
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { initMonitoring } = await import('./lib/monitoring');
+    initMonitoring();
     if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
       console.error('DATABASE_URL is not set in production: auth is DISABLED and the app is wide open to anyone who can reach it.');
     }
@@ -27,3 +32,11 @@ export async function register(): Promise<void> {
     await runMigrations();
   }
 }
+
+/** Errors a route or page threw without handling them. */
+export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { reportError } = await import('./lib/monitoring');
+    reportError(err, { path: request.path, method: request.method, routePath: context.routePath, routeType: context.routeType });
+  }
+};

@@ -39,6 +39,19 @@ projects over with `npm run import:local -- --owner <email>` (needs `GCS_BUCKET`
 - Run one refine/extract on a free model and confirm it does not report "not configured".
 - Free tier sleeps: expect a 30–60 s cold start.
 
+## LLM logs and Sentry
+- Every LLM attempt writes one JSON line to the service log: `"event":"llm_call"` with the models
+  sent, the model and upstream provider that answered, status, duration, `outcome` (`ok`,
+  `rate_limited`, `http_error`, `timeout`, `network_error`, `bad_envelope`, `bad_json`) and the
+  provider's error message. A failed job adds a `"event":"job_failed"` line. Prompts, photos and
+  keys are never logged. In Render: Logs → search `llm_call` or `job_failed`.
+- Optional Sentry: create a Node.js project in Sentry, copy its DSN and set `SENTRY_DSN` on Render
+  (and on the worker, if you run it). Each failed job then becomes one Sentry event, with its LLM
+  attempts under "Additional data". Events are grouped by job kind, error, outcome and model, and tagged
+  `llm_model`, `llm_outcome` and `rate_limit`. Rate limits are warnings, other failures are errors. Unhandled route
+  errors are reported too. Without `SENTRY_DSN` nothing is sent. Only error reporting is on: no
+  tracing or performance data.
+
 ## Notes
 - If `next build` runs out of memory on the free tier, build a Docker image in CI (Next
   `output: "standalone"`; copy `drizzle/` into the image since migrations read it at startup).

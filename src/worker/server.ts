@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { jobOwner } from '../lib/jobs';
 import { runJob } from '../lib/jobs/run';
+import { flushMonitoring, initMonitoring } from '../lib/monitoring';
 
 export const MAX_CONCURRENT_JOBS = 2;
 
@@ -71,6 +72,12 @@ if (require.main === module) {
     console.error('WORKER_TOKEN and DATABASE_URL are required');
     process.exit(1);
   }
+  initMonitoring();
   const port = Number(process.env.PORT ?? 8080);
-  createWorkerServer({ token }).listen(port, () => console.log(`worker listening on :${port}`));
+  const server = createWorkerServer({ token }).listen(port, () => console.log(`worker listening on :${port}`));
+  // Docker stops with SIGTERM: send any queued error reports before exiting.
+  process.once('SIGTERM', () => {
+    server.close();
+    void flushMonitoring().finally(() => process.exit(0));
+  });
 }

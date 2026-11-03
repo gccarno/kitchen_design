@@ -32,6 +32,8 @@ services:
         sync: false
       - key: LLM_TIMEOUT_MS
         value: "300000"
+      - key: SENTRY_DSN # optional: failed jobs and route errors go to Sentry (see docs/DEPLOYMENT.md)
+        sync: false
       - key: TRUSTED_PROXY_HOPS # verify against Render's X-Forwarded-For before go-live
         value: "1"
       - key: ALLOW_REGISTRATION
