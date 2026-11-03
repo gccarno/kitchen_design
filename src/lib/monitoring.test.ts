@@ -76,12 +76,33 @@ describe('monitoring', () => {
     const err = new LLMRateLimitError('429');
     const calls = [call(), call({ attempt: 1 })];
     m.reportJobFailure(err, failure(calls));
-    expect(sentry.captureException).toHaveBeenCalledWith(err, {
+    expect(sentry.captureException).toHaveBeenCalledWith(expect.objectContaining({ name: 'LLMRateLimitError', message: '429' }), {
       level: 'warning',
       fingerprint: ['job-failed', 'extract', 'LLMRateLimitError', 'rate_limited', 'a/vision:free'],
       tags: { job_kind: 'extract', llm_outcome: 'rate_limited', llm_model: 'a/vision:free', rate_limit: 'upstream' },
       extra: { jobId: 'job-1', projectId: 'proj-1', status: 502, shown: 'The free AI models are busy right now.', llmCalls: calls },
     });
+  });
+
+  it('trims what goes to Sentry: no model output, short provider messages and error text', async () => {
+    const m = await load();
+    m.initMonitoring({ SENTRY_DSN: 'x' });
+    const calls = [
+      call({ outcome: 'bad_json', detail: 'LLM returned non-JSON content: the user wrote MY-HINT' }),
+      call({ outcome: 'bad_envelope', detail: 'LLM response was not JSON: <html>' }),
+      call({ outcome: 'http_error', detail: 'p'.repeat(500) }),
+    ];
+    m.reportJobFailure(new Error(`LLM request failed: 400 — ${'b'.repeat(1000)}`), failure(calls));
+    const [sent, ctx] = sentry.captureException.mock.calls[0];
+    expect((sent as Error).message.length).toBeLessThanOrEqual(200);
+    expect((sent as Error).stack).toMatch(/^Error: LLM request failed/);
+    const sentCalls = (ctx as { extra: { llmCalls: LLMCallEvent[] } }).extra.llmCalls;
+    expect(sentCalls[0]).not.toHaveProperty('detail');
+    expect(sentCalls[1]).not.toHaveProperty('detail');
+    expect(sentCalls[2].detail).toHaveLength(200);
+    expect(JSON.stringify(ctx)).not.toContain('MY-HINT');
+    // The caller's events are left as they were (the full detail still goes to the log line).
+    expect(calls[0].detail).toContain('MY-HINT');
   });
 
   it('reports other failures as errors, and jobs that made no LLM call', async () => {
