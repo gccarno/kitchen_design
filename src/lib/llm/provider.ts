@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { ModelCooldown } from './cooldown';
 
 /**
  * A schema whose parsed OUTPUT is `T`. The input side is left open so
@@ -21,8 +22,14 @@ export interface ProviderConfig {
    */
   fallbackModels?: string[];
   visionFallbackModels?: string[];
-  /** Wait before the single retry after HTTP 429 when there's no Retry-After. Default 2 s. */
+  /** First wait after HTTP 429 when there's no Retry-After; each later wait is 3× longer. Default 5 s. */
   retryDelayMs?: number;
+  /** Retries after an upstream 429 before giving up. Default 3. */
+  maxRetries?: number;
+  /** Most time to spend waiting on 429s for one request. Default 60 s. */
+  maxRateLimitWaitMs?: number;
+  /** Remembers models rate-limited upstream. Defaults to one shared by the whole process. */
+  cooldown?: ModelCooldown;
 }
 
 export interface TextRequest {

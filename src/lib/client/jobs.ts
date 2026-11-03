@@ -36,7 +36,9 @@ export class JobFailedError extends Error {
     message: string,
     readonly status?: number,
     readonly issues?: unknown,
-    readonly keepJob = false
+    readonly keepJob = false,
+    /** Rate-limited: how long until trying again is worth it. */
+    readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = 'JobFailedError';
@@ -61,7 +63,7 @@ export type WaitOptions = {
 export type StartOptions = WaitOptions & { onJobId?: (id: string) => void };
 
 type JobView = { status?: unknown; result?: unknown; error?: unknown };
-type JobErrorBody = { status?: number; error?: string; issues?: unknown };
+type JobErrorBody = { status?: number; error?: string; issues?: unknown; retryAfterMs?: unknown };
 
 const defaultFallback = (status: number) => `request failed (${status})`;
 
@@ -135,7 +137,8 @@ export async function waitForJob<T>(jobId: string, opts: WaitOptions = {}): Prom
       case 'failed': {
         const e = (body.error ?? {}) as JobErrorBody;
         const status = e.status ?? 500;
-        throw new JobFailedError(e.error ?? (opts.fallbackError ?? defaultFallback)(status), status, e.issues);
+        const retryAfterMs = typeof e.retryAfterMs === 'number' ? e.retryAfterMs : undefined;
+        throw new JobFailedError(e.error ?? (opts.fallbackError ?? defaultFallback)(status), status, e.issues, false, retryAfterMs);
       }
       case 'queued':
       case 'running':

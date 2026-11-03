@@ -5,6 +5,7 @@ import type {
   TextRequest,
   VisionRequest,
 } from './provider';
+import { ModelCooldown } from './cooldown';
 
 /** Chat-completions message format used by every OpenAI-compatible API. */
 type ChatMessage =
@@ -20,7 +21,7 @@ type ChatMessage =
 
 interface ChatCompletionsRequest {
   model: string;
-  /** OpenRouter fallbacks, tried in order after `model`. */
+  /** OpenRouter: the whole list in priority order, `model` first, then its fallbacks. */
   models?: string[];
   messages: ChatMessage[];
   temperature?: number;
@@ -32,10 +33,19 @@ interface ChatCompletionsResponse {
   choices: Array<{ message: { content: string | null } }>;
 }
 
+/** A request body before the model route is added. */
+type ChatBody = Omit<ChatCompletionsRequest, 'model' | 'models'>;
+
 const DEFAULT_TIMEOUT_MS = 60_000;
-const DEFAULT_RETRY_DELAY_MS = 2_000;
-/** Never wait longer than this for a Retry-After, whatever the server says. */
-const MAX_RETRY_DELAY_MS = 10_000;
+const DEFAULT_RETRY_DELAY_MS = 5_000;
+const DEFAULT_MAX_RETRIES = 3;
+/** Jobs are requeued after 5 minutes and one job may make several calls, so keep each call's waiting short. */
+const DEFAULT_MAX_RATE_LIMIT_WAIT_MS = 60_000;
+/** How long the user should wait before trying again after the upstream stayed busy. */
+const UPSTREAM_TRY_AGAIN_MS = 60_000;
+
+/** Shared by every provider in the process, so one request's 429 steers the next request. */
+const sharedCooldown = new ModelCooldown(2 * 60 * 1000);
 
 /**
  * The model answered, but not with valid JSON matching the schema. Worth
@@ -59,6 +69,51 @@ export class LLMRequestError extends Error {
     super(message);
     this.name = 'LLMRequestError';
   }
+}
+
+/**
+ * Still rate-limited (HTTP 429) after waiting. `upstream`: the model's
+ * provider was busy, which usually clears in a minute or so. `quota`: the
+ * account's own limit (OpenRouter's free-model cap), which lasts until `resetAt`.
+ */
+export class LLMRateLimitError extends LLMRequestError {
+  constructor(
+    message: string,
+    readonly kind: 'upstream' | 'quota',
+    /** How long until trying again is worth it, when known. */
+    readonly retryAfterMs?: number
+  ) {
+    super(message);
+    this.name = 'LLMRateLimitError';
+  }
+}
+
+type PostResult = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  /** Lower-case header name → value, or null. */
+  header: (name: string) => string | null;
+  text: string;
+};
+
+/**
+ * OpenRouter answers its own limits with `X-RateLimit-Remaining: 0` and a
+ * `X-RateLimit-Reset` time (epoch ms); a busy upstream provider has neither.
+ */
+function classifyRateLimit(res: PostResult, now: number): { kind: 'upstream' | 'quota'; resetInMs?: number } {
+  const ownLimit = res.header('x-ratelimit-remaining') === '0' || /free-models-per-(day|min)/i.test(res.text);
+  if (!ownLimit) return { kind: 'upstream' };
+  const reset = Number(res.header('x-ratelimit-reset'));
+  if (!Number.isFinite(reset) || reset <= 0) return { kind: 'quota' };
+  const resetAt = reset < 1e12 ? reset * 1000 : reset; // tolerate seconds
+  return { kind: 'quota', resetInMs: Math.max(0, resetAt - now) };
+}
+
+/** `Retry-After` in seconds, as ms; null when absent or unreadable (HTTP-date form is ignored). */
+function retryAfterMs(res: PostResult): number | null {
+  const s = Number(res.header('retry-after') ?? NaN);
+  return Number.isFinite(s) && s >= 0 ? s * 1000 : null;
 }
 
 /** No LLM is configured (`LLM_API_KEY` unset). The rest of the app still works. */
@@ -89,6 +144,9 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private readonly fallbackModels: string[];
   private readonly visionFallbackModels: string[];
   private readonly retryDelayMs: number;
+  private readonly maxRetries: number;
+  private readonly maxRateLimitWaitMs: number;
+  private readonly cooldown: ModelCooldown;
 
   constructor(cfg: ProviderConfig) {
     // Trim trailing slash so concat is predictable.
@@ -100,17 +158,24 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.fallbackModels = cfg.fallbackModels ?? [];
     this.visionFallbackModels = cfg.visionFallbackModels ?? [];
     this.retryDelayMs = cfg.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+    this.maxRetries = cfg.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.maxRateLimitWaitMs = cfg.maxRateLimitWaitMs ?? DEFAULT_MAX_RATE_LIMIT_WAIT_MS;
+    this.cooldown = cfg.cooldown ?? sharedCooldown;
   }
 
-  /** `model`, plus `models` fallbacks only when configured. */
-  private route(vision: boolean): Pick<ChatCompletionsRequest, 'model' | 'models'> {
-    const fallbacks = vision ? this.visionFallbackModels : this.fallbackModels;
-    return { model: vision ? this.visionModel : this.model, ...(fallbacks.length > 0 ? { models: fallbacks } : {}) };
+  /** The configured models, primary first, with recently rate-limited ones moved to the back. */
+  private models(vision: boolean): string[] {
+    const configured = vision ? [this.visionModel, ...this.visionFallbackModels] : [this.model, ...this.fallbackModels];
+    return this.cooldown.order(configured);
+  }
+
+  /** `model`, plus the full `models` list only when there are fallbacks (plain OpenAI rejects unknown fields). */
+  private static route(models: string[]): Pick<ChatCompletionsRequest, 'model' | 'models'> {
+    return { model: models[0], ...(models.length > 1 ? { models } : {}) };
   }
 
   async completeText(req: TextRequest): Promise<string> {
-    const body: ChatCompletionsRequest = {
-      ...this.route(false),
+    const body: ChatBody = {
       messages: [
         { role: 'system', content: req.system },
         { role: 'user', content: req.user },
@@ -119,7 +184,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     if (req.temperature !== undefined) body.temperature = req.temperature;
     if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens;
 
-    const content = await this.callChatCompletions(body);
+    const content = await this.callChatCompletions(body, false);
     return content;
   }
 
@@ -128,15 +193,14 @@ export class OpenAICompatibleProvider implements LLMProvider {
     user: string;
     schema: OutputSchema<T>;
   }): Promise<T> {
-    const body: ChatCompletionsRequest = {
-      ...this.route(false),
+    const body: ChatBody = {
       messages: [
         { role: 'system', content: req.system },
         { role: 'user', content: req.user },
       ],
       response_format: { type: 'json_object' },
     };
-    const raw = await this.callChatCompletions(body);
+    const raw = await this.callChatCompletions(body, false);
     return parseAndValidate(raw, req.schema);
   }
 
@@ -151,45 +215,46 @@ export class OpenAICompatibleProvider implements LLMProvider {
       })),
     ];
 
-    const body: ChatCompletionsRequest = {
-      ...this.route(true),
+    const body: ChatBody = {
       messages: [
         { role: 'system', content: req.system },
         { role: 'user', content: userContent },
       ],
       response_format: { type: 'json_object' },
     };
-    const raw = await this.callChatCompletions(body);
+    const raw = await this.callChatCompletions(body, true);
     return parseAndValidate(raw, req.schema);
   }
 
   // -- internals --
 
-  private async callChatCompletions(body: ChatCompletionsRequest): Promise<string> {
-    let res = await this.post(body);
-    if (res.status === 429) {
-      // Rate limited (common on free models): wait once, then try again.
-      const retryAfterS = Number(res.retryAfter ?? NaN);
-      const wait = Number.isFinite(retryAfterS) && retryAfterS >= 0 ? retryAfterS * 1000 : this.retryDelayMs;
-      await new Promise((r) => setTimeout(r, Math.min(wait, MAX_RETRY_DELAY_MS)));
-      res = await this.post(body);
-    }
+  /**
+   * Free models are often rate-limited (429). A busy upstream provider: move
+   * that model to the back of the list and retry with growing waits (5 s,
+   * 15 s, 45 s by default) within a total budget. The account's own quota:
+   * wait for the reset only if it's soon, otherwise give up straight away.
+   */
+  private async callChatCompletions(body: ChatBody, vision: boolean): Promise<string> {
+    let waited = 0;
+    for (let attempt = 0; ; attempt++) {
+      const models = this.models(vision);
+      const res = await this.post({ ...OpenAICompatibleProvider.route(models), ...body });
+      if (res.status !== 429) return readContent(res);
 
-    if (!res.ok) {
-      throw new LLMRequestError(`LLM request failed: ${res.status} ${res.statusText} — ${res.text.slice(0, 500)}`);
+      const limit = classifyRateLimit(res, Date.now());
+      if (limit.kind === 'upstream') this.cooldown.mark(models[0]);
+      const wait =
+        limit.kind === 'quota' ? (limit.resetInMs ?? Infinity) : (retryAfterMs(res) ?? this.retryDelayMs * 3 ** attempt);
+      if (attempt >= this.maxRetries || waited + wait > this.maxRateLimitWaitMs) {
+        throw new LLMRateLimitError(
+          `LLM request failed: 429 ${res.statusText} — ${res.text.slice(0, 500)}`,
+          limit.kind,
+          limit.kind === 'quota' ? limit.resetInMs : UPSTREAM_TRY_AGAIN_MS
+        );
+      }
+      await new Promise((r) => setTimeout(r, wait));
+      waited += wait;
     }
-
-    let data: ChatCompletionsResponse;
-    try {
-      data = JSON.parse(res.text) as ChatCompletionsResponse;
-    } catch {
-      throw new LLMRequestError(`LLM response was not JSON: ${res.text.slice(0, 200)}`);
-    }
-    const choice = data.choices?.[0];
-    if (!choice || choice.message.content == null) {
-      throw new LLMRequestError('LLM response had no choices or empty content');
-    }
-    return choice.message.content;
   }
 
   /**
@@ -197,9 +262,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
    * straight away and holds the body until the model answers, so the timeout
    * often fires while reading the body — both must map to LLMRequestError.
    */
-  private async post(
-    body: ChatCompletionsRequest
-  ): Promise<{ ok: boolean; status: number; statusText: string; retryAfter: string | null; text: string }> {
+  private async post(body: ChatCompletionsRequest): Promise<PostResult> {
     const url = `${this.baseUrl}/chat/completions`;
     try {
       const res = await fetch(url, {
@@ -216,7 +279,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
         ok: res.ok,
         status: res.status,
         statusText: res.statusText,
-        retryAfter: res.headers?.get?.('retry-after') ?? null,
+        header: (name) => res.headers?.get?.(name) ?? null,
         text,
       };
     } catch (err) {
@@ -226,6 +289,24 @@ export class OpenAICompatibleProvider implements LLMProvider {
       throw new LLMRequestError(`LLM request failed: ${(err as Error).message}`);
     }
   }
+}
+
+/** The first choice's text from a chat-completions response; LLMRequestError for anything else. */
+function readContent(res: PostResult): string {
+  if (!res.ok) {
+    throw new LLMRequestError(`LLM request failed: ${res.status} ${res.statusText} — ${res.text.slice(0, 500)}`);
+  }
+  let data: ChatCompletionsResponse;
+  try {
+    data = JSON.parse(res.text) as ChatCompletionsResponse;
+  } catch {
+    throw new LLMRequestError(`LLM response was not JSON: ${res.text.slice(0, 200)}`);
+  }
+  const choice = data.choices?.[0];
+  if (!choice || choice.message.content == null) {
+    throw new LLMRequestError('LLM response had no choices or empty content');
+  }
+  return choice.message.content;
 }
 
 /** Strip ```json fences and parse; throw with the raw text on failure. */

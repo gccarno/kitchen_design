@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { ExtractionError, LLMNotConfiguredError, LLMRequestError, RefinementError } from '../llm';
+import { ExtractionError, LLMNotConfiguredError, LLMRateLimitError, LLMRequestError, RefinementError } from '../llm';
 import { toJobError } from './errors';
 
 afterEach(() => vi.restoreAllMocks());
@@ -16,13 +16,20 @@ describe('toJobError', () => {
     expect(toJobError(new LLMRequestError('upstream timeout'))).toEqual({ status: 502, error: 'upstream timeout' });
   });
 
-  it('replaces a rate-limit (429) body with a plain message and the per-kind hint', () => {
-    const raw = new LLMRequestError('LLM request failed: 429 Too Many Requests — {"error":{"message":"x is temporarily rate-limited upstream"}}');
-    expect(toJobError(raw, 'extract')).toEqual({
+  it('replaces a rate-limit (429) body with a plain message, the per-kind hint and when to try again', () => {
+    const raw = 'LLM request failed: 429 Too Many Requests — {"error":{"message":"x is temporarily rate-limited upstream"}}';
+    expect(toJobError(new LLMRateLimitError(raw, 'upstream', 60_000), 'extract')).toEqual({
       status: 502,
-      error: 'The model is busy right now (rate-limited). Try again in a minute. You can still sketch the room by hand.',
+      error: 'The free AI models are busy right now. You can still sketch the room by hand.',
+      retryAfterMs: 60_000,
     });
-    expect(toJobError(raw, 'refine').error).toContain('You can still edit the plan by hand.');
+    const quota = toJobError(new LLMRateLimitError(raw, 'quota', 3_600_000), 'refine');
+    expect(quota).toEqual({
+      status: 502,
+      error: 'The free AI model limit for this account is used up for now. You can still edit the plan by hand.',
+      retryAfterMs: 3_600_000,
+    });
+    expect(toJobError(new LLMRateLimitError(raw, 'quota'), 'extract')).not.toHaveProperty('retryAfterMs');
   });
 
   it('maps LLMNotConfiguredError to 503 with the per-kind hint', () => {

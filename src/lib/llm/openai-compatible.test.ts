@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, providerFromEnv } from './openai-compatible';
+import { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, LLMRateLimitError, providerFromEnv } from './openai-compatible';
+import { ModelCooldown } from './cooldown';
 import type { LLMProvider, ProviderConfig } from './provider';
 
 // Capture every fetch call and let each test decide the response.
@@ -250,14 +251,19 @@ describe('model fallbacks (OpenRouter)', () => {
   const ok = () => okJson({ choices: [{ message: { content: '{"a":1}' } }] });
   const body = (i = 0) => JSON.parse((fetchMock.mock.calls[i] as [string, RequestInit])[1].body as string);
 
-  it('sends fallback models in `models` after the primary', async () => {
+  it('sends the whole list in `models`, primary first (OpenRouter tries it in order)', async () => {
     fetchMock.mockResolvedValueOnce(ok());
-    const p = new OpenAICompatibleProvider({ ...cfg, fallbackModels: ['b/text', 'c/text'], visionFallbackModels: ['b/vision'] });
+    const p = new OpenAICompatibleProvider({
+      ...cfg,
+      fallbackModels: ['b/text', 'c/text'],
+      visionFallbackModels: ['b/vision'],
+      cooldown: new ModelCooldown(60_000),
+    });
     await p.completeText({ system: 's', user: 'u' });
-    expect(body()).toMatchObject({ model: 'gpt-test', models: ['b/text', 'c/text'] });
+    expect(body()).toMatchObject({ model: 'gpt-test', models: ['gpt-test', 'b/text', 'c/text'] });
     fetchMock.mockResolvedValueOnce(ok());
     await p.chatWithVision({ system: 's', user: 'u', images: [], schema: z.object({ a: z.number() }) });
-    expect(body(1)).toMatchObject({ model: 'gpt-vision-test', models: ['b/vision'] });
+    expect(body(1)).toMatchObject({ model: 'gpt-vision-test', models: ['gpt-vision-test', 'b/vision'] });
   });
 
   it('omits `models` when there are no fallbacks (plain OpenAI rejects unknown fields)', async () => {
@@ -268,37 +274,129 @@ describe('model fallbacks (OpenRouter)', () => {
 });
 
 describe('rate limits (429)', () => {
-  const tooMany = (retryAfter?: string) =>
+  const upstream = '{"error":{"code":429,"message":"a/text is temporarily rate-limited upstream"}}';
+  const tooMany = (headers: Record<string, string> = {}, text = upstream) =>
     ({
       ok: false,
       status: 429,
       statusText: 'Too Many Requests',
-      headers: new Headers(retryAfter ? { 'retry-after': retryAfter } : {}),
-      json: async () => ({}),
-      text: async () => 'rate limited',
+      headers: new Headers(headers),
+      json: async () => JSON.parse(text),
+      text: async () => text,
     }) as unknown as Response;
+  const ok = () => okJson({ choices: [{ message: { content: 'x' } }] });
+  const sentModels = () =>
+    fetchMock.mock.calls.map((c) => JSON.parse((c as [string, RequestInit])[1].body as string).model as string);
+  const provider = (extra: Partial<ProviderConfig> = {}) =>
+    new OpenAICompatibleProvider({ ...cfg, retryDelayMs: 1, cooldown: new ModelCooldown(60_000), ...extra });
 
-  it('retries once after a 429, then succeeds', async () => {
-    fetchMock.mockResolvedValueOnce(tooMany('0')).mockResolvedValueOnce(okJson({ choices: [{ message: { content: 'x' } }] }));
-    const out = await new OpenAICompatibleProvider({ ...cfg, retryDelayMs: 1 }).completeText({ system: 's', user: 'u' });
-    expect(out).toBe('x');
+  it('retries an upstream 429 with growing waits, then succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockResolvedValueOnce(tooMany()).mockResolvedValueOnce(tooMany()).mockResolvedValueOnce(ok());
+      const done = provider({ retryDelayMs: 1000 }).completeText({ system: 's', user: 'u' });
+      await vi.advanceTimersByTimeAsync(999);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(2999); // the second wait is 3× the first
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await done).toBe('x');
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('honours Retry-After (seconds)', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockResolvedValueOnce(tooMany({ 'retry-after': '7' })).mockResolvedValueOnce(ok());
+      const done = provider().completeText({ system: 's', user: 'u' });
+      await vi.advanceTimersByTimeAsync(6999);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await done).toBe('x');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('moves a model that was rate-limited upstream to the back of the list, for this and later requests', async () => {
+    const cooldown = new ModelCooldown(60_000);
+    const p = provider({ model: 'a/text', fallbackModels: ['b/text', 'c/text'], cooldown });
+    fetchMock.mockResolvedValueOnce(tooMany()).mockResolvedValueOnce(ok()).mockResolvedValueOnce(ok());
+    await p.completeText({ system: 's', user: 'u' });
+    await p.completeText({ system: 's', user: 'u' });
+    expect(sentModels()).toEqual(['a/text', 'b/text', 'b/text']);
+    const lastBody = JSON.parse((fetchMock.mock.calls[2] as [string, RequestInit])[1].body as string);
+    expect(lastBody.models).toEqual(['b/text', 'c/text', 'a/text']);
+  });
+
+  it('gives up after maxRetries with a typed upstream error and a minute to wait', async () => {
+    fetchMock.mockResolvedValue(tooMany());
+    const err = await provider({ maxRetries: 2 })
+      .completeText({ system: 's', user: 'u' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LLMRateLimitError);
+    expect(err).toBeInstanceOf(LLMRequestError);
+    expect(err).toMatchObject({ kind: 'upstream', retryAfterMs: 60_000 });
+    expect((err as Error).message).toMatch(/429/);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops early when the next wait would exceed the total budget', async () => {
+    fetchMock.mockResolvedValue(tooMany());
+    // Waits would be 10, 30, 90 ms; a 30 ms budget allows only the first (10 + 30 > 30).
+    await expect(
+      provider({ retryDelayMs: 10, maxRateLimitWaitMs: 30 }).completeText({ system: 's', user: 'u' })
+    ).rejects.toBeInstanceOf(LLMRateLimitError);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('gives up after the retry with a clear error', async () => {
-    fetchMock.mockResolvedValue(tooMany());
-    await expect(
-      new OpenAICompatibleProvider({ ...cfg, retryDelayMs: 1 }).completeText({ system: 's', user: 'u' })
-    ).rejects.toThrow(/429/);
+  it('does not retry the account quota when the reset is far off, and says when it resets', async () => {
+    const resetAt = Date.now() + 3 * 60 * 60 * 1000;
+    fetchMock.mockResolvedValue(
+      tooMany(
+        { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(resetAt) },
+        '{"error":{"code":429,"message":"Rate limit exceeded: free-models-per-day"}}'
+      )
+    );
+    const err = (await provider()
+      .completeText({ system: 's', user: 'u' })
+      .catch((e: unknown) => e)) as LLMRateLimitError;
+    expect(err).toBeInstanceOf(LLMRateLimitError);
+    expect(err.kind).toBe('quota');
+    expect(err.retryAfterMs).toBeGreaterThan(3 * 60 * 60 * 1000 - 5000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for a quota reset that is due within the budget (the per-minute limit)', async () => {
+    fetchMock
+      .mockResolvedValueOnce(tooMany({ 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(Date.now() + 20) }))
+      .mockResolvedValueOnce(ok());
+    expect(await provider().completeText({ system: 's', user: 'u' })).toBe('x');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('does not retry other errors', async () => {
     fetchMock.mockResolvedValue(errJson(500, {}));
-    await expect(new OpenAICompatibleProvider({ ...cfg, retryDelayMs: 1 }).completeText({ system: 's', user: 'u' })).rejects.toThrow(
-      /500/
-    );
+    await expect(provider().completeText({ system: 's', user: 'u' })).rejects.toThrow(/500/);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ModelCooldown', () => {
+  it('moves cooling models to the back until the cooldown ends, never dropping them', () => {
+    let now = 0;
+    const c = new ModelCooldown(1000, () => now);
+    c.mark('a');
+    expect(c.order(['a', 'b', 'c'])).toEqual(['b', 'c', 'a']);
+    c.mark('b');
+    expect(c.order(['a', 'b', 'c'])).toEqual(['c', 'a', 'b']);
+    now = 1000;
+    expect(c.order(['a', 'b', 'c'])).toEqual(['a', 'b', 'c']);
   });
 });
 
@@ -332,7 +430,7 @@ describe('providerFromEnv', () => {
     await providerFromEnv().chatWithVision({ system: 's', user: 'u', images: [], schema: z.object({ a: z.number() }) });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
-    expect(JSON.parse(init.body as string)).toMatchObject({ model: 'a/vision', models: ['b/vision', 'c/vision'] });
+    expect(JSON.parse(init.body as string)).toMatchObject({ model: 'a/vision', models: ['a/vision', 'b/vision', 'c/vision'] });
   });
 });
 

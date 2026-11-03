@@ -3,7 +3,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { proposalFromRefinement, type Proposal, type RefinementResponse } from '@/lib/plan/proposal';
 import { useOnline } from '@/lib/client/online';
-import { forgetJob, isAbortError, keepsJob, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
+import {
+  forgetJob,
+  isAbortError,
+  JobFailedError,
+  keepsJob,
+  recallJob,
+  rememberJob,
+  SLOW_HINT_MS,
+  startAndWait,
+  waitForJob,
+} from '@/lib/client/jobs';
+import RetryCountdown from './RetryCountdown';
 
 interface ChatPanelProps {
   projectId: string;
@@ -13,7 +24,14 @@ interface ChatPanelProps {
 }
 
 /** `content` is what was said (and goes back as history); `note` is UI-only guidance. */
-type Message = { role: 'user' | 'assistant'; content: string; note?: string; error?: boolean };
+type Message = {
+  role: 'user' | 'assistant';
+  content: string;
+  note?: string;
+  error?: boolean;
+  /** Rate-limited: offer to send `message` again after `afterMs`. */
+  retry?: { afterMs: number; message: string };
+};
 
 /** Turns of context sent with each request (errors excluded). */
 const HISTORY_TURNS = 6;
@@ -38,7 +56,7 @@ export default function ChatPanel({
   const jobKey = `kd-job:refine:${projectId}`;
 
   /** Wait for one reply (a new job, or a resumed one) and add it to the conversation. */
-  async function execute(work: (signal: AbortSignal) => Promise<RefinementResponse>) {
+  async function execute(work: (signal: AbortSignal) => Promise<RefinementResponse>, message?: string) {
     inFlight.current = true;
     const ctrl = new AbortController();
     current.current = ctrl;
@@ -60,7 +78,13 @@ export default function ChatPanel({
       if (isAbortError(err)) return;
       // Connection lost (or gave up waiting): the job may still finish, so the next mount resumes it.
       if (!keepsJob(err)) forgetJob(jobKey);
-      reply = { role: 'assistant', content: `Sorry — ${(err as Error).message}`, error: true };
+      const afterMs = err instanceof JobFailedError ? err.retryAfterMs : undefined;
+      reply = {
+        role: 'assistant',
+        content: `Sorry — ${(err as Error).message}`,
+        error: true,
+        ...(afterMs !== undefined && message !== undefined ? { retry: { afterMs, message } } : {}),
+      };
     }
     if (current.current !== ctrl) return;
     current.current = null;
@@ -73,8 +97,9 @@ export default function ChatPanel({
   useEffect(() => {
     const saved = recallJob<{ jobId: string; message?: unknown }>(jobKey);
     if (saved && !inFlight.current) {
-      if (typeof saved.message === 'string') setMessages([{ role: 'user', content: saved.message }]);
-      void execute((signal) => waitForJob<RefinementResponse>(saved.jobId, { signal }));
+      const message = typeof saved.message === 'string' ? saved.message : undefined;
+      if (message !== undefined) setMessages([{ role: 'user', content: message }]);
+      void execute((signal) => waitForJob<RefinementResponse>(saved.jobId, { signal }), message);
     }
     return () => {
       current.current?.abort();
@@ -99,6 +124,23 @@ export default function ChatPanel({
       .map(({ role, content }) => ({ role, content }));
     setMessages((ms) => [...ms, { role: 'user', content: message }]);
     setDraft('');
+    request(message, history);
+  }
+
+  /** Send a rate-limited message again; it is already in the conversation, so no new bubble. */
+  function retry(message: string) {
+    if (inFlight.current || !online) return;
+    // The history the first attempt had: everything before that message, errors excluded.
+    const upTo = messages.findLastIndex((m) => m.role === 'user' && m.content === message);
+    const history = messages
+      .slice(0, upTo < 0 ? messages.length : upTo)
+      .filter((m) => !m.error)
+      .slice(-HISTORY_TURNS)
+      .map(({ role, content }) => ({ role, content }));
+    request(message, history);
+  }
+
+  function request(message: string, history: { role: Message['role']; content: string }[]) {
     void execute((signal) =>
       startAndWait<RefinementResponse>(
         () =>
@@ -108,9 +150,12 @@ export default function ChatPanel({
             body: JSON.stringify({ message, history }),
           }),
         { signal, onJobId: (jobId) => rememberJob(jobKey, { jobId, message }) }
-      )
+      ),
+      message
     );
   }
+
+  const last = messages[messages.length - 1];
 
   return (
     <div className="flex flex-col gap-2">
@@ -128,6 +173,10 @@ export default function ChatPanel({
             </li>
           ))}
         </ol>
+      )}
+      {/* Only the latest reply offers a retry, and only until something else is sent. */}
+      {last?.retry && !busy && (
+        <RetryCountdown retryAfterMs={last.retry.afterMs} onRetry={() => retry(last.retry!.message)} disabled={!online} />
       )}
       <label className="flex flex-col gap-1 text-sm">
         <span>Ask for a change</span>
