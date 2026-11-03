@@ -113,6 +113,19 @@ describe('runJob', () => {
     expect(failed.error).toEqual({ status: 502, error: 'rate limited' });
   });
 
+  it('reports a failed job (a job_failed log line, and Sentry when on)', async () => {
+    const { job, project } = await setup('extract', {}, { photo: true });
+    await runJob(job.id, { provider: new StubProvider([new LLMRequestError('rate limited')]) });
+    const lines = vi
+      .mocked(console.error)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((l) => l.includes('"job_failed"'))
+      .map((l) => JSON.parse(l));
+    expect(lines).toEqual([
+      expect.objectContaining({ jobId: job.id, kind: 'extract', projectId: project.id, status: 502, errorName: 'LLMRequestError' }),
+    ]);
+  });
+
   it('fails with 502 and issues when extraction keeps failing', async () => {
     const { store, job } = await setup('extract', {}, { photo: true });
     const bad = new ExtractionError(['nope']);

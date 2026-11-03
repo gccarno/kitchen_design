@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { ModelCooldown } from './cooldown';
+import type { LLMCallSink } from './log';
 
 /**
  * A schema whose parsed OUTPUT is `T`. The input side is left open so
@@ -30,6 +31,10 @@ export interface ProviderConfig {
   maxRateLimitWaitMs?: number;
   /** Remembers models rate-limited upstream. Defaults to one shared by the whole process. */
   cooldown?: ModelCooldown;
+  /** Where each attempt is logged. Defaults to a JSON line on stdout. */
+  log?: LLMCallSink;
+  /** Also told about each attempt, e.g. to attach the trail to an error report. */
+  onCall?: LLMCallSink;
 }
 
 export interface TextRequest {

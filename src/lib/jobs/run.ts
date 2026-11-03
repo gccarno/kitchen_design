@@ -1,4 +1,6 @@
 import { providerFromEnv, type LLMProvider } from '../llm';
+import type { LLMCallEvent } from '../llm/log';
+import { reportJobFailure } from '../monitoring';
 import { getStorageFor } from '../storage';
 import { toJobError } from './errors';
 import { runExtract, runRefine, type HandlerArgs } from './handlers';
@@ -19,6 +21,8 @@ export async function runJob(jobId: string, deps: RunDeps = {}): Promise<void> {
     const store = await getJobStore(owner.userId);
     const job = await store.claim(jobId);
     if (!job) return;
+    /** This job's LLM attempts, for the failure report. */
+    const calls: LLMCallEvent[] = [];
     try {
       const storage = await getStorageFor(owner.userId);
       const project = await storage.projects.load(job.projectId);
@@ -26,12 +30,14 @@ export async function runJob(jobId: string, deps: RunDeps = {}): Promise<void> {
         await store.fail(jobId, { status: 404, error: 'project not found' });
         return;
       }
-      const provider = deps.provider ?? providerFromEnv();
+      const provider = deps.provider ?? providerFromEnv({ onCall: (e) => calls.push(e) });
       const args = { storage, project, input: job.input, provider };
       await store.complete(jobId, await runHandler(job.kind, args));
     } catch (err) {
+      const jobError = toJobError(err, job.kind);
+      reportJobFailure(err, { jobId, kind: job.kind, projectId: job.projectId, status: jobError.status, error: jobError.error, calls });
       try {
-        await store.fail(jobId, toJobError(err, job.kind));
+        await store.fail(jobId, jobError);
       } catch (failErr) {
         // The store itself is failing; the stale-job rule recovers the job on a later poll.
         console.error(`runJob could not record failure: ${errorName(failErr)}`);
