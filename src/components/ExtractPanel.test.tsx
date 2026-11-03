@@ -149,6 +149,53 @@ describe('ExtractPanel', () => {
     expect(sessionStorage.getItem(KEY)).toBeNull();
   });
 
+  it('after a rate limit, counts down to a Try again button that runs the same extraction', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'The free AI models are busy right now.', retryAfterMs: 60_000 } }));
+    const { button } = setup();
+    fillRow(0, 'sink wall', '3600');
+    fireEvent.click(button());
+    await tick(1500);
+    const retry = (await screen.findByRole('button', { name: /try again in 1:00/i })) as HTMLButtonElement;
+    expect(retry.disabled).toBe(true);
+    await tick(30_000);
+    expect(screen.getByRole('button', { name: /try again in 0:3\d/i })).not.toBeNull();
+    await tick(30_000);
+    const ready = screen.getByRole('button', { name: /^try again$/i }) as HTMLButtonElement;
+    expect(ready.disabled).toBe(false);
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202));
+    fireEvent.click(ready);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls[2][0]).toBe(`/api/projects/${ID}/extract`);
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ measurements: [{ description: 'sink wall', lengthMm: 3600 }] });
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+  });
+
+  it('shows the time to come back when the wait is long (daily quota)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'limit used up', retryAfterMs: 3 * 60 * 60 * 1000 } }));
+    const { button } = setup();
+    fireEvent.click(button());
+    await tick(1500);
+    expect(await screen.findByRole('button', { name: /try again after/i })).not.toBeNull();
+  });
+
+  it('offers no Try again for errors that are not rate limits', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'bad answer' } }));
+    const { button } = setup();
+    fireEvent.click(button());
+    await tick(1500);
+    expect(await screen.findByText('bad answer')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+  });
+
   it('explains a job the server lost (404 while polling)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(json({ error: 'job not found' }, 404));

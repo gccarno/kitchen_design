@@ -3,7 +3,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { proposalFromExtraction, type ExtractionResponse, type Proposal } from '@/lib/plan/proposal';
 import { useOnline } from '@/lib/client/online';
-import { forgetJob, isAbortError, keepsJob, recallJob, rememberJob, SLOW_HINT_MS, startAndWait, waitForJob } from '@/lib/client/jobs';
+import {
+  forgetJob,
+  isAbortError,
+  JobFailedError,
+  keepsJob,
+  recallJob,
+  rememberJob,
+  SLOW_HINT_MS,
+  startAndWait,
+  waitForJob,
+} from '@/lib/client/jobs';
+import RetryCountdown from './RetryCountdown';
 
 interface ExtractPanelProps {
   projectId: string;
@@ -27,7 +38,7 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
   const [rows, setRows] = useState<Row[]>([{ key: 0, description: '', length: '' }]);
   const [hint, setHint] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; retryAfterMs?: number } | null>(null);
   const [slow, setSlow] = useState(false);
   const inFlight = useRef(false);
   const current = useRef<AbortController | null>(null);
@@ -58,7 +69,7 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
       if (isAbortError(err)) return;
       // Connection lost (or gave up waiting): the job may still finish, so the next mount resumes it.
       if (!keepsJob(err)) forgetJob(jobKey);
-      setError((err as Error).message);
+      setError({ message: (err as Error).message, retryAfterMs: err instanceof JobFailedError ? err.retryAfterMs : undefined });
     } finally {
       if (current.current === ctrl) {
         current.current = null;
@@ -180,9 +191,12 @@ export default function ExtractPanel({ projectId, hasPhotos, onProposal }: Extra
         <p className="text-sm text-gray-600">Still working — the model is slow right now. You can leave this page and come back.</p>
       )}
       {error && (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
+        <p role="alert" className="text-sm break-words text-red-700">
+          {error.message}
         </p>
+      )}
+      {error?.retryAfterMs !== undefined && (
+        <RetryCountdown retryAfterMs={error.retryAfterMs} onRetry={run} disabled={!canRun} />
       )}
     </div>
   );

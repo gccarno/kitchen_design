@@ -50,6 +50,18 @@ LLM_VISION_MODEL=google/gemma-4-31b-it:free
 
 - `LLM_MODEL` and `LLM_VISION_MODEL` can be comma-separated lists on OpenRouter. The first is used and the rest are fallbacks.
 - Free models are often busy and can take minutes for a whole-kitchen layout. Raise `LLM_TIMEOUT_MS` (for example `300000`) if requests time out.
+
+#### Free models and rate limits
+
+Free (`:free`) models on OpenRouter hit two kinds of limit:
+
+- **A busy upstream provider** ("temporarily rate-limited upstream"). This usually clears within a minute or two. The app retries with growing waits (5 s, 15 s, 45 s, at most 60 s in total) and moves the busy model to the back of the list for 2 minutes, so the next request tries the others first. If all of them stay busy, the panel says so and shows a **Try again** countdown.
+- **Your account's own quota**: 20 requests a minute, and 50 a day on `:free` models (1000 a day once the account has bought at least 10 credits). The app waits for a per-minute reset, but not for the daily one. It tells you and shows when you can try again (the daily quota resets at midnight UTC).
+
+To get the fewest failures:
+
+- List **three or more free vision models from different providers** in `LLM_VISION_MODEL`, because the limits are per provider. A list where every model comes from one provider fails all at once.
+- Optional, and your choice: buying 10 OpenRouter credits once raises the daily free cap from 50 to 1000, even if you keep using only free models. Another option is to add your own key for a provider's free tier (for example Google AI Studio) in OpenRouter's "bring your own key" settings, which gives you that provider's limits instead of the shared ones.
 - For OpenAI, leave `LLM_BASE_URL` at its default and set a model such as `gpt-4o-mini`.
 - Paid models cost money per request. Check your provider's pricing first.
 
@@ -105,6 +117,8 @@ npx playwright install chromium
 **Photo extraction or chat says "not configured".** `LLM_API_KEY` is empty or not in `.env.local`. Restart `npm run dev` after editing it.
 
 **Chat or extraction times out.** The model is slow or rate-limited. Add fallback models to the comma-separated lists, or raise `LLM_TIMEOUT_MS`.
+
+**"The free AI models are busy right now" or "the free AI model limit … is used up".** See [Free models and rate limits](#free-models-and-rate-limits).
 
 **"Request was lost (the server restarted)".** In disk mode, background jobs live in memory, so restarting the server loses any in-flight request. Send it again.
 

@@ -154,6 +154,47 @@ describe('ChatPanel', () => {
     expect(sessionStorage.getItem(KEY)).toBeNull();
   });
 
+  it('after a rate limit, offers Try again once the wait is over, resending the same message and history', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    for (const r of viaJob(EDIT)) fetchMock.mockResolvedValueOnce(r);
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'The free AI models are busy right now.', retryAfterMs: 5000 } }));
+    const { say } = setup();
+    say('move the fridge to the north wall');
+    await tick(1500);
+    await screen.findByText(/Moved the fridge/);
+    say('a bit further left');
+    await tick(1500);
+    expect(await screen.findByText('Sorry — The free AI models are busy right now.')).not.toBeNull();
+    expect((screen.getByRole('button', { name: /try again in 0:0\d/i }) as HTMLButtonElement).disabled).toBe(true);
+    await tick(5000);
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202));
+    fireEvent.click(screen.getByRole('button', { name: /^try again$/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    expect(JSON.parse(fetchMock.mock.calls[4][1].body)).toEqual({
+      message: 'a bit further left',
+      history: [
+        { role: 'user', content: 'move the fridge to the north wall' },
+        { role: 'assistant', content: 'Moved the fridge.' },
+      ],
+    });
+    // No second bubble for the resent message, and the button goes while it runs.
+    expect(screen.getAllByText('a bit further left')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+  });
+
+  it('offers no Try again for errors that are not rate limits', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'bad answer' } }));
+    setup().say('add a dishwasher');
+    await tick(1500);
+    expect(await screen.findByText('Sorry — bad answer')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+  });
+
   it('explains a job the server lost (404 while polling)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(json({ error: 'job not found' }, 404));

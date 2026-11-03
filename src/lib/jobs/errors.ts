@@ -1,4 +1,4 @@
-import { ExtractionError, LLMNotConfiguredError, LLMRequestError, RefinementError } from '../llm';
+import { ExtractionError, LLMNotConfiguredError, LLMRateLimitError, LLMRequestError, RefinementError } from '../llm';
 import type { JobError, JobKind } from './types';
 
 const HAND_HINT: Record<JobKind, string> = {
@@ -14,13 +14,15 @@ export function toJobError(err: unknown, kind: JobKind = 'extract'): JobError {
   if (err instanceof ExtractionError || err instanceof RefinementError) {
     return { status: 502, error: err.message, issues: err.issues };
   }
-  if (err instanceof LLMRequestError) {
-    // Free models are often rate-limited upstream; the provider's raw JSON body means nothing to the user.
-    if (/^LLM request failed: 429\b/.test(err.message)) {
-      return { status: 502, error: `The model is busy right now (rate-limited). Try again in a minute. ${HAND_HINT[kind]}` };
-    }
-    return { status: 502, error: err.message };
+  // The provider's raw 429 body means nothing to the user; say what happened and when to try again.
+  if (err instanceof LLMRateLimitError) {
+    const error =
+      err.kind === 'quota'
+        ? `The free AI model limit for this account is used up for now. ${HAND_HINT[kind]}`
+        : `The free AI models are busy right now. ${HAND_HINT[kind]}`;
+    return { status: 502, error, ...(err.retryAfterMs !== undefined ? { retryAfterMs: err.retryAfterMs } : {}) };
   }
+  if (err instanceof LLMRequestError) return { status: 502, error: err.message };
   if (err instanceof LLMNotConfiguredError) return { status: 503, error: `${err.message} ${HAND_HINT[kind]}` };
   // Anything else is a bug; log its name and message (not the stack or payload) and answer generically.
   const name = err instanceof Error ? err.name : typeof err;

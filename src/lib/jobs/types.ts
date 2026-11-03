@@ -7,7 +7,13 @@ export const JOB_STATUSES = ['queued', 'running', 'done', 'failed'] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
 /** A failed job's error, mirroring the HTTP error body the synchronous route used to return. */
-export type JobError = { status: number; error: string; issues?: unknown };
+export type JobError = {
+  status: number;
+  error: string;
+  issues?: unknown;
+  /** Rate-limited: how long until trying again is worth it. */
+  retryAfterMs?: number;
+};
 
 export type Job = {
   id: string;
