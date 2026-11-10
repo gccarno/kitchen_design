@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CatalogSidebar from './CatalogSidebar';
 import ChatPanel from './ChatPanel';
+import dynamic from 'next/dynamic';
 import ClosetEditor from './ClosetEditor';
 import DiffPreview from './DiffPreview';
 import EstimatePanel from './EstimatePanel';
@@ -38,6 +39,12 @@ import type { Finishes, Pricing, Project } from '@/lib/plan/schemas';
 import { useOnline } from '@/lib/client/online';
 import { STALE_EVENT, submitRevision } from '@/lib/client/revisions';
 import { useEditorStore } from '@/store/editor';
+
+// three.js is only fetched when the 3D view is opened.
+const Kitchen3D = dynamic(() => import('./Kitchen3D'), {
+  ssr: false,
+  loading: () => <p className="text-sm text-gray-600">Loading the 3D view…</p>,
+});
 
 /**
  * The project page's client side. A kitchen: the plan stays in view while a
@@ -92,6 +99,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [suggestNote, setSuggestNote] = useState<string | null>(null);
   const [unitsError, setUnitsError] = useState<string | null>(null);
+  const [view, setView] = useState<'plan' | '3d'>('plan');
 
   // The step is remembered for this tab, so a refresh (or a save's reload) stays where you were.
   const stepKey = `kd-step:${initialProject.id}`;
@@ -136,6 +144,8 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   const elevations = useMemo(() => (project.closet ? [] : wallElevations(project, catalog)), [project, catalog]);
 
   function pickFromCatalog(item: CatalogItem) {
+    // Placing happens on the plan.
+    setView('plan');
     setPlacingItem((current) => (current?.id === item.id ? null : item));
     canvasRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
   }
@@ -361,18 +371,42 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
         <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2 lg:sticky lg:top-4">
-          <h2 className="text-lg font-semibold">Current room</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Current room</h2>
+            <div role="group" aria-label="View" className="flex overflow-hidden rounded border text-sm">
+              {(
+                [
+                  ['plan', 'Plan'],
+                  ['3d', '3D'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={view === value}
+                  className={`px-3 py-1 ${view === value ? 'bg-black text-white' : ''}`}
+                  onClick={() => setView(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           <HistoryControls project={project} onSaved={saved} />
-          <FloorPlanCanvas
-            room={project.room}
-            items={project.items}
-            units={project.units}
-            label="Current room"
-            onEdit={online ? editPlan : undefined}
-            placingItem={placingItem}
-            onPlacingDone={() => setPlacingItem(null)}
-            itemLabels={itemLabels}
-          />
+          {/* Not just hidden in 3D: a zero-size Konva stage throws when it draws. */}
+          {view === 'plan' && (
+            <FloorPlanCanvas
+              room={project.room}
+              items={project.items}
+              units={project.units}
+              label="Current room"
+              onEdit={online ? editPlan : undefined}
+              placingItem={placingItem}
+              onPlacingDone={() => setPlacingItem(null)}
+              itemLabels={itemLabels}
+            />
+          )}
+          {view === '3d' && <Kitchen3D project={project} />}
           <p className="text-sm text-gray-600">{roomSize}</p>
           {warnings.length > 0 && (
             <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">

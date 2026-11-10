@@ -78,6 +78,7 @@ A kitchen project page has the plan on the left (on a phone, on top) and four st
 5. Fridge on the north wall plus an island about 600 mm in front of it: a **Heads up** clearance warning appears under the canvas.
 6. Put an item in a door's swing: expect a door-swing warning.
 7. **Cancel** while placing: nothing is added.
+8. **3D view:** with the sample kitchen, press **3D** above the plan. The kitchen appears as blocks: a tall fridge, base cabinets with a dark countertop, wall cabinets and a hood above them, the window glass, an island with stools. Drag to turn, scroll or pinch to zoom, right-drag to move; **Reset view** puts the camera back. The wall nearest the camera disappears as you go round, so it never blocks the view. Change the cabinet colour or countertop (Finishes & cost step) and come back: the colours follow. Picking a catalog item returns to **Plan**. A browser without WebGL shows a short message instead.
 
 ## 8. Export
 

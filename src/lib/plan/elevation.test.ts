@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { loadCatalog } from '../catalog/loader';
 import { rotateAround, type Point } from './geometry';
 import { ProjectSchema, type Opening, type PlacedItem, type Project } from './schemas';
-import { wallElevations, type WallElevation } from './elevation';
+import { verticalPlacement, wallElevations, type WallElevation } from './elevation';
 import { doorCount } from './elevation-drawing';
 
 const catalog = loadCatalog();
@@ -182,5 +182,14 @@ describe('wallElevations — countertop and openings', () => {
     expect(wall(es, /west/).openings).toEqual([{ openingId: 'o0', kind: 'door', x: 1700, w: 800, y: 0, h: 2100 }]);
     // CCW wall 3 runs from (4000,0) to (0,0): facing north its left end is (0,0), so x = 4000 − 1000 − 900.
     expect(wall(es, /north/).openings).toEqual([{ openingId: 'o1', kind: 'window', x: 2100, w: 900, y: 1050, h: 1200 }]);
+  });
+});
+
+describe('verticalPlacement', () => {
+  it('gives the standard heights elevations use, and a floor-standing box for what they skip', () => {
+    expect(verticalPlacement(at('wall-600x320x720', 300, 100))).toMatchObject({ kind: 'wall', y: 1450, h: 720 });
+    expect(verticalPlacement(at('range-hood-760', 300, 100))).toMatchObject({ kind: 'wall', y: 1600 });
+    expect(verticalPlacement(at('island-1200x900', 2000, 1500))).toEqual({ kind: 'free', y: 0, h: 900, plinthMm: 0 });
+    expect(verticalPlacement(at('stool-counter-650', 2000, 1500))).toMatchObject({ kind: 'free', h: 650 });
   });
 });

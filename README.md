@@ -4,6 +4,8 @@ Design a kitchen with the help of an LLM. Upload room photos and a measured wall
 
 The kitchen page keeps the plan in view and works in four steps beside it — **Room** (photos, room from photos, sketch), **Layout** (suggest layouts, catalog, chat, checks), **Finishes & cost** (finishes, elevations, estimate) and **Share** (downloads, duplicate as option, compare). Lengths can be typed as `3600`, `3.6 m`, `12' 6"` or `150 in`, and a kitchen can be shown in millimetres or feet and inches (a **Units** box in its header; undoable).
 
+A **3D view** (the Plan | 3D switch above the plan) shows the kitchen as an orbitable model: walls with their door and window openings, and cabinets, appliances and furniture as blocks at their standard heights, in the chosen cabinet colour and countertop material. It is read-only, loads only when opened, and needs WebGL.
+
 A **layout check** scores the kitchen against the NKBA planning guidelines — work triangle, counter beside the sink, range and fridge, dishwasher next to the sink, aisle width — and the chat can fix what fails ("fix the layout check"). A separate **accessibility check** looks at what a wheelchair user needs — a 1220 mm aisle, room to turn a 1525 mm circle, a door of at least 815 mm, and (in a closet) a rod and storage within seated reach. It is kept apart from the NKBA count, and only checks what the plan records (not knee space, handles or lighting).
 
 An **estimate** prices the parts list — cabinets, appliances, countertop, closet parts and brackets, plus installation and tax — from rough default prices you can change per project, and exports it as CSV.

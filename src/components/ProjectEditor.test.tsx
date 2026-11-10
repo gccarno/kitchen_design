@@ -17,6 +17,10 @@ vi.mock('./FloorPlanCanvas', () => ({
     return <div role="img" aria-label={props.label} />;
   },
 }));
+// The WebGL view is covered by the scene tests and the Playwright spec.
+vi.mock('./Kitchen3D', () => ({
+  default: ({ project }: { project: { name: string } }) => <div data-testid="kitchen-3d-stub">{project.name}</div>,
+}));
 const push = vi.fn();
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh }) }));
@@ -622,5 +626,47 @@ describe('ProjectEditor steps and units', () => {
     fireEvent.click(screen.getByRole('button', { name: /save room/i }));
     const review = screen.getByRole('region', { name: /review proposed change/i });
     expect(within(review).getByText(/3810 × 3048 mm/)).not.toBeNull();
+  });
+});
+
+describe('ProjectEditor 3D view', () => {
+  const pressed = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed');
+  beforeEach(() => {
+    useEditorStore.setState({ project: null, proposal: null });
+    sessionStorage.clear();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('shows the plan first, and the 3D model instead of it once asked for', async () => {
+    render(<ProjectEditor initialProject={project} />);
+    expect(pressed('Plan')).toBe('true');
+    expect(screen.queryByTestId('kitchen-3d-stub')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '3D' }));
+    expect((await screen.findByTestId('kitchen-3d-stub')).textContent).toBe('Our kitchen');
+    expect(pressed('3D')).toBe('true');
+    // A hidden Konva stage would have no size and throw, so the plan is not rendered at all.
+    expect(screen.queryByRole('img', { name: /current room/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+    expect(screen.queryByTestId('kitchen-3d-stub')).toBeNull();
+    expect(screen.getByRole('img', { name: /current room/i })).not.toBeNull();
+    expect(pressed('Plan')).toBe('true');
+  });
+
+  it('goes back to the plan when you pick something to place', async () => {
+    render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
+    fireEvent.click(screen.getByRole('button', { name: '3D' }));
+    await screen.findByTestId('kitchen-3d-stub');
+    fireEvent.click(screen.getByRole('button', { name: /Dishwasher \(600 mm\)/ }));
+    expect(screen.queryByTestId('kitchen-3d-stub')).toBeNull();
+    expect(pressed('Plan')).toBe('true');
+    expect(canvasProps.placingItem?.id).toBe('dishwasher-600');
+  });
+
+  it('has no 3D switch for a closet', () => {
+    const closet = { widthMm: 1830, heightMm: 2440, depthMm: 610, opening: { style: 'bifold' as const, leftMm: 0, widthMm: 1830 }, components: [] };
+    render(<ProjectEditor initialProject={{ ...project, kind: 'closet', closet }} />);
+    expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
   });
 });
