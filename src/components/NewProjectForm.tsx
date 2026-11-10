@@ -6,6 +6,17 @@ import { useOnline } from '@/lib/client/online';
 import type { ProjectKind } from '@/lib/plan/schemas';
 import { templatesForKind } from '@/lib/templates/info';
 
+const UNITS_KEY = 'kd-units';
+
+/** The units chosen last time (a per-browser convenience; mm when there is none). */
+function rememberedUnits(): 'mm' | 'in' {
+  try {
+    return localStorage.getItem(UNITS_KEY) === 'in' ? 'in' : 'mm';
+  } catch {
+    return 'mm';
+  }
+}
+
 /** Create a project and go straight to its page. */
 export default function NewProjectForm() {
   const router = useRouter();
@@ -13,6 +24,7 @@ export default function NewProjectForm() {
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ProjectKind>('kitchen');
   const [templateId, setTemplateId] = useState('');
+  const [units, setUnits] = useState<'mm' | 'in'>('mm');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,6 +32,7 @@ export default function NewProjectForm() {
   useEffect(() => {
     router.refresh();
   }, [router]);
+  useEffect(() => setUnits(rememberedUnits()), []);
 
   const templates = templatesForKind(kind);
   const template = templates.find((t) => t.id === templateId);
@@ -32,8 +45,10 @@ export default function NewProjectForm() {
     await submit({ name: projectName, kind, ...(template ? { templateId: template.id } : {}) });
   }
 
-  async function submit(request: { name: string; kind: ProjectKind; sample?: boolean; templateId?: string }) {
+  async function submit(base: { name: string; kind: ProjectKind; sample?: boolean; templateId?: string }) {
     if (busy || !online) return;
+    // Only kitchens show lengths in their project's units, and mm is the default.
+    const request = base.kind === 'kitchen' && units === 'in' ? { ...base, units } : base;
     setBusy(true);
     setError(null);
     try {
@@ -100,6 +115,27 @@ export default function NewProjectForm() {
           ))}
         </select>
       </label>
+      {kind === 'kitchen' && (
+        <label className="flex flex-col gap-1 text-sm">
+          <span>Units</span>
+          <select
+            className="rounded border px-2 py-1"
+            value={units}
+            onChange={(e) => {
+              const next = e.target.value === 'in' ? 'in' : 'mm';
+              setUnits(next);
+              try {
+                localStorage.setItem(UNITS_KEY, next);
+              } catch {
+                /* private window: the choice just isn't remembered */
+              }
+            }}
+          >
+            <option value="mm">Millimetres</option>
+            <option value="in">Feet and inches</option>
+          </select>
+        </label>
+      )}
       <button type="submit" className="rounded bg-black px-4 py-2 text-white disabled:opacity-40" disabled={!online || busy || !projectName} title={online ? undefined : 'Offline'}>
         {busy ? 'Creating…' : 'Create project'}
       </button>

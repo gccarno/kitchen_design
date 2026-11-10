@@ -91,6 +91,14 @@ function heightOf(it: PlacedItem): Height | null {
   return { kind: 'appliance', y: 0, h: H, plinthMm: 0 };
 }
 
+/** Where an item sits vertically; `free` is what elevations skip (islands, tables, chairs, stools). */
+export type Placement = Omit<Height, 'kind'> & { kind: PieceKind | 'free' };
+
+/** Standard vertical placement for any item: `heightOf`, or a floor-standing box of its own height. */
+export function verticalPlacement(it: PlacedItem): Placement {
+  return heightOf(it) ?? { kind: 'free', y: 0, h: it.sizeMm.h, plinthMm: 0 };
+}
+
 export function wallElevations(project: Project, catalog: Catalog): WallElevation[] {
   if (projectKind(project) === 'closet') return [];
   const { room } = project;

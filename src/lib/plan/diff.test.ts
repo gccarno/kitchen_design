@@ -212,7 +212,6 @@ describe('patch-path allowlist', () => {
     ['/revision', 99],
     ['/history', []],
     ['/photos', []],
-    ['/units', 'in'],
     ['/updatedAt', 'x'],
     ['/names', 'x'],
   ])('rejects ops targeting %s', (path, value) => {
@@ -221,6 +220,11 @@ describe('patch-path allowlist', () => {
 
   it('rejects changing what kind of project it is', () => {
     expect(() => applyJsonPatch(newProject(), [{ op: 'add', path: '/kind', value: 'closet' }])).toThrow(/non-editable path/);
+  });
+
+  it('allows /units, which only changes how lengths are shown and typed', () => {
+    expect(applyJsonPatch(newProject(), [{ op: 'replace', path: '/units', value: 'in' }]).units).toBe('in');
+    expect(() => applyJsonPatch(newProject(), [{ op: 'replace', path: '/units', value: 'furlongs' }])).toThrow();
   });
 
   it('allows /closet/**', () => {

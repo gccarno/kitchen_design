@@ -39,6 +39,14 @@ describe('POST /api/projects', () => {
     expect(validatePlan(project).valid).toBe(true);
   });
 
+  it('starts a project in inches when asked, and rejects other units', async () => {
+    const { project } = (await (await post({ name: 'K', units: 'in' })).json()) as { project: Project };
+    expect(project.units).toBe('in');
+    const furnished = (await (await post({ name: 'K', units: 'in', sample: true })).json()) as { project: Project };
+    expect(furnished.project.units).toBe('in');
+    expect((await post({ name: 'K', units: 'furlongs' })).status).toBe(400);
+  });
+
   it('trims the name', async () => {
     const { project } = (await (await post({ name: '  Kitchen  ' })).json()) as { project: Project };
     expect(project.name).toBe('Kitchen');

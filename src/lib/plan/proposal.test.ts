@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { proposalFromExtraction, proposalForPlan, proposalForPricing, proposalForRoom } from './proposal';
+import { proposalFromExtraction, proposalForPlan, proposalForPricing, proposalForRoom, proposalForUnits } from './proposal';
 import { commitRevision } from './diff';
 import { ProjectSchema, type Room } from './schemas';
 
@@ -47,6 +47,21 @@ describe('proposalForPricing', () => {
       { op: 'add', path: '/pricing/taxPct', value: 8 },
     ]);
     expect(proposalForPricing(withPricing, undefined, 's').patch).toEqual([{ op: 'remove', path: '/pricing' }]);
+  });
+});
+
+describe('proposalForUnits', () => {
+  it('switches the project units as one undoable revision', () => {
+    const p = proposalForUnits(project, 'in', 'Show lengths in feet and inches');
+    expect(p).toMatchObject({ baseRevision: 4, source: 'user' });
+    expect(p.patch).toEqual([{ op: 'replace', path: '/units', value: 'in' }]);
+    const next = commitRevision(project, p.patch, { baseRevision: 4, source: 'user', summary: p.summary });
+    expect(next.units).toBe('in');
+    expect(next.history.at(-1)?.inverse).toEqual([{ op: 'replace', path: '/units', value: 'mm' }]);
+  });
+
+  it('proposes nothing when the units are already that', () => {
+    expect(proposalForUnits(project, 'mm', 's').patch).toEqual([]);
   });
 });
 

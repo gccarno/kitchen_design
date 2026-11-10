@@ -6,7 +6,7 @@
  */
 
 import type { Point } from './geometry';
-import type { Room } from './schemas';
+import type { PlacedItem, Room } from './schemas';
 import { wallLengthMm } from './validate';
 
 /** Above this relative disagreement between measurements, the UI should warn. */
@@ -56,4 +56,56 @@ export function rescaleRoomToMeasurements(room: Room): RescaleResult {
   }));
 
   return { room: { ...room, polygon, openings }, scale, residual };
+}
+
+/** What the user measured: a wall's length, or the width of a door or window. */
+export type ScaleTarget = { kind: 'wall'; id: string } | { kind: 'opening'; id: string };
+
+export interface KnownLengthResult {
+  room: Room;
+  items: PlacedItem[];
+  /** The uniform factor applied. */
+  factor: number;
+}
+
+/**
+ * Scale a whole design so `target` is `lengthMm` long: the outline, openings'
+ * positions and widths, and where items stand (their own sizes are catalog sizes
+ * and stay). Scales about the first vertex, like `rescaleRoomToMeasurements`.
+ * The estimated-size flag goes, and earlier measurements (which the new scale
+ * would contradict) are replaced by this one when it is a wall. Throws on a
+ * length that is not positive, or a target that is not in the room.
+ */
+export function rescaleToKnownLength(
+  project: { room: Room; items: PlacedItem[] },
+  target: ScaleTarget,
+  lengthMm: number
+): KnownLengthResult {
+  if (!Number.isFinite(lengthMm) || lengthMm <= 0) throw new Error('the real length must be a positive number');
+  const { room } = project;
+
+  let current: number;
+  if (target.kind === 'wall') {
+    const i = room.walls.findIndex((w) => w.id === target.id);
+    if (i < 0 || i >= room.polygon.length) throw new Error(`unknown wall "${target.id}"`);
+    current = wallLengthMm(room, i);
+  } else {
+    const opening = room.openings.find((o) => o.id === target.id);
+    if (!opening) throw new Error(`unknown opening "${target.id}"`);
+    current = opening.widthMm;
+  }
+  if (current <= 0) throw new Error('that has no length to scale from');
+  const factor = lengthMm / current;
+
+  const [ox, oy] = room.polygon[0];
+  const about = (v: number, o: number) => o + (v - o) * factor;
+  const { measurements: _old, sizeEstimated: _estimated, ...rest } = room;
+  const next: Room = {
+    ...rest,
+    polygon: room.polygon.map(([x, y]): Point => [about(x, ox), about(y, oy)]),
+    openings: room.openings.map((o) => ({ ...o, positionMm: o.positionMm * factor, widthMm: o.widthMm * factor })),
+    ...(target.kind === 'wall' ? { measurements: [{ wallId: target.id, lengthMm, source: 'user' as const }] } : {}),
+  };
+  const items = project.items.map((it) => ({ ...it, position: { x: about(it.position.x, ox), y: about(it.position.y, oy) } }));
+  return { room: next, items, factor };
 }

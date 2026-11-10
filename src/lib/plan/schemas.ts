@@ -65,6 +65,12 @@ const RoomSchema = z.object({
   walls: z.array(WallSchema),
   openings: z.array(OpeningSchema),
   measurements: z.array(MeasurementSchema).optional(),
+  /**
+   * Set when the room's sizes are only the model's guess from photos (no wall was
+   * measured). Cleared by anything that fixes the scale: a measurement, a sketch,
+   * or confirming a real size (`rescaleToKnownLength`).
+   */
+  sizeEstimated: z.literal(true).optional(),
 });
 
 // A photo with optional reference object for scale and optional wall hint.

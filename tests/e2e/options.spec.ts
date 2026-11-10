@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openStep } from './helpers';
 
 test('download the spec sheet, duplicate the sample kitchen as an option, edit it, and compare', async ({ page }) => {
   await page.goto('/');
@@ -6,6 +7,7 @@ test('download the spec sheet, duplicate the sample kitchen as an option, edit i
   await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
   const originalUrl = page.url();
 
+  await openStep(page, 'Share');
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: 'Spec sheet (PDF)' }).click()]);
   expect(download.suggestedFilename()).toBe('sample-kitchen-spec-sheet.pdf');
 
@@ -14,12 +16,14 @@ test('download the spec sheet, duplicate the sample kitchen as an option, edit i
   await expect(page.getByRole('heading', { level: 1, name: 'Sample kitchen — Option B' })).toBeVisible();
   await expect(page.getByText('Revision 0')).toBeVisible();
 
+  await openStep(page, 'Finishes & cost');
   // Make the option cost more: raise the first unit price.
   const price = page.getByRole('table', { name: 'Estimate' }).getByRole('textbox', { name: /^Unit price: / }).first();
   await price.fill(String(Number(await price.inputValue()) + 100));
   await price.press('Enter');
   await expect(page.getByText('Revision 1')).toBeVisible();
 
+  await openStep(page, 'Share');
   await page.getByRole('link', { name: 'Compare options' }).click();
   await page.waitForURL(/\/compare\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Compare options — Sample kitchen' })).toBeVisible();

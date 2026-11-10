@@ -89,6 +89,31 @@ describe('ExtractPanel', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ measurements: [] });
   });
 
+  it('keeps the measured-wall fields in a section that starts closed, and extracts without them', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(job('running'));
+    const { button } = setup();
+    const section = screen.getByText(/i measured a wall/i).closest('details')!;
+    expect(section.open).toBe(false);
+    expect(section.contains(screen.getAllByLabelText(/which wall/i)[0])).toBe(true);
+    expect(button().disabled).toBe(false);
+    fireEvent.click(button());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ measurements: [] });
+  });
+
+  it('takes a measured length in feet and inches in an inch project', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(job('running'));
+    render(<ExtractPanel projectId={ID} hasPhotos units="in" onProposal={vi.fn()} />);
+    fireEvent.change(screen.getAllByLabelText(/which wall/i)[0], { target: { value: 'sink wall' } });
+    fireEvent.change(screen.getAllByLabelText(/length \(ft\/in\)/i)[0], { target: { value: `12' 6"` } });
+    fireEvent.click(screen.getByRole('button', { name: /get room from photos/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.measurements[0].lengthMm).toBeCloseTo(3810);
+  });
+
   it('blocks a half-filled measurement row', () => {
     const { button } = setup();
     fillRow(0, 'sink wall', '');
