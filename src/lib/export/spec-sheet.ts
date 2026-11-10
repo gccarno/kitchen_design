@@ -81,6 +81,10 @@ function cover(sheet: Sheet, project: Project, subtitle: string, rows: [string, 
   sheet.line(subtitle, { color: GREY });
   sheet.gap(6);
   sheet.keyValues(rows);
+  if (project.room.sizeEstimated) {
+    sheet.gap(4);
+    sheet.line('Sizes are estimated from photos, not measured. Confirm them on site before ordering anything.', { bold: true });
+  }
   sheet.gap(10);
 }
 

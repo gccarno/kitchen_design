@@ -84,7 +84,7 @@ export async function extractRoom(input: ExtractRoomInput): Promise<ExtractRoomR
 
   const warnings: string[] = [];
   if (measurements.length === 0) {
-    warnings.push('No measured walls: all sizes are the model’s estimate. Measure at least one wall for accurate dimensions.');
+    warnings.push('No measured walls: all sizes are the model’s estimate. After applying, confirm one real size in the Room step.');
   } else if (residual > SCALE_DISAGREEMENT_WARN) {
     warnings.push(
       `Your measurements disagree with the outline’s proportions by ${Math.round(residual * 100)}%. Check the measurements or adjust the shape.`
@@ -147,6 +147,8 @@ function toRoom(ex: ExtractedRoom, measurements: MeasurementInput[]): Room {
       heightMm: o.heightMm,
     })),
   };
+  // Nothing was measured, so the scale is only the model's guess; confirming a real size clears this.
+  if (measurements.length === 0) room.sizeEstimated = true;
   if (measurements.length > 0) {
     room.measurements = measurements.map((m, j) => ({
       wallId: walls[ex.measuredWalls[j]].id,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { rescaleRoomToMeasurements, SCALE_DISAGREEMENT_WARN } from './scale';
+import { rescaleRoomToMeasurements, rescaleToKnownLength, SCALE_DISAGREEMENT_WARN } from './scale';
 import { wallLengthMm } from './validate';
-import type { Room } from './schemas';
+import type { PlacedItem, Room } from './schemas';
 
 function rectRoom(w: number, d: number, extra: Partial<Room> = {}): Room {
   return {
@@ -97,5 +97,66 @@ describe('rescaleRoomToMeasurements', () => {
     const copy = structuredClone(room);
     rescaleRoomToMeasurements(room);
     expect(room).toEqual(copy);
+  });
+});
+
+describe('rescaleToKnownLength', () => {
+  const door = { id: 'o1', wallId: 'w0', kind: 'door' as const, positionMm: 500, widthMm: 900, heightMm: 2100 };
+  const fridge: PlacedItem = { id: 'i1', catalogId: 'fridge-600', sizeMm: { w: 600, d: 650, h: 1850 }, position: { x: 300, y: 400 }, rotationDeg: 0 };
+  const estimated = () => rectRoom(3000, 4000, { openings: [door], sizeEstimated: true });
+
+  it('scales the room so a wall has its real length, and clears the estimated flag', () => {
+    const r = rescaleToKnownLength({ room: estimated(), items: [] }, { kind: 'wall', id: 'w0' }, 3600);
+    expect(r.factor).toBeCloseTo(1.2);
+    expect(wallLengthMm(r.room, 0)).toBeCloseTo(3600);
+    expect(wallLengthMm(r.room, 1)).toBeCloseTo(4800);
+    expect(r.room.sizeEstimated).toBeUndefined();
+    expect(r.room.measurements).toEqual([{ wallId: 'w0', lengthMm: 3600, source: 'user' }]);
+  });
+
+  it('scales to a door or window width, and records no wall measurement', () => {
+    const r = rescaleToKnownLength({ room: estimated(), items: [] }, { kind: 'opening', id: 'o1' }, 810);
+    expect(r.factor).toBeCloseTo(0.9);
+    expect(r.room.openings[0].widthMm).toBeCloseTo(810);
+    expect(r.room.openings[0].positionMm).toBeCloseTo(450);
+    expect(r.room.openings[0].heightMm).toBe(2100); // heights are not on the floor plan's scale
+    expect(wallLengthMm(r.room, 0)).toBeCloseTo(2700);
+    expect(r.room.measurements).toBeUndefined();
+    expect(r.room.sizeEstimated).toBeUndefined();
+  });
+
+  it('moves items with the room about the same corner, but keeps their sizes', () => {
+    const r = rescaleToKnownLength({ room: estimated(), items: [fridge] }, { kind: 'wall', id: 'w0' }, 3600);
+    expect(r.items[0].position.x).toBeCloseTo(360);
+    expect(r.items[0].position.y).toBeCloseTo(480);
+    expect(r.items[0].sizeMm).toEqual(fridge.sizeMm);
+  });
+
+  it('keeps the first vertex fixed and walls thickness unchanged', () => {
+    const r = rescaleToKnownLength({ room: { ...estimated(), polygon: [[100, 200], [3100, 200], [3100, 4200], [100, 4200]] }, items: [] }, { kind: 'wall', id: 'w0' }, 6000);
+    expect(r.room.polygon[0]).toEqual([100, 200]);
+    expect(r.room.walls.every((w) => w.thicknessMm === 100)).toBe(true);
+  });
+
+  it('drops earlier measurements, which the new scale would contradict', () => {
+    const room = rectRoom(3000, 4000, { measurements: [{ wallId: 'w1', lengthMm: 4000, source: 'user' }] });
+    const r = rescaleToKnownLength({ room, items: [] }, { kind: 'wall', id: 'w0' }, 3300);
+    expect(r.room.measurements).toEqual([{ wallId: 'w0', lengthMm: 3300, source: 'user' }]);
+  });
+
+  it('does not mutate its input', () => {
+    const room = estimated();
+    const before = JSON.stringify(room);
+    rescaleToKnownLength({ room, items: [fridge] }, { kind: 'wall', id: 'w0' }, 3600);
+    expect(JSON.stringify(room)).toBe(before);
+  });
+
+  it.each([0, -5, NaN, Infinity])('rejects a length of %s', (len) => {
+    expect(() => rescaleToKnownLength({ room: estimated(), items: [] }, { kind: 'wall', id: 'w0' }, len)).toThrow(/positive/);
+  });
+
+  it('rejects a wall or opening that is not in the room', () => {
+    expect(() => rescaleToKnownLength({ room: estimated(), items: [] }, { kind: 'wall', id: 'zzz' }, 3000)).toThrow(/unknown wall/);
+    expect(() => rescaleToKnownLength({ room: estimated(), items: [] }, { kind: 'opening', id: 'zzz' }, 900)).toThrow(/unknown opening/);
   });
 });

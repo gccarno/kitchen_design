@@ -1,8 +1,8 @@
 # Kitchen Design App
 
-Design a kitchen with the help of an LLM. Upload room photos and a measured wall length or two for scale (or sketch the room by hand), get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON, SVG/PNG (plan and wall elevations), a CSV parts list, and a PDF spec sheet.
+Design a kitchen with the help of an LLM. Upload room photos (a measured wall or two makes the scale exact; with none, the room is marked as estimated until you confirm one real size), or sketch the room by hand, and get a draft 2D floor plan, refine it through a chat-driven LLM, and place cabinets, appliances, and furniture from a catalog. Exports to JSON, SVG/PNG (plan and wall elevations), a CSV parts list, and a PDF spec sheet.
 
-The kitchen page keeps the plan in view and works in four steps beside it — **Room** (photos, room from photos, sketch), **Layout** (suggest layouts, catalog, chat, checks), **Finishes & cost** (finishes, elevations, estimate) and **Share** (downloads, duplicate as option, compare). Lengths can be typed as `3600`, `3.6 m`, `12' 6"` or `150 in`, and a kitchen can be shown in millimetres or feet and inches (a **Units** box in its header; undoable).
+The kitchen page keeps the plan in view and works in four steps beside it — **Room** (photos, room from photos, confirm a real size, sketch), **Layout** (suggest layouts, catalog, chat, checks), **Finishes & cost** (finishes, elevations, estimate) and **Share** (downloads, duplicate as option, compare). Lengths can be typed as `3600`, `3.6 m`, `12' 6"` or `150 in`, and a kitchen can be shown in millimetres or feet and inches (a **Units** box in its header; undoable).
 
 A **3D view** (the Plan | 3D switch above the plan) shows the kitchen as an orbitable model: walls with their door and window openings, and cabinets, appliances and furniture as blocks at their standard heights, in the chosen cabinet colour and countertop material. It is read-only, loads only when opened, and needs WebGL.
 

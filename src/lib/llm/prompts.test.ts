@@ -162,6 +162,20 @@ describe('buildExtractRoomPrompt', () => {
     expect(p.user).toMatch(/measuredWalls must be \[\]/);
   });
 
+  it('with no measurements, tells the model to scale from standard-size things and to name them in the notes', () => {
+    const p = buildExtractRoomPrompt({ photos: [photo(0)], measurements: [] });
+    expect(p.user).toMatch(/counter.*900 mm/i);
+    expect(p.user).toMatch(/door.*2030 mm/i);
+    expect(p.user).toMatch(/dishwasher/i);
+    expect(p.user).toMatch(/say in "?notes"? which/i);
+    expect(p.system).toMatch(/prompt v1\.3\.0/);
+  });
+
+  it('does not push standard sizes when the user measured something', () => {
+    const p = buildExtractRoomPrompt({ photos: [photo(0)], measurements: [{ description: 'sink wall', lengthMm: 3600 }] });
+    expect(p.user).not.toMatch(/2030 mm/);
+  });
+
   it('describes each photo, its wall hint, and its reference box', () => {
     const p = buildExtractRoomPrompt({
       photos: [

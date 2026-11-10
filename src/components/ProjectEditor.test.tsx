@@ -670,3 +670,39 @@ describe('ProjectEditor 3D view', () => {
     expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
   });
 });
+
+describe('ProjectEditor estimated sizes', () => {
+  const estimated: Project = { ...project, revision: 1, room: { ...project.room, sizeEstimated: true } };
+  beforeEach(() => {
+    useEditorStore.setState({ project: null, proposal: null });
+    sessionStorage.clear();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('says so under the plan while the sizes are only estimated, and not otherwise', () => {
+    const { unmount } = render(<ProjectEditor initialProject={project} />);
+    expect(screen.queryByText(/sizes are estimated from photos/i)).toBeNull();
+    unmount();
+    render(<ProjectEditor initialProject={estimated} />);
+    expect(screen.getByText(/sizes are estimated from photos/i)).not.toBeNull();
+  });
+
+  it('the notice takes you to the Room step to confirm a size', () => {
+    render(<ProjectEditor initialProject={estimated} />);
+    openStep('Share');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm a size' }));
+    expect(screen.getByRole('tab', { name: 'Room' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('heading', { name: 'Confirm the size' })).not.toBeNull();
+  });
+
+  it('confirming a real size goes through the review step as a rescale', () => {
+    render(<ProjectEditor initialProject={estimated} />);
+    openStep('Room');
+    fireEvent.change(screen.getByLabelText(/real size/i), { target: { value: '3600' } });
+    fireEvent.click(screen.getByRole('button', { name: /rescale the room/i }));
+    const review = screen.getByRole('region', { name: /review proposed change/i });
+    expect(within(review).getByText('Confirm the room size: Wall 1 is 3600 mm')).not.toBeNull();
+    expect(within(review).getByText(/3000 × 4000 mm.*→ 3600 × 4800 mm/)).not.toBeNull();
+  });
+});

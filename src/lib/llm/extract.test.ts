@@ -182,6 +182,15 @@ describe('extractRoom', () => {
     expect(r.warnings.join(' ')).toMatch(/no measured walls/i);
   });
 
+  it('marks a room made without measurements as estimated, and one made with them as not', async () => {
+    const guess = await run(new StubProvider([answer({ measuredWalls: [] })]), []);
+    expect(guess.room.sizeEstimated).toBe(true);
+    expect(guess.patch).toContainEqual({ op: 'add', path: '/room/sizeEstimated', value: true });
+    expect(guess.warnings.join(' ')).toMatch(/confirm/i);
+    const measured = await run(new StubProvider([answer()]));
+    expect(measured.room.sizeEstimated).toBeUndefined();
+  });
+
   it('warns when two measurements disagree', async () => {
     const r = await run(new StubProvider([answer({ measuredWalls: [0, 1] })]), [
       { description: 'sink wall', lengthMm: 4400 },

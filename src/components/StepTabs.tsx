@@ -42,7 +42,7 @@ export default function StepTabs<Id extends string>({ steps, active, onChange, i
   }
 
   return (
-    <div role="tablist" aria-label="Design steps" className="flex gap-0 overflow-x-auto border-b sm:gap-1">
+    <div role="tablist" aria-label="Design steps" className="flex gap-0 overflow-x-auto overflow-y-hidden border-b sm:gap-1">
       {steps.map((step, i) => {
         const selected = step.id === active;
         return (

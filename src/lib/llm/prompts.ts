@@ -6,7 +6,7 @@
 
 import type { ReferenceObject } from '../plan/schemas';
 
-export const PROMPT_VERSION = '1.2.0';
+export const PROMPT_VERSION = '1.3.0';
 
 export interface ExtractPromptPhoto {
   /** 0-based position in the attached images. */
@@ -83,7 +83,10 @@ export function buildExtractRoomPrompt(input: ExtractPromptInput): { system: str
 
   lines.push('');
   if (input.measurements.length === 0) {
-    lines.push('There are no measured walls: estimate sizes from the photos and typical kitchens, and lower your confidence. measuredWalls must be [].');
+    lines.push(
+      'There are no measured walls: estimate sizes from the photos, and lower your confidence. measuredWalls must be [].',
+      'Scale from things of standard size that you can see: a kitchen counter is about 900 mm high, a base cabinet about 600 mm deep, a dishwasher about 600 mm wide, a range 600 to 760 mm wide, an interior door about 2030 mm high and 810 to 910 mm wide, a refrigerator about 1800 mm tall. Say in "notes" which ones you used.'
+    );
   } else {
     lines.push('Measured walls:');
     input.measurements.forEach((m, i) => lines.push(`- Measurement ${i + 1}: "${m.description}" = ${m.lengthMm} mm`));

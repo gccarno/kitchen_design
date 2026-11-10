@@ -43,6 +43,14 @@ describe('buildSpecSheet', () => {
     }
   });
 
+  it('warns on the cover while the room size is only estimated from photos, and not otherwise', async () => {
+    const base = sample();
+    const estimated = { ...base, room: { ...base.room, sizeEstimated: true as const } };
+    const warning = 'Sizes are estimated from photos';
+    expect((await read(await buildSpecSheet(estimated, catalog, { date: '2026-02-03' }))).text).toContain(warning);
+    expect((await read(await buildSpecSheet(base, catalog, { date: '2026-02-03' }))).text).not.toContain(warning);
+  });
+
   it('writes the work-triangle arrows as plain text', async () => {
     const { text } = await read(await buildSpecSheet(sample(), catalog, { date: '2026-02-03' }));
     expect(text).toContain('fridge - sink');

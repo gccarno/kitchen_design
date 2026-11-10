@@ -7,6 +7,7 @@ import CatalogSidebar from './CatalogSidebar';
 import ChatPanel from './ChatPanel';
 import dynamic from 'next/dynamic';
 import ClosetEditor from './ClosetEditor';
+import ConfirmScale from './ConfirmScale';
 import DiffPreview from './DiffPreview';
 import EstimatePanel from './EstimatePanel';
 import ExtractPanel from './ExtractPanel';
@@ -112,6 +113,11 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
       /* storage blocked: keep the default */
     }
   }, [stepKey]);
+  // The estimated-size notice leads here: open the Room step and bring the confirm panel into view.
+  function goConfirmSize() {
+    chooseStep('room');
+    setTimeout(() => document.getElementById('confirm-size')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 0);
+  }
   function chooseStep(next: StepId) {
     setStep(next);
     try {
@@ -408,6 +414,15 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
           )}
           {view === '3d' && <Kitchen3D project={project} />}
           <p className="text-sm text-gray-600">{roomSize}</p>
+          {project.room.sizeEstimated && (
+            <div role="note" className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+              <p className="font-medium">Sizes are estimated from photos</p>
+              <p>Confirm one real size so the plan, the parts list and the spec sheet can be trusted.</p>
+              <button type="button" className="mt-1 underline" onClick={goConfirmSize}>
+                Confirm a size
+              </button>
+            </div>
+          )}
           {warnings.length > 0 && (
             <div className="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
               <p className="font-medium">Heads up</p>
@@ -441,6 +456,10 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
                   units={project.units}
                   onProposal={propose}
                 />
+              </section>
+              <section id="confirm-size" className="flex scroll-mt-4 flex-col gap-3">
+                <h2 className="text-lg font-semibold">Confirm the size</h2>
+                <ConfirmScale project={project} onProposal={propose} />
               </section>
               <section className="flex flex-col gap-3">
                 <h2 className="text-lg font-semibold">Or sketch it by hand</h2>

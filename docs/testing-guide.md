@@ -39,13 +39,14 @@ A kitchen project page has the plan on the left (on a phone, on top) and four st
 
 1. In a project's **Room** step, upload 1–4 kitchen photos (on a phone: use the camera). Each appears with a "mark the reference object" view.
 2. Optional: drag a box around a credit card in a photo and pick its edge. "Saved" appears.
-3. In the extraction panel enter one measured wall: a description (e.g. "sink wall") and its tape-measured length (in mm, or `12' 6"` / `3.6 m` / `150 in`; a bare number uses the project's units). Click **Get room from photos**. Wait up to a minute (longer on free models).
+3. **Photos first:** type nothing and click **Get room from photos**. Wait up to a minute (longer on free models).
 4. A **Review proposed change** panel appears: current vs proposed plan, model confidence, notes, change list. **Nothing is saved yet** — reload to confirm the revision hasn't changed.
 5. Click **Apply**. Revision goes up by one.
-6. **Check:** the wall you measured is exactly the length you typed (see the wall labels on the canvas), not approximately.
-7. Run another extraction and click **Discard**: nothing changes.
-8. With no photos uploaded the button is disabled and asks for a photo.
-9. With `LLM_API_KEY` empty (restart the server): extraction says the key isn't set and that you can still sketch by hand, with no crash.
+6. The room is marked **Sizes are estimated from photos** (a notice under the plan, and a line on the spec sheet's cover). **Confirm a size** takes you to the **Confirm the size** panel: pick a wall, door or window you can measure, type its real size (`3.6 m`, `12'`, `150 in`), and **Rescale the room**. The panel says how much the room changes (a very different number is refused), then the usual review opens; **Apply** and the notice goes. One undo brings the guess back.
+7. **Measured instead:** open **I measured a wall (more accurate)**, enter a wall (e.g. "sink wall") and its tape-measured length, and run again. **Check:** that wall is exactly the length you typed (see the wall labels on the canvas), not approximately, and the room is not marked estimated.
+8. Run another extraction and click **Discard**: nothing changes.
+9. With no photos uploaded the button is disabled and asks for a photo.
+10. With `LLM_API_KEY` empty (restart the server): extraction says the key isn't set and that you can still sketch by hand, with no crash.
 
 ## 4. Sketch a room by hand (no LLM)
 
