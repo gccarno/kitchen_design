@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { createProject, pagePoint, projectJson, settle } from './helpers';
+import { createProject, openStep, pagePoint, projectJson, settle } from './helpers';
 
 async function clickWorld(page: Page, canvas: Locator, p: [number, number]) {
   const [x, y] = await pagePoint(canvas, p);
@@ -27,6 +27,7 @@ async function place(page: Page, canvas: Locator, name: RegExp, at: [number, num
 
 test('place a dishwasher against a wall, then move, rotate, and remove it', async ({ page }) => {
   const { id, canvas } = await createProject(page, 'Items basic');
+  await openStep(page, 'Layout');
 
   await place(page, canvas, /^Dishwasher \(600 mm\)/, [1234, 100], 1);
   let item = projectJson(id).items[0];
@@ -64,6 +65,7 @@ test('place a dishwasher against a wall, then move, rotate, and remove it', asyn
 
 test('items face into the room on every wall', async ({ page }) => {
   const { id, canvas } = await createProject(page, 'Items walls');
+  await openStep(page, 'Layout');
   await place(page, canvas, /^Dishwasher \(600 mm\)/, [2950, 1000], 1);
   await place(page, canvas, /^Dishwasher \(600 mm\)/, [1500, 3950], 2);
   const [right, bottom] = projectJson(id).items;
@@ -73,6 +75,7 @@ test('items face into the room on every wall', async ({ page }) => {
 
 test('a wall cabinet hangs over a base cabinet; tapping again selects the one below', async ({ page }) => {
   const { id, canvas } = await createProject(page, 'Items stack');
+  await openStep(page, 'Layout');
   await page.getByLabel('Search catalog').fill('600');
   await place(page, canvas, /^Base cabinet 600 mm\b(?! \()/, [1500, 100], 1);
   await place(page, canvas, /^Wall cabinet 600 mm\b(?! \()/, [1500, 100], 2);
@@ -93,6 +96,7 @@ test('a wall cabinet hangs over a base cabinet; tapping again selects the one be
 
 test('clearance problems are listed under the plan', async ({ page }) => {
   const { canvas } = await createProject(page, 'Items clearance');
+  await openStep(page, 'Layout');
   await page.getByLabel('Search catalog').fill('fridge');
   await place(page, canvas, /^Refrigerator, French door/, [1500, 100], 1);
   await page.getByLabel('Search catalog').fill('island');
@@ -104,6 +108,7 @@ test('clearance problems are listed under the plan', async ({ page }) => {
 
 test('placing outside the room, or a wall cabinet away from walls, is refused', async ({ page }) => {
   const { id, canvas } = await createProject(page, 'Items refused');
+  await openStep(page, 'Layout');
   await page.getByLabel('Search catalog').fill('600');
   await page.getByRole('button', { name: /^Wall cabinet 600 mm\b(?! \()/ }).click();
   await settle(canvas);

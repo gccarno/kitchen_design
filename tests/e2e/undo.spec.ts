@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { createProject, pagePoint, projectJson, settle } from './helpers';
+import { createProject, openStep, pagePoint, projectJson, settle } from './helpers';
 
 async function placeDishwasher(page: Page, canvas: import('@playwright/test').Locator, revision: number) {
   await page.getByRole('button', { name: /^Dishwasher \(600 mm\)/ }).click();
@@ -11,6 +11,7 @@ async function placeDishwasher(page: Page, canvas: import('@playwright/test').Lo
 
 test('undo and redo a change with the buttons and the keyboard; both survive a reload', async ({ page }) => {
   const { id, canvas } = await createProject(page, 'Undo');
+  await openStep(page, 'Layout');
   const undo = page.getByRole('button', { name: 'Undo', exact: true });
   const redo = page.getByRole('button', { name: 'Redo', exact: true });
   await expect(undo).toBeDisabled();

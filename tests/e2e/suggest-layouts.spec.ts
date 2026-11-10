@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { projectJson } from './helpers';
+import { openStep, projectJson } from './helpers';
 
 test('suggest layouts makes options for an empty kitchen and opens their comparison', async ({ page }) => {
   await page.goto('/');
@@ -8,6 +8,7 @@ test('suggest layouts makes options for an empty kitchen and opens their compari
   await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
   const originalId = page.url().split('/').pop()!;
 
+  await openStep(page, 'Layout');
   await page.getByRole('button', { name: 'Suggest layouts' }).click();
   await page.waitForURL(/\/compare\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Compare options — Suggest me' })).toBeVisible();

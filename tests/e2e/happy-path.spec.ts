@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { planToJsonPatch } from '../../src/lib/plan/diff';
-import { createProject, mockJob, pagePoint, projectJson, settle } from './helpers';
+import { createProject, mockJob, openStep, pagePoint, projectJson, settle } from './helpers';
 
 /**
  * The whole v1 journey in one test: new project → photo → measured wall →
@@ -58,6 +58,7 @@ test('photo + measured wall → extracted room → cabinet → SVG export', asyn
   expect(projectJson(id).room.polygon).toEqual(after.room.polygon);
 
   // Place one cabinet against the north wall.
+  await openStep(page, 'Layout');
   await page.getByLabel('Search catalog').fill('600');
   await page.getByRole('button', { name: /^Base cabinet 600 mm\b(?! \()/ }).click();
   await expect(page.getByText(/Tap the plan to place/)).toBeVisible();
@@ -68,6 +69,7 @@ test('photo + measured wall → extracted room → cabinet → SVG export', asyn
   expect(projectJson(id).items).toHaveLength(1);
 
   // Export the drawing.
+  await openStep(page, 'Share');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('link', { name: 'SVG', exact: true }).click(),

@@ -4,6 +4,13 @@ import { join } from 'node:path';
 
 export type View = { scale: number; x: number; y: number };
 
+/** Open one of a kitchen project's steps (Room, Layout, Finishes & cost, Share); the plan stays visible in all of them. */
+export async function openStep(page: Page, name: 'Room' | 'Layout' | 'Finishes & cost' | 'Share'): Promise<void> {
+  const tab = page.getByRole('tab', { name });
+  await tab.click();
+  await expect(tab).toHaveAttribute('aria-selected', 'true');
+}
+
 /** Create a project from the home page and return its id once the canvas is ready. */
 export async function createProject(page: Page, name: string): Promise<{ id: string; canvas: Locator }> {
   await page.goto('/');

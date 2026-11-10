@@ -47,6 +47,9 @@ const project: Project = ProjectSchema.parse({
   history: [],
 });
 
+/** The kitchen page works in steps; open the one with the panel a test needs. */
+const openStep = (name: 'Room' | 'Layout' | 'Finishes & cost' | 'Share') => fireEvent.click(screen.getByRole('tab', { name }));
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -67,6 +70,7 @@ describe('ProjectEditor', () => {
   it('duplicates the project as an option and opens the copy', async () => {
     fetchMock.mockResolvedValueOnce(json({ project: { ...project, id: 'copy-id', name: `${project.name} — Option B` } }, 201));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
     fireEvent.click(screen.getByRole('button', { name: 'Duplicate as option' }));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/project/copy-id'));
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -77,6 +81,7 @@ describe('ProjectEditor', () => {
   it('disables Duplicate as option while the copy is being made, so a double click makes one copy', () => {
     fetchMock.mockReturnValueOnce(new Promise(() => {}));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
     const button = screen.getByRole('button', { name: 'Duplicate as option' });
     fireEvent.click(button);
     fireEvent.click(button);
@@ -87,6 +92,7 @@ describe('ProjectEditor', () => {
   it('says why a duplicate failed and lets you try again', async () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'project not found' }, 404));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
     const button = screen.getByRole('button', { name: 'Duplicate as option' });
     fireEvent.click(button);
     expect((await screen.findByRole('alert')).textContent).toContain('project not found');
@@ -97,6 +103,7 @@ describe('ProjectEditor', () => {
   it('suggests layouts and opens the comparison of the new options', async () => {
     fetchMock.mockResolvedValueOnce(json({ groupId: project.id, options: [{ id: 'o1', name: 'Our kitchen — Option B', label: 'L-shape', passed: 8, counted: 8 }] }, 201));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     fireEvent.click(screen.getByRole('button', { name: 'Suggest layouts' }));
     await waitFor(() => expect(push).toHaveBeenCalledWith(`/compare/${project.id}`));
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -107,6 +114,7 @@ describe('ProjectEditor', () => {
   it('disables Suggest layouts while it works, so a double click makes one set', () => {
     fetchMock.mockReturnValueOnce(new Promise(() => {}));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     const button = screen.getByRole('button', { name: 'Suggest layouts' });
     fireEvent.click(button);
     fireEvent.click(button);
@@ -117,6 +125,7 @@ describe('ProjectEditor', () => {
   it('says why there are no suggestions, and stays on the page', async () => {
     fetchMock.mockResolvedValueOnce(json({ options: [], reason: 'No standard layout fits this room well.' }));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     const button = screen.getByRole('button', { name: 'Suggest layouts' });
     fireEvent.click(button);
     expect(await screen.findByText('No standard layout fits this room well.')).not.toBeNull();
@@ -127,6 +136,7 @@ describe('ProjectEditor', () => {
   it('says why suggesting failed and lets you try again', async () => {
     fetchMock.mockResolvedValueOnce(json({ error: 'project not found' }, 404));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     const button = screen.getByRole('button', { name: 'Suggest layouts' });
     fireEvent.click(button);
     expect((await screen.findByRole('alert')).textContent).toContain('project not found');
@@ -136,6 +146,7 @@ describe('ProjectEditor', () => {
 
   it('does not offer Suggest layouts offline', () => {
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     act(() => markOffline());
     expect((screen.getByRole('button', { name: 'Suggest layouts' }) as HTMLButtonElement).disabled).toBe(true);
     act(() => markOnline());
@@ -143,12 +154,15 @@ describe('ProjectEditor', () => {
 
   it('links to the comparison only when the project has options', () => {
     const { unmount } = render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
     expect(screen.queryByRole('link', { name: 'Compare options' })).toBeNull();
     unmount();
     const one = render(<ProjectEditor initialProject={project} groupId="g-1" optionCount={1} />);
+    openStep('Share');
     expect(screen.queryByRole('link', { name: 'Compare options' })).toBeNull();
     one.unmount();
     render(<ProjectEditor initialProject={project} groupId="g-1" optionCount={2} />);
+    openStep('Share');
     expect(screen.getByRole('link', { name: 'Compare options' }).getAttribute('href')).toBe('/compare/g-1');
   });
 
@@ -159,6 +173,7 @@ describe('ProjectEditor', () => {
     expect(screen.getByRole('heading', { name: 'Photos' })).not.toBeNull();
     expect(screen.getByRole('button', { name: /get room from photos/i })).not.toBeNull();
     expect(screen.getByRole('button', { name: /use rectangle/i })).not.toBeNull();
+    openStep('Layout');
     expect(screen.getByRole('heading', { name: 'Catalog' })).not.toBeNull();
     expect(screen.getByLabelText(/ask for a change/i)).not.toBeNull();
     expect(screen.getByLabelText(/search catalog/i)).not.toBeNull();
@@ -189,6 +204,7 @@ describe('ProjectEditor', () => {
 
   it('has a Finishes section for a kitchen', () => {
     render(<ProjectEditor initialProject={project} />);
+    openStep('Finishes & cost');
     expect(screen.getByRole('heading', { name: 'Finishes' })).not.toBeNull();
     expect(screen.getByLabelText('Cabinet colour')).not.toBeNull();
   });
@@ -196,6 +212,7 @@ describe('ProjectEditor', () => {
   it('saves a finish pick as a revision', async () => {
     fetchMock.mockResolvedValueOnce(json({ project: { ...project, revision: 1, finishes: { cabinetColor: '#f5f5f4', doorStyle: 'shaker', countertop: 'quartz' } } }));
     render(<ProjectEditor initialProject={project} />);
+    openStep('Finishes & cost');
     fireEvent.change(screen.getByLabelText('Cabinet colour'), { target: { value: '#f5f5f4' } });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -207,12 +224,14 @@ describe('ProjectEditor', () => {
 
   it('shows the accessibility check next to the layout check for a kitchen', () => {
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     expect(screen.getByRole('heading', { name: 'Layout check — place a fridge, sink and range to start' })).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Accessibility — place cabinets to start' })).not.toBeNull();
   });
 
   it('offers the plan as a drawing to download', () => {
     render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
     const href = (name: string) => screen.getByRole('link', { name }).getAttribute('href');
     expect(href('SVG')).toBe(`/api/export/${ID}/svg?rev=0`);
     expect(href('PNG')).toBe(`/api/export/${ID}/png?scale=1&rev=0`);
@@ -223,6 +242,7 @@ describe('ProjectEditor', () => {
 
   it('links to the spec sheet PDF for the current revision', () => {
     render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
     expect(screen.getByRole('link', { name: 'Spec sheet (PDF)' }).getAttribute('href')).toBe(`/api/export/${project.id}/pdf?rev=${project.revision}`);
   });
 
@@ -329,6 +349,7 @@ describe('ProjectEditor', () => {
   it('saves a price change in the estimate straight away as a user revision', async () => {
     const range: PlacedItem = { id: 'r', catalogId: 'range-760', sizeMm: { w: 760, d: 650, h: 900 }, position: { x: 380, y: 325 }, rotationDeg: 0 };
     render(<ProjectEditor initialProject={{ ...project, items: [range] }} />);
+    openStep('Finishes & cost');
     const pricing = { currency: 'USD', unitPrices: { 'range-760': 1200 } };
     fetchMock.mockImplementationOnce(async (_url: string, init: RequestInit) => {
       expect(JSON.parse(init.body as string)).toMatchObject({
@@ -370,6 +391,7 @@ describe('ProjectEditor', () => {
 
   it('picking a catalog item arms placement on the canvas; picking it again cancels', () => {
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     fireEvent.click(screen.getByRole('button', { name: /Dishwasher \(600 mm\)/ }));
     expect(canvasProps.placingItem?.id).toBe('dishwasher-600');
     fireEvent.click(screen.getByRole('button', { name: /Dishwasher \(600 mm\)/ }));
@@ -434,6 +456,7 @@ describe('ProjectEditor', () => {
       })
     );
     render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
     fireEvent.change(screen.getByLabelText(/ask for a change/i), { target: { value: 'call it Galley' } });
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
     await act(() => vi.advanceTimersByTimeAsync(1500));
@@ -445,13 +468,17 @@ describe('ProjectEditor', () => {
 
   it('shows wall elevations and their downloads once something is against a wall', () => {
     const { unmount } = render(<ProjectEditor initialProject={project} />);
+    openStep('Finishes & cost');
     expect(screen.getByRole('heading', { name: 'Wall elevations' })).not.toBeNull();
+    openStep('Share');
     expect(screen.queryByRole('link', { name: 'Elevations as SVG' })).toBeNull();
     unmount();
     useEditorStore.setState({ project: null, proposal: null });
     const dw: PlacedItem = { id: 'dw', catalogId: 'dishwasher-600', tag: 'dishwasher', sizeMm: { w: 600, d: 580, h: 850 }, position: { x: 1250, y: 290 }, rotationDeg: 0 };
     render(<ProjectEditor initialProject={{ ...project, items: [dw] }} />);
+    openStep('Finishes & cost');
     expect(screen.getByRole('img', { name: 'Elevation of Wall 1 — north, 3000 mm' })).not.toBeNull();
+    openStep('Share');
     expect(screen.getByRole('link', { name: 'Elevations as SVG' }).getAttribute('href')).toBe(`/api/export/${ID}/elevations/svg?rev=0`);
     expect(screen.getByRole('link', { name: 'Elevations as PNG' }).getAttribute('href')).toBe(`/api/export/${ID}/elevations/png?scale=1&rev=0`);
   });
@@ -478,6 +505,7 @@ describe('ProjectEditor offline', () => {
   it('disables Duplicate, turns server exports into disabled labels and makes the canvas read-only', () => {
     useEditorStore.setState({ project: null, proposal: null });
     render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
     expect(screen.getByRole('link', { name: 'SVG' })).not.toBeNull();
     act(() => markOffline());
     const dup = screen.getByRole('button', { name: 'Duplicate as option' }) as HTMLButtonElement;
@@ -486,5 +514,113 @@ describe('ProjectEditor offline', () => {
     expect(screen.queryByRole('link', { name: 'SVG' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'CSV' })).toBeNull();
     expect(onEdit).toBeUndefined();
+  });
+});
+
+describe('ProjectEditor steps and units', () => {
+  const selected = () => screen.getAllByRole('tab').find((t) => t.getAttribute('aria-selected') === 'true')?.textContent;
+  beforeEach(() => {
+    useEditorStore.setState({ project: null, proposal: null });
+    sessionStorage.clear();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('opens an untouched project on Room and one with work in it on Layout', () => {
+    const fresh = render(<ProjectEditor initialProject={project} />);
+    expect(selected()).toBe('1Room');
+    fresh.unmount();
+    sessionStorage.clear();
+    const dw: PlacedItem = { id: 'dw', catalogId: 'dishwasher-600', sizeMm: { w: 600, d: 580, h: 850 }, position: { x: 1250, y: 290 }, rotationDeg: 0 };
+    render(<ProjectEditor initialProject={{ ...project, items: [dw] }} />);
+    expect(selected()).toBe('2Layout');
+    sessionStorage.clear();
+  });
+
+  it('remembers the step for this project', () => {
+    const first = render(<ProjectEditor initialProject={project} />);
+    openStep('Share');
+    first.unmount();
+    render(<ProjectEditor initialProject={project} />);
+    expect(selected()).toBe('4Share');
+  });
+
+  it('shows one panel at a time but keeps the others mounted, so typing survives a switch', () => {
+    render(<ProjectEditor initialProject={project} />);
+    openStep('Layout');
+    const chat = screen.getByLabelText(/ask for a change/i) as HTMLTextAreaElement | HTMLInputElement;
+    fireEvent.change(chat, { target: { value: 'move the fridge' } });
+    openStep('Room');
+    expect(screen.queryByRole('heading', { name: 'Catalog' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Photos' })).not.toBeNull();
+    openStep('Layout');
+    expect((screen.getByLabelText(/ask for a change/i) as HTMLTextAreaElement).value).toBe('move the fridge');
+  });
+
+  it('moves on with the Next button at the end of each step', () => {
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Layout →' }));
+    expect(selected()).toBe('2Layout');
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Finishes & cost →' }));
+    expect(selected()).toBe('3Finishes & cost');
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Share →' }));
+    expect(selected()).toBe('4Share');
+  });
+
+  it('keeps the plan in view whichever step is open', () => {
+    render(<ProjectEditor initialProject={project} />);
+    for (const step of ['Room', 'Layout', 'Finishes & cost', 'Share'] as const) {
+      openStep(step);
+      expect(screen.getByRole('img', { name: /current room/i })).not.toBeNull();
+    }
+  });
+
+  it('has no steps for a closet', () => {
+    const closet = { widthMm: 1830, heightMm: 2440, depthMm: 610, opening: { style: 'bifold' as const, leftMm: 0, widthMm: 1830 }, components: [] };
+    render(<ProjectEditor initialProject={{ ...project, kind: 'closet', closet }} />);
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.queryByLabelText('Units')).toBeNull();
+  });
+
+  it('switches the units as a revision, from the header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({ project: { ...project, units: 'in', revision: 1 } }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.change(screen.getByLabelText('Units'), { target: { value: 'in' } });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`/api/projects/${project.id}/revisions`);
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      baseRevision: 0,
+      source: 'user',
+      summary: 'Show lengths in feet and inches',
+      patch: [{ op: 'replace', path: '/units', value: 'in' }],
+    });
+    await waitFor(() => expect((screen.getByLabelText('Units') as HTMLSelectElement).value).toBe('in'));
+  });
+
+  it('says why the units could not be changed', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ error: 'plan changed' }, 409)));
+    render(<ProjectEditor initialProject={project} />);
+    fireEvent.change(screen.getByLabelText('Units'), { target: { value: 'in' } });
+    expect((await screen.findByRole('alert')).textContent).toContain('Couldn’t change units');
+  });
+
+  it('shows the room size in feet and inches for an inch project, and in mm otherwise', () => {
+    const inches = render(<ProjectEditor initialProject={{ ...project, units: 'in' }} />);
+    expect(screen.getByText(`9' 10" × 13' 1 1/2", 129 ft²`)).not.toBeNull();
+    inches.unmount();
+    render(<ProjectEditor initialProject={project} />);
+    expect(screen.getByText('3000 × 4000 mm, 12.0 m²')).not.toBeNull();
+  });
+
+  it('takes a sketch size in feet and inches in an inch project', () => {
+    render(<ProjectEditor initialProject={{ ...project, units: 'in' }} />);
+    fireEvent.change(screen.getByLabelText(/width/i), { target: { value: `12' 6"` } });
+    fireEvent.change(screen.getByLabelText(/depth/i), { target: { value: `10'` } });
+    fireEvent.click(screen.getByRole('button', { name: /use rectangle/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save room/i }));
+    const review = screen.getByRole('region', { name: /review proposed change/i });
+    expect(within(review).getByText(/3810 × 3048 mm/)).not.toBeNull();
   });
 });

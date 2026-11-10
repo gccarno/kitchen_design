@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { openStep } from './helpers';
 
 test('change a price in the sample kitchen estimate, then undo it', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Try a sample kitchen' }).click();
   await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
   await expect(page.getByText('Revision 0')).toBeVisible();
+  await openStep(page, 'Finishes & cost');
 
   const table = page.getByRole('table', { name: 'Estimate' });
   const total = table.getByRole('row', { name: /^Total/ });

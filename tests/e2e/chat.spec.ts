@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createProject, mockJob, projectJson } from './helpers';
+import { createProject, mockJob, openStep, projectJson } from './helpers';
 
 // The e2e server has no LLM key, so the refine job (202, then polling) is mocked in the browser.
 // (The real endpoint → provider → compiler path is covered by tests/integration.)
@@ -35,6 +35,7 @@ test('ask for a change in the chat, review it, and apply it', async ({ page }) =
     (body) => expect(body).toEqual({ message: 'add a dishwasher on the north wall', history: [] })
   );
 
+  await openStep(page, 'Layout');
   await page.getByLabel('Ask for a change').fill('add a dishwasher on the north wall');
   await page.getByLabel('Ask for a change').press('Enter');
 
@@ -53,6 +54,7 @@ test('ask for a change in the chat, review it, and apply it', async ({ page }) =
 
 test('without an LLM key, the chat explains that edits still work by hand', async ({ page }) => {
   await createProject(page, 'Chat no key');
+  await openStep(page, 'Layout');
   await page.getByLabel('Ask for a change').fill('add a fridge');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByRole('list', { name: 'Conversation' })).toContainText(/LLM_API_KEY is not set.*by hand/);

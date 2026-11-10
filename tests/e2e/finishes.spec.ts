@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { projectJson } from './helpers';
+import { openStep, projectJson } from './helpers';
 
 test('pick finishes: the elevations, the estimate and the saved project follow, and reset goes back', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Try a sample kitchen' }).click();
   await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
   const id = page.url().split('/').pop()!;
+  await openStep(page, 'Finishes & cost');
   const elevation = page.getByRole('img', { name: /^Elevation of / });
   const estimate = page.getByRole('table', { name: 'Estimate' });
   await expect(estimate.getByText('Countertop', { exact: true })).toBeVisible();

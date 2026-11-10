@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
-import { createProject } from './helpers';
+import { createProject, openStep } from './helpers';
 
 test('download the plan as an SVG drawing', async ({ page }) => {
   await createProject(page, 'Export me');
+  await openStep(page, 'Share');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('link', { name: 'SVG', exact: true }).click(),
@@ -18,6 +19,7 @@ test('download the plan as an SVG drawing', async ({ page }) => {
 
 test('download the plan as a PNG, at 1× and 2×', async ({ page }) => {
   await createProject(page, 'Export png');
+  await openStep(page, 'Share');
   const save = async (name: string) => {
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name, exact: true }).click()]);
     return { name: download.suggestedFilename(), meta: await sharp((await download.path())!).metadata() };

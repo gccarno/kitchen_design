@@ -25,19 +25,21 @@ npm run dev                    # http://localhost:3000
 
 The whole journey is `tests/e2e/happy-path.spec.ts` (photo → measured wall → extract → apply → place cabinet → export SVG, with the LLM mocked).
 
+A kitchen project page has the plan on the left (on a phone, on top) and four steps beside it: **Room · Layout · Finishes & cost · Share**. A new project opens on Room; one with work in it opens on Layout, and the step you pick is remembered for the tab. The sections below say which step each panel lives in: photos and the sketch in Room; suggest layouts, catalog, chat and the layout checks in Layout; finishes, elevations and the estimate in Finishes & cost; every download plus Duplicate and Compare in Share. In the end-to-end specs, `openStep(page, 'Layout')` opens one.
+
 ## 2. Projects and the home page (no LLM)
 
 1. Open `/`. Create a project called "Test kitchen". You land on `/project/<id>` showing **Revision 0** and a default 3000 × 4000 mm room.
-2. Go back to `/`. The card shows a thumbnail, name, revision and date.
+2. Go back to `/`. The card shows a thumbnail, name, revision and date. The form has a **Units** choice for kitchens (millimetres or feet and inches); it is remembered in the browser, and a project can switch with the **Units** box in its header (an undoable revision).
 3. **Rename** the card to "Test kitchen 2". Open it: **Revision 1**; history says "Rename to …". Undo (section 6) brings the old name back.
 4. Create a second project and **Delete** it from the list: it asks first, then disappears; reload and it's still gone.
 5. Reload `/`: newest project first, thumbnails still render.
 
 ## 3. Room from photos (needs an LLM key)
 
-1. In a project, upload 1–4 kitchen photos (on a phone: use the camera). Each appears with a "mark the reference object" view.
+1. In a project's **Room** step, upload 1–4 kitchen photos (on a phone: use the camera). Each appears with a "mark the reference object" view.
 2. Optional: drag a box around a credit card in a photo and pick its edge. "Saved" appears.
-3. In the extraction panel enter one measured wall: a description (e.g. "sink wall") and its tape-measured length in mm. Click **Get room from photos**. Wait up to a minute (longer on free models).
+3. In the extraction panel enter one measured wall: a description (e.g. "sink wall") and its tape-measured length (in mm, or `12' 6"` / `3.6 m` / `150 in`; a bare number uses the project's units). Click **Get room from photos**. Wait up to a minute (longer on free models).
 4. A **Review proposed change** panel appears: current vs proposed plan, model confidence, notes, change list. **Nothing is saved yet** — reload to confirm the revision hasn't changed.
 5. Click **Apply**. Revision goes up by one.
 6. **Check:** the wall you measured is exactly the length you typed (see the wall labels on the canvas), not approximately.
@@ -47,9 +49,9 @@ The whole journey is `tests/e2e/happy-path.spec.ts` (photo → measured wall →
 
 ## 4. Sketch a room by hand (no LLM)
 
-1. In the sketch panel enter Width 3600 and Depth 2700, **Use rectangle**, then **Save room**.
+1. In the **Room** step's sketch panel enter Width 3600 and Depth 2700 (or about `11' 10"` and `8' 10"`; the box echoes how it read them, and the review then shows those sizes instead), **Use rectangle**, then **Save room**.
 2. The review panel shows `3000 × 4000 mm → 3600 × 2700 mm`. **Apply**. Reload: the new size persists.
-3. Type a measured length into a wall's "measured mm" box; the sketch rescales to match exactly.
+3. Type a measured length into a wall's "measured" box; the sketch rescales to match exactly.
 
 ## 5. Chat edits and layouts (needs an LLM key)
 
@@ -79,7 +81,7 @@ The whole journey is `tests/e2e/happy-path.spec.ts` (photo → measured wall →
 
 ## 8. Export
 
-1. Header links: **SVG**, **PNG**, **PNG (2×)**.
+1. In the **Share** step: **SVG**, **PNG**, **PNG (2×)** (and CSV, the PDF spec sheet and the elevations).
 2. Open the SVG in a browser: black mitred walls, door arcs, window lines, labelled items, a dimension on every wall, a scale bar, a north arrow, a title block (name, scale, revision, date).
 3. The PNG opens in an image viewer; the 2× file is twice the width of the 1×, white background.
 4. File names are the project name, with `@2x` on the large PNG.
