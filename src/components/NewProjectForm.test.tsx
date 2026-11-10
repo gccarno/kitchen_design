@@ -82,3 +82,37 @@ describe('NewProjectForm templates', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ name: 'Hall', kind: 'closet' });
   });
 });
+
+describe('NewProjectForm units', () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
+  const ok = () => vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => ({ project: { id: 'p1' } }) });
+
+  it('starts a kitchen in inches when chosen, and remembers the choice', async () => {
+    const fetchMock = ok();
+    vi.stubGlobal('fetch', fetchMock);
+    const first = render(<NewProjectForm />);
+    fireEvent.change(screen.getByLabelText('Units'), { target: { value: 'in' } });
+    fireEvent.change(screen.getByLabelText('New project name'), { target: { value: 'Flat' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Create project' })));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ name: 'Flat', kind: 'kitchen', units: 'in' });
+    first.unmount();
+
+    render(<NewProjectForm />);
+    expect((screen.getByLabelText('Units') as HTMLSelectElement).value).toBe('in');
+  });
+
+  it('has no units choice for a closet, and sends none', async () => {
+    const fetchMock = ok();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<NewProjectForm />);
+    fireEvent.change(screen.getByLabelText('Units'), { target: { value: 'in' } });
+    fireEvent.click(screen.getByLabelText('Closet'));
+    expect(screen.queryByLabelText('Units')).toBeNull();
+    fireEvent.change(screen.getByLabelText('New project name'), { target: { value: 'Hall' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Create project' })));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ name: 'Hall', kind: 'closet' });
+  });
+});

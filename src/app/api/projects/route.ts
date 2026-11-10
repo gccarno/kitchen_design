@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { loadCatalog } from '@/lib/catalog/loader';
-import { ProjectKindSchema } from '@/lib/plan/schemas';
+import { ProjectKindSchema, ProjectSchema } from '@/lib/plan/schemas';
 import { buildFromTemplate, getTemplateInfo } from '@/lib/templates';
 import { getStorage, newProject } from '@/lib/storage';
 import { withUnauthorized } from '@/lib/auth/session';
@@ -13,12 +13,13 @@ export const runtime = 'nodejs';
 const CreateProjectSchema = z.object({
   name: z.string().trim().min(1).max(200),
   kind: ProjectKindSchema.default('kitchen'),
+  units: ProjectSchema.shape.units.optional(),
   sample: z.boolean().optional(),
   templateId: z.string().min(1).max(100).optional(),
 });
 
 /**
- * POST /api/projects — JSON body { name, kind?, sample?, templateId? }.
+ * POST /api/projects — JSON body { name, kind?, units?, sample?, templateId? }.
  * Creates a kitchen with the default 3 m × 4 m room, or (kind "closet") an
  * empty default closet, and returns it (201). With `templateId` it comes
  * furnished from that starter template (400 if it is unknown or for the
@@ -34,8 +35,9 @@ async function handlePost(req: Request): Promise<NextResponse> {
   }
   const input = CreateProjectSchema.safeParse(body);
   if (!input.success) {
-    const kindIssue = input.error.issues.some((i) => i.path[0] === 'kind');
-    return NextResponse.json({ error: kindIssue ? 'kind must be "kitchen" or "closet"' : 'name is required' }, { status: 400 });
+    const first = input.error.issues[0]?.path[0];
+    const error = first === 'kind' ? 'kind must be "kitchen" or "closet"' : first === 'units' ? 'units must be "mm" or "in"' : 'name is required';
+    return NextResponse.json({ error }, { status: 400 });
   }
   const { sample, templateId, ...fields } = input.data;
   const template = templateId ?? (sample ? (fields.kind === 'closet' ? 'closet-cleaning' : 'kitchen-sample') : undefined);

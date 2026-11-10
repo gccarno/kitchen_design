@@ -19,6 +19,11 @@ describe('newProject', () => {
     expect(p.closet).toBeTruthy();
   });
 
+  it('takes the units it is given, mm otherwise', () => {
+    expect(newProject({ name: 'X', units: 'in' }).units).toBe('in');
+    expect(newProject({ name: 'X' }).units).toBe('mm');
+  });
+
   it('keeps a given id', () => {
     const id = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
     expect(newProject({ id, name: 'X' }).id).toBe(id);

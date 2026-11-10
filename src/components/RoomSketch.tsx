@@ -4,6 +4,9 @@ import React, { useMemo, useState } from 'react';
 import { newId } from '@/lib/id';
 import PlanThumbnail from './PlanThumbnail';
 import { polygonSelfIntersects, signedPolygonArea, snapToGrid, type Point } from '@/lib/plan/geometry';
+import { parseLength } from '@/lib/plan/length';
+import { formatLength } from '@/lib/plan/viewport';
+import LengthInput from './LengthInput';
 import { rescaleRoomToMeasurements, SCALE_DISAGREEMENT_WARN } from '@/lib/plan/scale';
 import type { Measurement, Room } from '@/lib/plan/schemas';
 import { wallLengthMm } from '@/lib/plan/validate';
@@ -11,6 +14,8 @@ import { wallLengthMm } from '@/lib/plan/validate';
 interface RoomSketchProps {
   /** Called with the finished room (rescaled to the measurements) on "Save room". */
   onSave: (room: Room) => void;
+  /** The project's units: what a bare length means, and how lengths are shown. */
+  units?: 'mm' | 'in';
 }
 
 /** The draw canvas covers a 10 m square — enough for any kitchen. */
@@ -28,22 +33,22 @@ type Mode = { kind: 'rectangle' } | { kind: 'draw'; points: Point[] };
  * saved room is always `rescale(base + measurements)` — so adding a second
  * measurement never compounds an earlier rescale.
  */
-export default function RoomSketch({ onSave }: RoomSketchProps) {
+export default function RoomSketch({ onSave, units = 'mm' }: RoomSketchProps) {
   const [mode, setMode] = useState<Mode>({ kind: 'rectangle' });
   const [width, setWidth] = useState('3000');
   const [depth, setDepth] = useState('4000');
   const [base, setBase] = useState<Room | null>(null);
-  // Typed measured lengths by wall id; only valid positive numbers count.
+  // Typed measured lengths by wall id; only lengths that parse count.
   const [measured, setMeasured] = useState<Record<string, string>>({});
 
-  const widthMm = positive(width);
-  const depthMm = positive(depth);
+  const widthMm = parseLength(width, units);
+  const depthMm = parseLength(depth, units);
 
-  function startFrom(polygon: Point[], initialMeasured: Record<number, number> = {}) {
+  function startFrom(polygon: Point[], initialMeasured: Record<number, string> = {}) {
     const walls = polygon.map(() => ({ id: newId(), thicknessMm: WALL_THICKNESS_MM }));
     setBase({ polygon, walls, openings: [] });
     setMeasured(
-      Object.fromEntries(Object.entries(initialMeasured).map(([i, mm]) => [walls[Number(i)].id, String(mm)]))
+      Object.fromEntries(Object.entries(initialMeasured).map(([i, mm]) => [walls[Number(i)].id, mm]))
     );
   }
 
@@ -56,11 +61,11 @@ export default function RoomSketch({ onSave }: RoomSketchProps) {
   const result = useMemo(() => {
     if (!base) return null;
     const measurements: Measurement[] = base.walls.flatMap((w) => {
-      const mm = positive(measured[w.id] ?? '');
+      const mm = parseLength(measured[w.id] ?? '', units);
       return mm === null ? [] : [{ wallId: w.id, lengthMm: mm, source: 'user' as const }];
     });
     return rescaleRoomToMeasurements(measurements.length > 0 ? { ...base, measurements } : base);
-  }, [base, measured]);
+  }, [base, measured, units]);
 
   if (base && result) {
     const room = result.room;
@@ -71,18 +76,16 @@ export default function RoomSketch({ onSave }: RoomSketchProps) {
           {room.walls.map((w, i) => (
             <li key={w.id} className="flex flex-wrap items-center gap-2">
               <span className="w-32">
-                Wall {i + 1} · {Math.round(wallLengthMm(room, i)).toLocaleString()} mm
+                Wall {i + 1} · {units === 'in' ? formatLength(wallLengthMm(room, i), 'in') : `${Math.round(wallLengthMm(room, i)).toLocaleString()} mm`}
               </span>
               <label className="flex items-center gap-1">
-                <span className="sr-only">Wall {i + 1} measured length (mm)</span>
-                <input
+                <span className="sr-only">Wall {i + 1} measured length ({units === 'in' ? 'ft/in' : 'mm'})</span>
+                <LengthInput
                   className="w-28 rounded border px-2 py-1"
-                  type="number"
-                  inputMode="decimal"
-                  min={1}
-                  placeholder="measured mm"
+                  units={units}
+                  placeholder={units === 'in' ? 'measured' : 'measured mm'}
                   value={measured[w.id] ?? ''}
-                  onChange={(e) => setMeasured((m) => ({ ...m, [w.id]: e.target.value }))}
+                  onChange={(text) => setMeasured((m) => ({ ...m, [w.id]: text }))}
                 />
               </label>
             </li>
@@ -168,26 +171,12 @@ export default function RoomSketch({ onSave }: RoomSketchProps) {
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col gap-1">
-          <span>Width (mm)</span>
-          <input
-            className="w-28 rounded border px-2 py-1"
-            type="number"
-            inputMode="decimal"
-            min={1}
-            value={width}
-            onChange={(e) => setWidth(e.target.value)}
-          />
+          <span>Width ({units === 'in' ? 'ft/in' : 'mm'})</span>
+          <LengthInput className="w-28 rounded border px-2 py-1" units={units} value={width} onChange={setWidth} />
         </label>
         <label className="flex flex-col gap-1">
-          <span>Depth (mm)</span>
-          <input
-            className="w-28 rounded border px-2 py-1"
-            type="number"
-            inputMode="decimal"
-            min={1}
-            value={depth}
-            onChange={(e) => setDepth(e.target.value)}
-          />
+          <span>Depth ({units === 'in' ? 'ft/in' : 'mm'})</span>
+          <LengthInput className="w-28 rounded border px-2 py-1" units={units} value={depth} onChange={setDepth} />
         </label>
         <button
           type="button"
@@ -202,7 +191,7 @@ export default function RoomSketch({ onSave }: RoomSketchProps) {
                 [widthMm, depthMm],
                 [0, depthMm],
               ],
-              { 0: widthMm, 1: depthMm }
+              { 0: width, 1: depth }
             );
           }}
         >
@@ -225,11 +214,6 @@ function closeProblem(points: Point[]): string | null {
   if (polygonSelfIntersects(points)) return 'The walls cross each other — undo a corner and try again.';
   if (Math.abs(signedPolygonArea(points)) < 1) return 'The corners are all in a line.';
   return null;
-}
-
-function positive(s: string): number | null {
-  const n = Number(s);
-  return s.trim() !== '' && Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function Grid() {

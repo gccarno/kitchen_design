@@ -3,7 +3,7 @@ import { closetFootprint, newCloset } from '../closet/catalog';
 import { ProjectSchema, type Project, type ProjectKind } from './schemas';
 
 /** A fresh, unsaved project: a kitchen with the default room, or a closet with the default closet. */
-export function newProject(fields: { id?: string; name: string; kind?: ProjectKind }): Project {
+export function newProject(fields: { id?: string; name: string; kind?: ProjectKind; units?: Project['units'] }): Project {
   const now = new Date().toISOString();
   const kind = fields.kind ?? 'kitchen';
   const closet = kind === 'closet' ? newCloset() : undefined;
@@ -11,7 +11,7 @@ export function newProject(fields: { id?: string; name: string; kind?: ProjectKi
     id: fields.id ?? randomUUID(),
     name: fields.name,
     kind,
-    units: 'mm',
+    units: fields.units ?? 'mm',
     createdAt: now,
     updatedAt: now,
     revision: 0,

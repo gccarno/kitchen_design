@@ -44,6 +44,11 @@ export function proposalForFinishes(project: Project, finishes: Finishes | undef
   return { patch: planToJsonPatch(project, next), baseRevision: project.revision, summary, source: 'user' };
 }
 
+/** Propose showing lengths in other units. The geometry stays in mm; only how it is shown and typed changes. */
+export function proposalForUnits(project: Project, units: Project['units'], summary: string): Proposal {
+  return { patch: planToJsonPatch(project, { ...project, units }), baseRevision: project.revision, summary, source: 'user' };
+}
+
 /** Propose replacing the project's room (e.g. from the manual sketch). */
 export function proposalForRoom(project: Project, room: Room, summary: string): Proposal {
   return proposalForPlan(project, { room }, summary);
