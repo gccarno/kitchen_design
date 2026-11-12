@@ -51,6 +51,12 @@ projects over with `npm run import:local -- --owner <email>` (needs `GCS_BUCKET`
   `llm_model`, `llm_outcome` and `rate_limit`. Rate limits are warnings, other failures are errors. Unhandled route
   errors are reported too. Without `SENTRY_DSN` nothing is sent. Only error reporting is on: no
   tracing or performance data.
+- Optional browser reporting: create a second Sentry project (platform Next.js) and set
+  `NEXT_PUBLIC_SENTRY_DSN` on Render. It is read when the app is **built**, so redeploy after
+  setting it. Uncaught browser errors (the phone app included) and every failed photo upload
+  ("Photo upload failed: HTTP 502" or "…: no response", with size, type and time taken) are
+  reported. No file names, photos, cookies, user data or console output are sent. The release
+  is the Render commit, the same as the server's.
 
 ## Notes
 - If `next build` runs out of memory on the free tier, build a Docker image in CI (Next

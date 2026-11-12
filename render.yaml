@@ -34,6 +34,8 @@ services:
         value: "300000"
       - key: SENTRY_DSN # optional: failed jobs and route errors go to Sentry (see docs/DEPLOYMENT.md)
         sync: false
+      - key: NEXT_PUBLIC_SENTRY_DSN # optional: browser errors and failed uploads; read at build time
+        sync: false
       - key: TRUSTED_PROXY_HOPS # verify against Render's X-Forwarded-For before go-live
         value: "1"
       - key: ALLOW_REGISTRATION

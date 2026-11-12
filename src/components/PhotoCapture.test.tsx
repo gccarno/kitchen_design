@@ -4,6 +4,9 @@ import React from 'react';
 import { markOffline, markOnline } from '@/lib/client/online';
 import { act as actOffline } from '@testing-library/react';
 import PhotoCapture from './PhotoCapture';
+
+const monitoring = vi.hoisted(() => ({ reportUploadFailure: vi.fn() }));
+vi.mock('@/lib/client/monitoring', () => monitoring);
 import type { Photo } from '@/lib/plan/schemas';
 
 const PROJECT = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
@@ -96,6 +99,17 @@ describe('PhotoCapture', () => {
 
     expect(await screen.findByText(/bad\.jpg.*not a readable image/i)).not.toBeNull();
     await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1));
+  });
+
+  it('reports a failed upload with its status, and a network failure as status 0', async () => {
+    monitoring.reportUploadFailure.mockClear();
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'too big' }, 413)).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    render(<PhotoCapture projectId={PROJECT} />);
+    const files = [new File(['xx'], 'a.jpg', { type: 'image/jpeg' }), new File(['y'], 'b.jpg', { type: 'image/jpeg' })];
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files } });
+    await waitFor(() => expect(monitoring.reportUploadFailure).toHaveBeenCalledTimes(2));
+    expect(monitoring.reportUploadFailure.mock.calls[0][0]).toMatchObject({ status: 413, error: 'too big', sizeBytes: 2, mimeType: 'image/jpeg' });
+    expect(monitoring.reportUploadFailure.mock.calls[1][0]).toMatchObject({ status: 0, error: 'Failed to fetch' });
   });
 
   it('saves a marked reference with PUT to the reference route', async () => {
