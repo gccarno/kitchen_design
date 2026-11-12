@@ -84,8 +84,12 @@ describe('config', () => {
     }
   });
 
+  it('skips /api/upload, which checks the session and CSRF itself (large bodies break behind Node middleware)', () => {
+    for (const p of ['/api/upload', '/api/upload/']) expect(matches(p), p).toBe(false);
+  });
+
   it('runs for pages and the rest of the API', () => {
-    for (const p of ['/', '/project/abc', '/compare/abc', '/api/projects', '/api/upload', '/api/export/x/csv', '/loginx', '/api/authx', '/api/healthz', '/sw.js.map', '/offlinex', '/offline/x']) {
+    for (const p of ['/', '/project/abc', '/compare/abc', '/api/projects', '/api/uploads', '/api/upload/x', '/api/export/x/csv', '/loginx', '/api/authx', '/api/healthz', '/sw.js.map', '/offlinex', '/offline/x']) {
       expect(matches(p), p).toBe(true);
     }
   });

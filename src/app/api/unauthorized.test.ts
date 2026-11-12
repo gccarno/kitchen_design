@@ -128,3 +128,54 @@ describe('storage-backed API routes with auth on', () => {
     expect(still?.name).toBe("A's kitchen");
   });
 });
+
+// The middleware skips /api/upload (a Next 15 bug locks large bodies when Node middleware awaits),
+// so the route does the middleware's checks itself, before it reads the body.
+describe('POST /api/upload checks the session and CSRF itself', () => {
+  const jpeg = async () => {
+    const sharp = (await import('sharp')).default;
+    const buf = await sharp({ create: { width: 40, height: 30, channels: 3, background: '#888' } }).jpeg().toBuffer();
+    return new Blob([new Uint8Array(buf)], { type: 'image/jpeg' });
+  };
+  const form = async (projectId: string) => {
+    const f = new FormData();
+    f.set('projectId', projectId);
+    f.set('file', await jpeg(), 'k.jpg');
+    return f;
+  };
+
+  it('answers 401 without reading the upload', async () => {
+    let read = false;
+    const body = new ReadableStream({
+      pull() {
+        read = true;
+        throw new Error('the body must not be read');
+      },
+    }, { highWaterMark: 0 }); // pull only when someone reads
+    const req = new Request('http://localhost/api/upload', { method: 'POST', body, duplex: 'half' } as RequestInit);
+    const res = await upload.POST(req);
+    expect(res.status).toBe(401);
+    expect(read).toBe(false);
+  });
+
+  it('refuses a cross-site upload even with a valid session', async () => {
+    const { p } = await seedA();
+    const user = (await db.query.users.findFirst())!;
+    state.headers = new Headers({ cookie: `session=${await createSession(db, user.id)}` });
+    for (const h of [{ 'sec-fetch-site': 'cross-site' }, { origin: 'https://evil.example', host: 'app.example' }] as Record<string, string>[]) {
+      const req = new Request('http://localhost/api/upload', { method: 'POST', headers: h, body: await form(p.id) });
+      const res = await upload.POST(req);
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: 'Cross-site request refused' });
+    }
+  });
+
+  it('saves a same-site upload from a signed-in user', async () => {
+    const { p } = await seedA();
+    const user = (await db.query.users.findFirst())!;
+    state.headers = new Headers({ cookie: `session=${await createSession(db, user.id)}` });
+    const req = new Request('http://localhost/api/upload', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' }, body: await form(p.id) });
+    const res = await upload.POST(req);
+    expect(res.status).toBe(201);
+  });
+});
