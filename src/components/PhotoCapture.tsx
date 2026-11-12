@@ -26,6 +26,9 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
   const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
   const [uploads, setUploads] = useState<UploadStatus[]>([]);
   const [saveState, setSaveState] = useState<Record<string, SaveState>>({});
+  // Photos whose reference marker is open. Marking is optional, so it starts closed: an open
+  // marker fills the screen and its drawing surface can't be swiped to scroll the page.
+  const [marking, setMarking] = useState<Set<string>>(new Set());
   const nextKey = useRef(0);
   // Reference saves are chained per photo so a fast second edit can't land
   // before the first and be overwritten by it.
@@ -63,6 +66,14 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
     const files = Array.from(e.target.files ?? []);
     e.target.value = ''; // allow re-selecting the same file
     if (files.length > 0) void uploadFiles(files);
+  }
+
+  function toggleMarking(photoId: string) {
+    setMarking((s) => {
+      const next = new Set(s);
+      if (!next.delete(photoId)) next.add(photoId);
+      return next;
+    });
   }
 
   function saveReference(photoId: string, value: ReferenceInput | null) {
@@ -116,14 +127,29 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
 
       {photos.map((p) => {
         const state = saveState[p.id];
+        const imageUrl = `/api/projects/${projectId}/photos/${p.id}`;
+        const open = marking.has(p.id);
         return (
           <div key={p.id} className="flex flex-col gap-1">
-            <ReferenceMarker
-              imageUrl={`/api/projects/${projectId}/photos/${p.id}`}
-              value={toInput(p.referenceObject)}
-              onChange={(v) => saveReference(p.id, v)}
-              disabled={!online}
-            />
+            {open ? (
+              <ReferenceMarker
+                imageUrl={imageUrl}
+                value={toInput(p.referenceObject)}
+                onChange={(v) => saveReference(p.id, v)}
+                disabled={!online}
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- served by our API route, not a static asset
+              <img src={imageUrl} alt="Room photo" className="block max-h-64 max-w-full self-start rounded" />
+            )}
+            <button
+              type="button"
+              className="self-start text-sm text-blue-700 underline"
+              aria-expanded={open}
+              onClick={() => toggleMarking(p.id)}
+            >
+              {open ? 'Done marking' : p.referenceObject ? 'Edit the marked object' : 'Mark a known-size object (optional)'}
+            </button>
             {state && (
               <p className={`text-xs ${typeof state === 'object' ? 'text-red-600' : 'text-gray-500'}`}>
                 {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : `Could not save: ${state.error}`}

@@ -19,8 +19,14 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+/** Open the reference marker on a photo (it starts closed). */
+function openMarker(index = 0) {
+  fireEvent.click(screen.getAllByRole('button', { name: /mark a known-size object|edit the marked object/i })[index]);
+}
+
 /** Make a rendered marker image measurable, then drag a box on it (display 200×150, natural 400×300). */
-function drawBox(index = 0) {
+function drawBox(index = 0, { alreadyOpen = false } = {}) {
+  if (!alreadyOpen) openMarker(index);
   const img = screen.getAllByRole('img')[index] as HTMLImageElement;
   Object.defineProperty(img, 'naturalWidth', { value: 400, configurable: true });
   Object.defineProperty(img, 'naturalHeight', { value: 300, configurable: true });
@@ -113,6 +119,7 @@ describe('PhotoCapture', () => {
       referenceObject: { kind: 'credit_card', side: 'long', knownSizeMm: 85.6, pixelBox: [20, 20, 220, 120] },
     });
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[withRef]} />);
+    openMarker();
     fireEvent.click(screen.getByRole('button', { name: /clear/i }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -121,11 +128,30 @@ describe('PhotoCapture', () => {
     expect(init.method).toBe('DELETE');
   });
 
+  it('shows a photo without the reference marker until asked, and can close it again', () => {
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a')]} />);
+    expect(screen.queryByTestId('reference-surface')).toBeNull();
+    expect(screen.queryByLabelText('Reference object')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /mark a known-size object \(optional\)/i }));
+    expect(screen.getByTestId('reference-surface')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /done marking/i }));
+    expect(screen.queryByTestId('reference-surface')).toBeNull();
+  });
+
+  it('offers to edit a photo that already has a marked object', () => {
+    const withRef = photo('a', {
+      referenceObject: { kind: 'credit_card', side: 'long', knownSizeMm: 85.6, pixelBox: [20, 20, 220, 120] },
+    });
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[withRef]} />);
+    expect(screen.getByRole('button', { name: /edit the marked object/i })).not.toBeNull();
+  });
+
   it('passes a saved custom reference back to the marker with its size', () => {
     const withCustom = photo('a', {
       referenceObject: { kind: 'custom', side: 'long', knownSizeMm: 600, pixelBox: [0, 0, 100, 10] },
     });
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[withCustom]} />);
+    openMarker();
     expect((screen.getByLabelText(/size \(mm\)/i) as HTMLInputElement).value).toBe('600');
   });
 });
@@ -148,9 +174,10 @@ describe('PhotoCapture offline reference marker', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a')]} />);
     actOffline(() => markOffline());
+    openMarker();
     expect((screen.getByLabelText('Reference object') as HTMLSelectElement).disabled).toBe(true);
     expect((screen.getByLabelText('Edge in the box') as HTMLSelectElement).disabled).toBe(true);
-    drawBox();
+    drawBox(0, { alreadyOpen: true });
     expect(fetchMock).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });

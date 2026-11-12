@@ -35,8 +35,9 @@ type Mode = { kind: 'rectangle' } | { kind: 'draw'; points: Point[] };
  */
 export default function RoomSketch({ onSave, units = 'mm' }: RoomSketchProps) {
   const [mode, setMode] = useState<Mode>({ kind: 'rectangle' });
-  const [width, setWidth] = useState('3000');
-  const [depth, setDepth] = useState('4000');
+  // A bare number is in the project's units, so an inch project needs its own defaults (3000 would be 250 ft).
+  const [width, setWidth] = useState(units === 'in' ? `10'` : '3000');
+  const [depth, setDepth] = useState(units === 'in' ? `13'` : '4000');
   const [base, setBase] = useState<Room | null>(null);
   // Typed measured lengths by wall id; only lengths that parse count.
   const [measured, setMeasured] = useState<Record<string, string>>({});

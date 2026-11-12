@@ -21,6 +21,7 @@ import { insertVertex, moveVertex, removeVertex } from '@/lib/plan/room-edit';
 import type { OpeningKind, PlacedItem, Room } from '@/lib/plan/schemas';
 import { validateRoom } from '@/lib/plan/validate';
 import { fitToBounds, formatLength, pan, pinch, rulerTicks, screenToWorld, zoomAt, type Viewport } from '@/lib/plan/viewport';
+import { useStableHeight } from '@/lib/client/stable-height';
 import { OPENING_COLOR } from './plan-colors';
 
 // Konva touches `window` at import time, so the stage only loads in the browser.
@@ -77,7 +78,8 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * Pannable, zoomable view of the plan. Mouse: drag to pan, wheel to zoom
- * at the cursor. Touch: one finger pans, two fingers pinch-zoom. Rulers
+ * at the cursor. Touch: one finger scrolls the page (unless it grabs an item,
+ * corner or opening), two fingers pan and pinch-zoom. Rulers
  * along the top and left edges follow the view in the project's units.
  *
  * With `onEdit`:
@@ -103,11 +105,15 @@ export default function FloorPlanCanvas({
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const pointers = useRef(new Map<number, Point>());
+  // 60% of the window, but not re-measured when a phone keyboard opens (see useStableHeight).
+  const stableHeight = useStableHeight(0.6);
 
   const [editing, setEditing] = useState(false);
   const [snap, setSnap] = useState(true);
-  // On a phone the plan fills the width, so a finger on it can't scroll the page; this hands the touch back.
-  const [pageScroll, setPageScroll] = useState(false);
+  // On a phone the plan fills the width, so one finger must scroll the page; two fingers move the plan.
+  const [touchScreen, setTouchScreen] = useState(false);
+  // Set on pointer-down when the touch starts a drag, so the touchstart that follows keeps the page still.
+  const claimTouch = useRef(false);
   const [selected, setSelected] = useState<Selection>(null);
   const [placing, setPlacing] = useState<OpeningKind | null>(null);
   // What's shown while dragging or saving; null means "show the props".
@@ -178,8 +184,18 @@ export default function FloorPlanCanvas({
       const at = toLocal(el, e.clientX, e.clientY);
       setViewport((v) => v && zoomAt(v, at, factor));
     };
+    // Pointer-down fires before touchstart. A touch that grabs something, or a second finger,
+    // must not scroll the page; any other one-finger touch is left to scroll it.
+    const onTouchStart = (e: TouchEvent) => {
+      if (claimTouch.current || e.touches.length > 1) e.preventDefault();
+    };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    setTouchScreen(window.matchMedia?.('(pointer: coarse)').matches ?? false);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+    };
   }, []);
 
   const local = (e: React.PointerEvent): Point => toLocal(wrapRef.current!, e.clientX, e.clientY);
@@ -206,7 +222,11 @@ export default function FloorPlanCanvas({
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (pageScroll) return;
+    pointerDown(e);
+    claimTouch.current = drag.current?.pointerId === e.pointerId;
+  }
+
+  function pointerDown(e: React.PointerEvent<HTMLDivElement>) {
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -365,7 +385,8 @@ export default function FloorPlanCanvas({
     const prev = map.get(e.pointerId);
     if (!prev) return;
     const next = local(e);
-    if (map.size === 1) {
+    // One finger scrolls the page (the browser has it), so only a mouse or pen pans on its own.
+    if (map.size === 1 && e.pointerType !== 'touch') {
       setViewport((v) => v && pan(v, next[0] - prev[0], next[1] - prev[1]));
     } else if (map.size === 2) {
       const other = [...map.entries()].find(([id]) => id !== e.pointerId)![1];
@@ -464,7 +485,8 @@ export default function FloorPlanCanvas({
         data-y={viewport?.y}
         role="img"
         aria-label={label}
-        className={`relative h-[60vh] max-h-[560px] min-h-[280px] w-full ${pageScroll ? 'touch-pan-y' : 'touch-none'} select-none overflow-hidden rounded border bg-white ${
+        style={{ height: stableHeight }}
+        className={`relative h-[60vh] max-h-[560px] min-h-[280px] w-full touch-pan-y select-none overflow-hidden rounded border bg-white ${
           placingItem ? 'cursor-copy' : 'cursor-grab active:cursor-grabbing'
         }`}
         onPointerDown={onPointerDown}
@@ -485,7 +507,6 @@ export default function FloorPlanCanvas({
             selectedOpening={selected?.kind === 'opening' ? selected.id : null}
             selectedItem={selected?.kind === 'item' ? selected.id : null}
             itemLabels={itemLabels}
-            interactive={!pageScroll}
           />
         )}
         <div data-testid="ruler-x" aria-hidden className="pointer-events-none absolute inset-x-0 top-0 border-b bg-white/85 text-[10px] text-gray-600" style={{ height: RULER_PX }}>
@@ -525,14 +546,7 @@ export default function FloorPlanCanvas({
         <button type="button" className="rounded border px-3 py-1" onClick={fit}>
           Fit
         </button>
-        <button
-          type="button"
-          className={`rounded border px-3 py-1 ${pageScroll ? 'bg-black text-white' : ''}`}
-          aria-pressed={pageScroll}
-          onClick={() => setPageScroll((on) => !on)}
-        >
-          Scroll page
-        </button>
+        {touchScreen && <span className="text-xs text-gray-500">Two fingers move and zoom the plan</span>}
         {onEdit && (
           <>
             <button

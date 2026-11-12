@@ -38,6 +38,16 @@ const tap = (svg: SVGSVGElement, x: number, y: number) => fireEvent.click(svg, {
 
 describe('RoomSketch', () => {
   describe('rectangle quick start', () => {
+    it('starts an inch project at 10 ft × 13 ft, not 3000 × 4000 inches', () => {
+      const onSave = vi.fn();
+      render(<RoomSketch onSave={onSave} units="in" />);
+      fireEvent.click(screen.getByRole('button', { name: /use rectangle/i }));
+      fireEvent.click(screen.getByRole('button', { name: /save room/i }));
+      const [w, d] = savedRoom(onSave).measurements!.map((m) => m.lengthMm);
+      expect(w).toBeCloseTo(3048);
+      expect(d).toBeCloseTo(3962.4);
+    });
+
     it('saves a W × D room with both dimensions recorded as measurements', () => {
       const onSave = vi.fn();
       render(<RoomSketch onSave={onSave} />);

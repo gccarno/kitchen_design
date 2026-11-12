@@ -142,7 +142,7 @@ describe('ExtractPanel', () => {
     const { button } = setup();
     fireEvent.click(button());
     fireEvent.click(button());
-    expect(screen.getByText(/can take up to a minute/i)).not.toBeNull();
+    expect(screen.getByText(/usually takes 1–4 minutes/i)).not.toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock.mockResolvedValueOnce(job('done', { result: RESULT }));
@@ -230,15 +230,17 @@ describe('ExtractPanel', () => {
     expect(await screen.findByText('The request was lost (the server restarted). Please try again.')).not.toBeNull();
   });
 
-  it('says it is still working after 20 s', async () => {
+  it('says it is still working after 20 s, with a clock that shows the time passing', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockImplementation(async () => job('running'));
     const { button } = setup();
     fireEvent.click(button());
+    expect(screen.getByRole('status').textContent).toMatch(/0:00/);
     await tick(19_000);
     expect(screen.queryByText(/still working/i)).toBeNull();
     await tick(1_500);
     expect(screen.getByText(/still working/i)).not.toBeNull();
+    expect(screen.getByRole('status').textContent).toMatch(/0:(19|2\d)/);
   });
 
   it('resumes polling a remembered job after a remount instead of posting again', async () => {
@@ -253,7 +255,7 @@ describe('ExtractPanel', () => {
     fetchMock.mockReset();
     fetchMock.mockResolvedValueOnce(job('done', { result: RESULT }));
     const second = setup();
-    expect(screen.getByText(/can take up to a minute/i)).not.toBeNull();
+    expect(screen.getByText(/usually takes 1–4 minutes/i)).not.toBeNull();
     await tick(1500);
     await waitFor(() => expect(second.onProposal).toHaveBeenCalled());
     expect(fetchMock).toHaveBeenCalledTimes(1);

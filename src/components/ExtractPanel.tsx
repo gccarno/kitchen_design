@@ -197,10 +197,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onPro
       >
         Get room from photos
       </button>
-      {busy && <p className="text-sm text-gray-600">Asking the model… this can take up to a minute.</p>}
-      {busy && slow && (
-        <p className="text-sm text-gray-600">Still working — the model is slow right now. You can leave this page and come back.</p>
-      )}
+      {busy && <ExtractProgress slow={slow} />}
       {error && (
         <p role="alert" className="text-sm break-words text-red-700">
           {error.message}
@@ -209,6 +206,37 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onPro
       {error?.retryAfterMs !== undefined && (
         <RetryCountdown retryAfterMs={error.retryAfterMs} onRetry={run} disabled={!canRun} />
       )}
+    </div>
+  );
+}
+
+/** What the free vision models usually take: the bar fills over this and then waits near the end. */
+const TYPICAL_MS = 3 * 60_000;
+
+/**
+ * The wait is minutes, not seconds, so show that time is passing: a clock and
+ * a bar that eases towards the usual time (it never claims to be done).
+ */
+function ExtractProgress({ slow }: { slow: boolean }) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const timer = setInterval(() => setElapsedMs(Date.now() - start), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const secs = Math.floor(elapsedMs / 1000);
+  const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  // 1 − e^(−t/τ): about 63% at the usual time, 95% at three times it.
+  const fraction = 1 - Math.exp(-elapsedMs / TYPICAL_MS);
+  return (
+    <div className="flex flex-col gap-1 text-sm text-gray-600" role="status">
+      <p>
+        Reading your photos… <span className="tabular-nums">{clock}</span>. This usually takes 1–4 minutes.
+      </p>
+      <div className="h-1.5 w-full max-w-xs overflow-hidden rounded bg-gray-200" aria-hidden>
+        <div className="h-full bg-black transition-[width] duration-1000 ease-linear" style={{ width: `${Math.max(fraction, 0.03) * 100}%` }} />
+      </div>
+      {slow && <p>Still working — you can leave this page and come back; it keeps going.</p>}
     </div>
   );
 }
