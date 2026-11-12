@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { addPhoto, getStorage, isValidProjectId, ProjectNotFoundError } from '@/lib/storage';
+import { addPhoto, getRequestUserId, getStorage, isValidProjectId, ProjectNotFoundError } from '@/lib/storage';
 import { normalizeOrientation, readImageDimensions } from '@/lib/exif';
+import { authEnabled } from '@/lib/auth/config';
+import { csrfBlocked, csrfRefusedResponse } from '@/lib/auth/csrf';
 import { withUnauthorized } from '@/lib/auth/session';
 
 // Disable any caching on this route.
@@ -21,7 +23,12 @@ const MAX_BYTES = 20 * 1024 * 1024; // 20 MB per photo
  * the photo metadata. The reference object is marked afterwards via
  * PUT /api/projects/[id]/photos/[photoId]/reference.
  */
-async function handlePost(req: Request): Promise<NextResponse> {
+async function handlePost(req: Request): Promise<Response> {
+  // The middleware skips this route (see its matcher), so check here, before reading the body:
+  // a cross-site POST gets 403, and no valid session gets 401 (UnauthorizedError → withUnauthorized).
+  if (authEnabled() && csrfBlocked(req.method, '/api/upload', req.headers)) return csrfRefusedResponse();
+  await getRequestUserId();
+
   let formData: FormData;
   try {
     formData = await req.formData();
