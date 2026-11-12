@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { reportUploadFailure } from '@/lib/client/monitoring';
 import { useOnline } from '@/lib/client/online';
 import ReferenceMarker from './ReferenceMarker';
 import type { ReferenceInput } from '@/lib/plan/reference-objects';
@@ -45,11 +46,14 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
     for (const file of files) {
       const key = nextKey.current++;
       setUploads((u) => [...u, { key, name: file.name, state: 'uploading' }]);
+      const started = performance.now();
+      let status = 0; // stays 0 when no response arrives
       try {
         const form = new FormData();
         form.append('projectId', projectId);
         form.append('file', file);
         const res = await fetch('/api/upload', { method: 'POST', body: form });
+        status = res.status;
         const body = (await res.json().catch(() => ({}))) as { photo?: Photo; error?: string };
         if (!res.ok || !body.photo) throw new Error(body.error ?? `upload failed (${res.status})`);
         const uploaded = body.photo;
@@ -57,6 +61,7 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
         setUploads((u) => u.filter((x) => x.key !== key));
       } catch (err) {
         const error = (err as Error).message;
+        reportUploadFailure({ status, error, sizeBytes: file.size, mimeType: file.type, durationMs: performance.now() - started });
         setUploads((u) => u.map((x) => (x.key === key ? { key, name: file.name, state: 'error', error } : x)));
       }
     }
