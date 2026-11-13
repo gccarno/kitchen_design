@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { reportUploadFailure } from '@/lib/client/monitoring';
+import { reportPickerLost, reportUploadFailure, uploadStep } from '@/lib/client/monitoring';
 import { useOnline } from '@/lib/client/online';
 import ReferenceMarker from './ReferenceMarker';
 import type { ReferenceInput } from '@/lib/plan/reference-objects';
@@ -16,6 +16,34 @@ interface PhotoCaptureProps {
 
 type UploadStatus = { key: number; name: string; state: 'uploading' } | { key: number; name: string; state: 'error'; error: string };
 type SaveState = 'saving' | 'saved' | { error: string };
+type PickerSource = 'camera' | 'library';
+
+/** An upload that hasn't answered after this long is given up on (and reported). */
+export const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000;
+/** Set while the camera or picker is open; still there after a reload means its result was lost. */
+export const PICKER_PENDING_KEY = 'photo-picker-pending';
+const PICKER_LOST_WINDOW_MS = 10 * 60 * 1000;
+
+// localStorage, not sessionStorage: Android may hand a killed app back in a new WebView, which
+// starts a new session. It can throw (private mode, blocked storage): the marker is best-effort.
+function readPending(): { source: string; at: number } | null {
+  try {
+    const raw = localStorage.getItem(PICKER_PENDING_KEY);
+    return raw ? (JSON.parse(raw) as { source: string; at: number }) : null;
+  } catch {
+    return null;
+  }
+}
+function writePending(source: PickerSource) {
+  try {
+    localStorage.setItem(PICKER_PENDING_KEY, JSON.stringify({ source, at: Date.now() }));
+  } catch {}
+}
+function clearPending() {
+  try {
+    localStorage.removeItem(PICKER_PENDING_KEY);
+  } catch {}
+}
 
 /**
  * Capture or pick room photos, upload them, and mark a reference object on
@@ -30,7 +58,10 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
   // Photos whose reference marker is open. Marking is optional, so it starts closed: an open
   // marker fills the screen and its drawing surface can't be swiped to scroll the page.
   const [marking, setMarking] = useState<Set<string>>(new Set());
+  const [lostPhoto, setLostPhoto] = useState(false);
   const nextKey = useRef(0);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
   // Reference saves are chained per photo so a fast second edit can't land
   // before the first and be overwritten by it.
   const saveChains = useRef(new Map<string, Promise<void>>());
@@ -41,36 +72,103 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
     if (photos !== initialRef.current) onPhotosChange?.(photos);
   }, [photos, onPhotosChange]);
 
+  // The camera or picker was opened and the page has been reloaded since, without its result
+  // arriving: Android closed the app while the camera was in front. Report it and tell the user.
+  useEffect(() => {
+    const pending = readPending();
+    if (pending) {
+      clearPending();
+      const ageMs = Date.now() - pending.at;
+      if (ageMs >= 0 && ageMs < PICKER_LOST_WINDOW_MS) {
+        reportPickerLost({ source: pending.source, ageMs });
+        setLostPhoto(true);
+      }
+    }
+    // Leaving the page normally (unmount) means nothing was lost.
+    return clearPending;
+  }, []);
+
+  // Closing the picker without choosing fires `cancel` (no React prop for it on inputs).
+  useEffect(() => {
+    const inputs = [cameraRef.current, libraryRef.current].filter((i): i is HTMLInputElement => !!i);
+    const onCancel = () => {
+      clearPending();
+      uploadStep('picker-cancelled');
+    };
+    inputs.forEach((i) => i.addEventListener('cancel', onCancel));
+    return () => inputs.forEach((i) => i.removeEventListener('cancel', onCancel));
+  }, []);
+
+  async function uploadOne(file: File, key: number) {
+    const started = performance.now();
+    const sizeKB = Math.round(file.size / 1024);
+    const fail = (status: number, error: string, timedOut = false) => {
+      const durationMs = performance.now() - started;
+      uploadStep('upload-failed', { status, sizeKB, ms: Math.round(durationMs), ...(timedOut ? { timedOut } : {}) });
+      reportUploadFailure({ status, error, sizeBytes: file.size, mimeType: file.type, durationMs, ...(timedOut ? { timedOut } : {}) });
+      setUploads((u) => u.map((x) => (x.key === key ? { key, name: file.name, state: 'error', error } : x)));
+    };
+    if (file.size === 0) {
+      fail(-1, 'the photo came through empty, please try again');
+      return;
+    }
+    uploadStep('upload-start', { sizeKB, type: file.type || 'unknown' });
+    const abort = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      abort.abort();
+    }, UPLOAD_TIMEOUT_MS);
+    let status = 0; // stays 0 when no response arrives
+    try {
+      const form = new FormData();
+      form.append('projectId', projectId);
+      form.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: form, signal: abort.signal });
+      status = res.status;
+      const body = (await res.json().catch(() => ({}))) as { photo?: Photo; error?: string };
+      if (!res.ok || !body.photo) throw new Error(body.error ?? `upload failed (${res.status})`);
+      const uploaded = body.photo;
+      uploadStep('upload-done', { status, sizeKB, ms: Math.round(performance.now() - started) });
+      setPhotos((prev) => [...prev, uploaded]);
+      setUploads((u) => u.filter((x) => x.key !== key));
+    } catch (err) {
+      if (timedOut) fail(0, 'upload timed out, check your connection and try again', true);
+      else fail(status, (err as Error).message);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function uploadFiles(files: File[]) {
     // Sequential: keeps order stable and memory low on phones.
     for (const file of files) {
       const key = nextKey.current++;
       setUploads((u) => [...u, { key, name: file.name, state: 'uploading' }]);
-      const started = performance.now();
-      let status = 0; // stays 0 when no response arrives
-      try {
-        const form = new FormData();
-        form.append('projectId', projectId);
-        form.append('file', file);
-        const res = await fetch('/api/upload', { method: 'POST', body: form });
-        status = res.status;
-        const body = (await res.json().catch(() => ({}))) as { photo?: Photo; error?: string };
-        if (!res.ok || !body.photo) throw new Error(body.error ?? `upload failed (${res.status})`);
-        const uploaded = body.photo;
-        setPhotos((prev) => [...prev, uploaded]);
-        setUploads((u) => u.filter((x) => x.key !== key));
-      } catch (err) {
-        const error = (err as Error).message;
-        reportUploadFailure({ status, error, sizeBytes: file.size, mimeType: file.type, durationMs: performance.now() - started });
-        setUploads((u) => u.map((x) => (x.key === key ? { key, name: file.name, state: 'error', error } : x)));
-      }
+      await uploadOne(file, key);
     }
   }
 
+  function openPicker(source: PickerSource) {
+    writePending(source);
+    uploadStep('picker-open', { source });
+  }
+
   function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    clearPending();
+    setLostPhoto(false);
     const files = Array.from(e.target.files ?? []);
     e.target.value = ''; // allow re-selecting the same file
-    if (files.length > 0) void uploadFiles(files);
+    if (files.length === 0) {
+      uploadStep('picker-cancelled');
+      return;
+    }
+    uploadStep('files-picked', {
+      count: files.length,
+      sizeKB: Math.round(files.reduce((n, f) => n + f.size, 0) / 1024),
+      types: [...new Set(files.map((f) => f.type || 'unknown'))].join(','),
+    });
+    void uploadFiles(files);
   }
 
   function toggleMarking(photoId: string) {
@@ -112,13 +210,37 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
       <div className="flex flex-wrap gap-2">
         <label className={`rounded bg-black px-4 py-2 text-white ${online ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
           Take photo
-          <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={!online} onChange={handleFiles} />
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            disabled={!online}
+            onClick={() => openPicker('camera')}
+            onChange={handleFiles}
+          />
         </label>
         <label className={`rounded border px-4 py-2 ${online ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
           Choose photos
-          <input type="file" accept="image/*" multiple className="sr-only" disabled={!online} onChange={handleFiles} />
+          <input
+            ref={libraryRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            disabled={!online}
+            onClick={() => openPicker('library')}
+            onChange={handleFiles}
+          />
         </label>
       </div>
+
+      {lostPhoto && (
+        <p role="alert" className="text-sm text-red-600">
+          Your last photo didn&apos;t come through. Please take it again.
+        </p>
+      )}
 
       {uploads.length > 0 && (
         <ul className="text-sm">

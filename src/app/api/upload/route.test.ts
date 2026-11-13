@@ -142,3 +142,23 @@ describe('POST /api/upload', () => {
     }
   });
 });
+
+describe('POST /api/upload logging', () => {
+  it('logs one line with the status, declared size and time taken (no ids)', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    try {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(4096)], { type: 'image/jpeg' }));
+      const req = new Request('http://localhost/api/upload', { method: 'POST', body: form });
+      const res = await POST(req);
+      expect(res.status).toBe(400);
+      const lines = info.mock.calls.map((c) => JSON.parse(String(c[0])));
+      const line = lines.find((l) => l.event === 'upload');
+      expect(line).toMatchObject({ event: 'upload', status: 400 });
+      expect(typeof line.ms).toBe('number');
+      expect(Object.keys(line).sort()).toEqual(['contentLengthKB', 'event', 'ms', 'status']);
+    } finally {
+      info.mockRestore();
+    }
+  });
+});

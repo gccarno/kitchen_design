@@ -79,4 +79,28 @@ async function handlePost(req: Request): Promise<Response> {
   }
 }
 
-export const POST = withUnauthorized(handlePost);
+const authedPost = withUnauthorized(handlePost);
+
+/**
+ * One JSON log line per upload (status, declared size, time taken), so a phone
+ * report can be matched to the server side. Unhandled errors still reach Sentry
+ * through onRequestError (src/instrumentation.ts); this only adds the line.
+ */
+export async function POST(req: Request): Promise<Response> {
+  const started = Date.now();
+  const declared = Number(req.headers.get('content-length'));
+  const contentLengthKB = Number.isFinite(declared) && declared > 0 ? Math.round(declared / 1024) : null;
+  const log = (status: number, errorName?: string) => {
+    const line = JSON.stringify({ event: 'upload', status, contentLengthKB, ms: Date.now() - started, ...(errorName ? { errorName } : {}) });
+    if (status >= 500) console.error(line);
+    else console.info(line);
+  };
+  try {
+    const res = await authedPost(req);
+    log(res.status);
+    return res;
+  } catch (err) {
+    log(500, err instanceof Error ? err.name : typeof err);
+    throw err;
+  }
+}

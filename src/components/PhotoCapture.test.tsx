@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { markOffline, markOnline } from '@/lib/client/online';
 import { act as actOffline } from '@testing-library/react';
-import PhotoCapture from './PhotoCapture';
+import PhotoCapture, { PICKER_PENDING_KEY, UPLOAD_TIMEOUT_MS } from './PhotoCapture';
 
-const monitoring = vi.hoisted(() => ({ reportUploadFailure: vi.fn() }));
+const monitoring = vi.hoisted(() => ({ reportUploadFailure: vi.fn(), uploadStep: vi.fn(), reportPickerLost: vi.fn() }));
 vi.mock('@/lib/client/monitoring', () => monitoring);
 import type { Photo } from '@/lib/plan/schemas';
 
@@ -167,6 +167,87 @@ describe('PhotoCapture', () => {
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[withCustom]} />);
     openMarker();
     expect((screen.getByLabelText(/size \(mm\)/i) as HTMLInputElement).value).toBe('600');
+  });
+});
+
+describe('PhotoCapture upload diagnostics', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    localStorage.clear();
+    Object.values(monitoring).forEach((f) => f.mockClear());
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('records each step of a successful upload, without file names', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ photo: photo('one') }, 201));
+    render(<PhotoCapture projectId={PROJECT} />);
+    const input = screen.getByLabelText(/take photo/i);
+    fireEvent.click(input);
+    fireEvent.change(input, { target: { files: [new File(['abc'], 'secret-name.jpg', { type: 'image/jpeg' })] } });
+    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1));
+    expect(monitoring.uploadStep.mock.calls.map((c) => c[0])).toEqual(['picker-open', 'files-picked', 'upload-start', 'upload-done']);
+    expect(JSON.stringify(monitoring.uploadStep.mock.calls)).not.toContain('secret-name');
+    expect(localStorage.getItem(PICKER_PENDING_KEY)).toBeNull();
+  });
+
+  it('reports a camera result lost to a reload and asks for the photo again', () => {
+    localStorage.setItem(PICKER_PENDING_KEY, JSON.stringify({ source: 'camera', at: Date.now() - 30_000 }));
+    render(<PhotoCapture projectId={PROJECT} />);
+    expect(monitoring.reportPickerLost).toHaveBeenCalledTimes(1);
+    expect(monitoring.reportPickerLost.mock.calls[0][0]).toMatchObject({ source: 'camera' });
+    expect(screen.getByRole('alert').textContent).toMatch(/didn.t come through/i);
+    expect(localStorage.getItem(PICKER_PENDING_KEY)).toBeNull();
+  });
+
+  it('ignores a marker older than ten minutes', () => {
+    localStorage.setItem(PICKER_PENDING_KEY, JSON.stringify({ source: 'camera', at: Date.now() - 60 * 60 * 1000 }));
+    render(<PhotoCapture projectId={PROJECT} />);
+    expect(monitoring.reportPickerLost).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('clears the marker when the picker is cancelled', () => {
+    const { unmount } = render(<PhotoCapture projectId={PROJECT} />);
+    const input = screen.getByLabelText(/choose photos/i);
+    fireEvent.click(input);
+    expect(localStorage.getItem(PICKER_PENDING_KEY)).not.toBeNull();
+    input.dispatchEvent(new Event('cancel'));
+    expect(localStorage.getItem(PICKER_PENDING_KEY)).toBeNull();
+    expect(monitoring.uploadStep).toHaveBeenLastCalledWith('picker-cancelled');
+    fireEvent.click(input);
+    unmount();
+    expect(localStorage.getItem(PICKER_PENDING_KEY)).toBeNull();
+  });
+
+  it('reports an empty file and does not send it', async () => {
+    render(<PhotoCapture projectId={PROJECT} />);
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files: [new File([], 'a.jpg', { type: 'image/jpeg' })] } });
+    expect(await screen.findByText(/came through empty/i)).not.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(monitoring.reportUploadFailure.mock.calls[0][0]).toMatchObject({ status: -1, sizeBytes: 0 });
+  });
+
+  it('gives up on an upload that never answers, and reports it as a timeout', async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        })
+    );
+    render(<PhotoCapture projectId={PROJECT} />);
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files: [new File(['x'], 'a.jpg', { type: 'image/jpeg' })] } });
+    await actOffline(async () => {
+      await vi.advanceTimersByTimeAsync(UPLOAD_TIMEOUT_MS + 10);
+    });
+    expect(monitoring.reportUploadFailure).toHaveBeenCalledTimes(1);
+    expect(monitoring.reportUploadFailure.mock.calls[0][0]).toMatchObject({ status: 0, timedOut: true });
+    expect(screen.getByText(/timed out/i)).not.toBeNull();
   });
 });
 
