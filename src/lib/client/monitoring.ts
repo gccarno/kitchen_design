@@ -36,8 +36,10 @@ export function initClientMonitoring(env: Env = buildEnv): boolean {
 }
 
 export type UploadFailure = {
-  /** HTTP status, or 0 when no response came back (network error, connection reset). */
+  /** HTTP status, 0 when no response came back (network error, timeout), -1 when nothing was sent (empty file). */
   status: number;
+  /** The request was aborted after waiting too long. */
+  timedOut?: boolean;
   /** The message the user was shown. */
   error: string;
   sizeBytes: number;
@@ -53,15 +55,53 @@ export class PhotoUploadError extends Error {
 /** A photo upload failed: the user saw an error, so Sentry gets one too, grouped by status. */
 export function reportUploadFailure(f: UploadFailure): void {
   if (!enabled) return;
-  const network = f.status === 0;
-  Sentry.captureException(new PhotoUploadError(`Photo upload failed: ${network ? 'no response' : `HTTP ${f.status}`}`), {
+  const what = f.timedOut ? 'timed out' : f.status === 0 ? 'no response' : f.status === -1 ? 'empty file' : `HTTP ${f.status}`;
+  Sentry.captureException(new PhotoUploadError(`Photo upload failed: ${what}`), {
     level: 'error',
-    fingerprint: ['upload-failed', String(f.status)],
-    tags: { upload_status: String(f.status), upload_type: f.mimeType || 'unknown', online: String(navigator.onLine) },
+    fingerprint: ['upload-failed', f.timedOut ? 'timeout' : String(f.status)],
+    tags: {
+      upload_status: String(f.status),
+      upload_type: f.mimeType || 'unknown',
+      online: String(navigator.onLine),
+      ...(f.timedOut ? { upload_timeout: 'true' } : {}),
+    },
     extra: {
       shown: f.error.slice(0, 200),
       sizeKB: Math.round(f.sizeBytes / 1024),
       durationMs: Math.round(f.durationMs),
     },
+  });
+}
+
+export type UploadStep =
+  | 'picker-open'
+  | 'picker-cancelled'
+  | 'files-picked'
+  | 'upload-start'
+  | 'upload-done'
+  | 'upload-failed';
+
+/**
+ * A breadcrumb for each step of a photo upload, so any later report carries
+ * the sequence that led to it. Counts, sizes, types, statuses and timings only:
+ * never file names.
+ */
+export function uploadStep(step: UploadStep, data: Record<string, string | number | boolean> = {}): void {
+  if (!enabled) return;
+  Sentry.addBreadcrumb({ category: 'photo-upload', message: step, level: step === 'upload-failed' ? 'error' : 'info', data });
+}
+
+/**
+ * The camera or photo picker was opened but its result never came back,
+ * usually because Android closed the app while the camera was in front and
+ * the page reloaded. Nothing else would report this.
+ */
+export function reportPickerLost(f: { source: string; ageMs: number }): void {
+  if (!enabled) return;
+  Sentry.captureMessage('Photo picker result lost (page reloaded while picking)', {
+    level: 'warning',
+    fingerprint: ['photo-picker-lost', f.source],
+    tags: { picker_source: f.source },
+    extra: { secondsSincePickerOpened: Math.round(f.ageMs / 1000) },
   });
 }

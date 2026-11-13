@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const sentry = vi.hoisted(() => ({
   init: vi.fn(),
   captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
 }));
 vi.mock('@sentry/browser', () => sentry);
 
@@ -54,5 +56,45 @@ describe('client monitoring', () => {
     m.initClientMonitoring({ dsn: 'https://k@o1.ingest.sentry.io/1' });
     m.reportUploadFailure({ ...failure, status: 0, error: 'Failed to fetch' });
     expect((sentry.captureException.mock.calls[0][0] as Error).message).toBe('Photo upload failed: no response');
+  });
+
+  it('groups a timed-out upload apart from one with no response', async () => {
+    const m = await import('./monitoring');
+    m.initClientMonitoring({ dsn: 'https://k@o1.ingest.sentry.io/1' });
+    m.reportUploadFailure({ ...failure, status: 0, error: 'timed out', timedOut: true });
+    const [err, ctx] = sentry.captureException.mock.calls[0];
+    expect(err.message).toBe('Photo upload failed: timed out');
+    expect(ctx.fingerprint).toEqual(['upload-failed', 'timeout']);
+    expect(ctx.tags.upload_timeout).toBe('true');
+  });
+
+  it('names an empty file that was never sent', async () => {
+    const m = await import('./monitoring');
+    m.initClientMonitoring({ dsn: 'https://k@o1.ingest.sentry.io/1' });
+    m.reportUploadFailure({ ...failure, status: -1, error: 'empty file' });
+    expect((sentry.captureException.mock.calls[0][0] as Error).message).toBe('Photo upload failed: empty file');
+  });
+
+  it('records upload steps as breadcrumbs only when enabled', async () => {
+    const m = await import('./monitoring');
+    m.uploadStep('upload-start', { sizeKB: 10 });
+    expect(sentry.addBreadcrumb).not.toHaveBeenCalled();
+    m.initClientMonitoring({ dsn: 'https://k@o1.ingest.sentry.io/1' });
+    m.uploadStep('upload-start', { sizeKB: 10 });
+    m.uploadStep('upload-failed', { status: 0 });
+    expect(sentry.addBreadcrumb.mock.calls.map((c) => [c[0].category, c[0].message, c[0].level])).toEqual([
+      ['photo-upload', 'upload-start', 'info'],
+      ['photo-upload', 'upload-failed', 'error'],
+    ]);
+  });
+
+  it('reports a lost picker result as a warning grouped by source', async () => {
+    const m = await import('./monitoring');
+    m.reportPickerLost({ source: 'camera', ageMs: 5000 });
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
+    m.initClientMonitoring({ dsn: 'https://k@o1.ingest.sentry.io/1' });
+    m.reportPickerLost({ source: 'camera', ageMs: 42_400 });
+    const [, ctx] = sentry.captureMessage.mock.calls[0];
+    expect(ctx).toMatchObject({ level: 'warning', fingerprint: ['photo-picker-lost', 'camera'], extra: { secondsSincePickerOpened: 42 } });
   });
 });
