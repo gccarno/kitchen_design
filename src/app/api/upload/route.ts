@@ -4,12 +4,45 @@ import { normalizeOrientation, readImageDimensions } from '@/lib/exif';
 import { authEnabled } from '@/lib/auth/config';
 import { csrfBlocked, csrfRefusedResponse } from '@/lib/auth/csrf';
 import { withUnauthorized } from '@/lib/auth/session';
+import { MAX_BODY_BYTES, MAX_PHOTO_BYTES } from './limits';
 
 // Disable any caching on this route.
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const MAX_BYTES = 20 * 1024 * 1024; // 20 MB per photo
+const MAX_BYTES = MAX_PHOTO_BYTES;
+
+const tooLarge = () => NextResponse.json({ error: `file too large (max ${MAX_BYTES / 1024 / 1024}MB)` }, { status: 413 });
+
+/**
+ * The request body, read up to MAX_BODY_BYTES; null as soon as it is (or declares itself)
+ * larger, without buffering the rest. `req.formData()` would read any size into memory.
+ */
+async function readCappedBody(req: Request): Promise<Uint8Array<ArrayBuffer> | null> {
+  const declared = Number(req.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+  const reader = req.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.byteLength;
+  }
+  return out;
+}
 
 /**
  * POST /api/upload
@@ -29,9 +62,11 @@ async function handlePost(req: Request): Promise<Response> {
   if (authEnabled() && csrfBlocked(req.method, '/api/upload', req.headers)) return csrfRefusedResponse();
   await getRequestUserId();
 
+  const bytes = await readCappedBody(req);
+  if (!bytes) return tooLarge();
   let formData: FormData;
   try {
-    formData = await req.formData();
+    formData = await new Response(bytes, { headers: { 'content-type': req.headers.get('content-type') ?? '' } }).formData();
   } catch {
     return NextResponse.json({ error: 'expected multipart/form-data' }, { status: 400 });
   }
@@ -51,12 +86,7 @@ async function handlePost(req: Request): Promise<Response> {
   if (!(file instanceof Blob)) {
     return NextResponse.json({ error: 'file is required' }, { status: 400 });
   }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json(
-      { error: `file too large (max ${MAX_BYTES / 1024 / 1024}MB)` },
-      { status: 413 }
-    );
-  }
+  if (file.size > MAX_BYTES) return tooLarge();
 
   // Normalize EXIF orientation; this also rejects bytes sharp can't decode.
   let normalized: Buffer;
