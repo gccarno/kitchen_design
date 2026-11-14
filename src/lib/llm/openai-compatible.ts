@@ -44,7 +44,7 @@ type ChatBody = Omit<ChatCompletionsRequest, 'model' | 'models'>;
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_RETRY_DELAY_MS = 5_000;
 const DEFAULT_MAX_RETRIES = 3;
-/** Jobs are requeued after 5 minutes and one job may make several calls, so keep each call's waiting short. */
+/** One job may make several calls, and jobs.staleJobMs() budgets this much waiting per call: keep them in step. */
 const DEFAULT_MAX_RATE_LIMIT_WAIT_MS = 60_000;
 /** How long the user should wait before trying again after the upstream stayed busy. */
 const UPSTREAM_TRY_AGAIN_MS = 60_000;

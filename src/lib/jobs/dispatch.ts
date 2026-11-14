@@ -13,8 +13,25 @@ export type DispatchOpts = {
 };
 
 export const WORKER_TIMEOUT_MS = 2000;
-/** A running job older than this is presumed dead (each LLM call is bounded at about 60 s, plus one retry). */
+/** The shortest time a running job is given before it is presumed dead. */
 export const STALE_JOB_MS = 5 * 60 * 1000;
+/** LLM calls one job makes at most (extract, refine and closet each retry a bad answer once). */
+const LLM_CALLS_PER_JOB = 2;
+/** Mirrors openai-compatible.ts: the default per-call timeout, and the rate-limit waiting allowed per call. */
+const DEFAULT_LLM_TIMEOUT_MS = 60_000;
+const LLM_RATE_LIMIT_WAIT_MS = 60_000;
+const STALE_MARGIN_MS = 60_000;
+
+/**
+ * How long a job may run before it is presumed dead: long enough for every LLM call it can make
+ * to hit its timeout after waiting out rate limits (LLM_TIMEOUT_MS is often minutes with free
+ * reasoning models), and never under STALE_JOB_MS. Requeueing a job that is still running would
+ * call the model again and, after MAX_JOB_ATTEMPTS, fail a job that was about to succeed.
+ */
+export function staleJobMs(env: Record<string, string | undefined> = process.env): number {
+  const timeout = Number(env.LLM_TIMEOUT_MS) || DEFAULT_LLM_TIMEOUT_MS;
+  return Math.max(STALE_JOB_MS, LLM_CALLS_PER_JOB * (timeout + LLM_RATE_LIMIT_WAIT_MS) + STALE_MARGIN_MS);
+}
 export const MAX_JOB_ATTEMPTS = 3;
 /** A job still `queued` this long after creation was never started (e.g. the server restarted). */
 export const UNSTARTED_JOB_MS = 60 * 1000;
@@ -59,7 +76,7 @@ export async function dispatchJob(jobId: string, opts: DispatchOpts = {}): Promi
 
 /**
  * Called when a job is polled: recovers a stuck job. A `running` job started
- * over 5 minutes ago goes back to queued (or failed after 3 attempts) and is
+ * longer ago than staleJobMs() (5 minutes at least) goes back to queued (or failed after 3 attempts) and is
  * dispatched again. A job left `queued` for over a minute (never started, e.g.
  * the server restarted before running it) is dispatched too; the claim keeps
  * that safe. One still `queued` after 10 minutes is failed ('job was never
@@ -74,7 +91,7 @@ export async function ensureProgress(job: Job, opts: DispatchOpts = {}): Promise
     await dispatchJob(job.id, opts);
     return 'requeued';
   }
-  const outcome = await store.requeueStale(job.id, STALE_JOB_MS, MAX_JOB_ATTEMPTS);
+  const outcome = await store.requeueStale(job.id, staleJobMs(opts.env ?? process.env), MAX_JOB_ATTEMPTS);
   if (outcome === 'requeued') await dispatchJob(job.id, opts);
   return outcome;
 }
