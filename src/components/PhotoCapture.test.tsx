@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { markOffline, markOnline } from '@/lib/client/online';
 import { act as actOffline } from '@testing-library/react';
-import PhotoCapture, { PICKER_PENDING_KEY, UPLOAD_TIMEOUT_MS } from './PhotoCapture';
+import PhotoCapture, { MAX_PHOTOS, PICKER_PENDING_KEY, UPLOAD_TIMEOUT_MS } from './PhotoCapture';
 
 const monitoring = vi.hoisted(() => ({ reportUploadFailure: vi.fn(), uploadStep: vi.fn(), reportPickerLost: vi.fn() }));
 vi.mock('@/lib/client/monitoring', () => monitoring);
@@ -60,6 +60,37 @@ describe('PhotoCapture', () => {
     expect(camera.accept).toBe('image/*');
     expect(library.multiple).toBe(true);
     expect(library.hasAttribute('capture')).toBe(false);
+  });
+
+  it('removes a photo after asking, and reports the new list', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ photos: [photo('b')] }));
+    const onPhotosChange = vi.fn();
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a'), photo('b')]} onPhotosChange={onPhotosChange} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /remove photo/i })[0]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /yes, remove/i }));
+    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1));
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`/api/projects/${PROJECT}/photos/a`);
+    expect(init).toMatchObject({ method: 'DELETE' });
+    expect(onPhotosChange).toHaveBeenLastCalledWith([photo('b')]);
+  });
+
+  it('keeps the photo and says why when removing fails', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'photo not found' }, 404));
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a')]} />);
+    fireEvent.click(screen.getByRole('button', { name: /remove photo/i }));
+    fireEvent.click(screen.getByRole('button', { name: /yes, remove/i }));
+    expect(await screen.findByText(/couldn.t remove: photo not found/i)).toBeTruthy();
+    expect(screen.getAllByRole('img')).toHaveLength(1);
+  });
+
+  it(`stops offering new photos at ${MAX_PHOTOS}, and says how to add another`, () => {
+    const full = Array.from({ length: MAX_PHOTOS }, (_, i) => photo(`p${i}`));
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={full} />);
+    expect((screen.getByLabelText(/take photo/i) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText(/choose photos/i) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText(new RegExp(`${MAX_PHOTOS} photos is the most`, 'i'))).toBeTruthy();
   });
 
   it('renders existing photos served from the photo route', () => {

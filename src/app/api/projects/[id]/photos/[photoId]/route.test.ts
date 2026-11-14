@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { createProject, loadProject } from '@/lib/storage/projects';
 import { POST as upload } from '@/app/api/upload/route';
-import { GET } from './route';
+import { GET, DELETE as removePhoto } from './route';
 import { PUT, DELETE } from './reference/route';
 
 type Params = { params: Promise<{ id: string; photoId: string }> };
@@ -123,6 +123,31 @@ describe('photo routes', () => {
       const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }), ctx(p.id, photoId));
       expect(res.status).toBe(200);
       expect(loadProject(dataDir, p.id).photos[0].referenceObject).toBeUndefined();
+    });
+  });
+
+  describe('DELETE /api/projects/[id]/photos/[photoId]', () => {
+    const del = (id: string, photoId: string) => removePhoto(new Request('http://localhost/x', { method: 'DELETE' }), ctx(id, photoId));
+
+    it('removes the photo from the project and its file, and returns the remaining photos', async () => {
+      const p = createProject(dataDir, { name: 'P' });
+      const keep = await uploadPhoto(p.id);
+      const drop = await uploadPhoto(p.id);
+      const res = await del(p.id, drop);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { photos: { id: string }[] };
+      expect(body.photos.map((ph) => ph.id)).toEqual([keep]);
+      expect(loadProject(dataDir, p.id).photos.map((ph) => ph.id)).toEqual([keep]);
+      expect((await GET(new Request('http://localhost/x'), ctx(p.id, drop))).status).toBe(404);
+    });
+
+    it('returns 400 for a bad project id and 404 for an unknown project or photo', async () => {
+      const p = createProject(dataDir, { name: 'P' });
+      const photo = await uploadPhoto(p.id);
+      expect((await del('..', photo)).status).toBe(400);
+      expect((await del(randomUUID(), photo)).status).toBe(404);
+      expect((await del(p.id, 'not-listed')).status).toBe(404);
+      expect(loadProject(dataDir, p.id).photos).toHaveLength(1);
     });
   });
 });

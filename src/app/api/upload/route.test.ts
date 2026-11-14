@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { POST } from './route';
 import { MAX_BODY_BYTES } from './limits';
+import { MAX_PHOTOS } from '@/lib/storage/service';
 import { createProject, loadProject, projectDir } from '@/lib/storage/projects';
 
 const raceState = vi.hoisted(() => ({ vanish: false }));
@@ -135,6 +136,16 @@ describe('POST /api/upload', () => {
     expect(res.status).toBe(413);
     expect(sent).toBeLessThan(MAX_BODY_BYTES + 3 * chunk.byteLength);
     expect(loadProject(dataDir, p.id).photos).toEqual([]);
+  });
+
+  it(`refuses a photo past the project's limit (${MAX_PHOTOS}) with 409, keeping no file`, async () => {
+    const p = createProject(dataDir, { name: 'Test' });
+    for (let i = 0; i < MAX_PHOTOS; i++) expect((await post({ projectId: p.id, file: await jpegBlob() })).status).toBe(201);
+    const res = await post({ projectId: p.id, file: await jpegBlob() });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toMatch(/at most 8 photos/);
+    expect(loadProject(dataDir, p.id).photos).toHaveLength(MAX_PHOTOS);
+    expect(readdirSync(join(projectDir(dataDir, p.id), 'photos'))).toHaveLength(MAX_PHOTOS);
   });
 
   it('rejects requests without a file', async () => {

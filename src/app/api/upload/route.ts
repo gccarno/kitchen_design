@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addPhoto, getRequestUserId, getStorage, isValidProjectId, ProjectNotFoundError } from '@/lib/storage';
+import { addPhoto, getRequestUserId, getStorage, isValidProjectId, MAX_PHOTOS, ProjectNotFoundError, TooManyPhotosError } from '@/lib/storage';
 import { normalizeOrientation, readImageDimensions } from '@/lib/exif';
 import { authEnabled } from '@/lib/auth/config';
 import { csrfBlocked, csrfRefusedResponse } from '@/lib/auth/csrf';
@@ -12,6 +12,7 @@ export const runtime = 'nodejs';
 
 const MAX_BYTES = MAX_PHOTO_BYTES;
 
+const tooManyPhotos = () => NextResponse.json({ error: new TooManyPhotosError().message }, { status: 409 });
 const tooLarge = () => NextResponse.json({ error: `file too large (max ${MAX_BYTES / 1024 / 1024}MB)` }, { status: 413 });
 
 /**
@@ -80,9 +81,12 @@ async function handlePost(req: Request): Promise<Response> {
     return NextResponse.json({ error: 'invalid projectId' }, { status: 400 });
   }
   const storage = await getStorage();
-  if (!(await storage.projects.load(projectId))) {
+  const project = await storage.projects.load(projectId);
+  if (!project) {
     return NextResponse.json({ error: 'project not found' }, { status: 404 });
   }
+  // Checked again under the project lock (addPhoto); this saves decoding a photo that can't be kept.
+  if (project.photos.length >= MAX_PHOTOS) return tooManyPhotos();
   if (!(file instanceof Blob)) {
     return NextResponse.json({ error: 'file is required' }, { status: 400 });
   }
@@ -105,6 +109,7 @@ async function handlePost(req: Request): Promise<Response> {
     if (err instanceof ProjectNotFoundError) {
       return NextResponse.json({ error: 'project not found' }, { status: 404 });
     }
+    if (err instanceof TooManyPhotosError) return tooManyPhotos();
     throw err;
   }
 }
