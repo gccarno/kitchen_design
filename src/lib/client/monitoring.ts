@@ -91,6 +91,11 @@ export function uploadStep(step: UploadStep, data: Record<string, string | numbe
   Sentry.addBreadcrumb({ category: 'photo-upload', message: step, level: step === 'upload-failed' ? 'error' : 'info', data });
 }
 
+/** Named so the Sentry issue reads "PhotoPickerLostError: Photo picker result lost …". */
+export class PhotoPickerLostError extends Error {
+  override name = 'PhotoPickerLostError';
+}
+
 /**
  * The camera or photo picker was opened but its result never came back,
  * usually because Android closed the app while the camera was in front and
@@ -98,7 +103,8 @@ export function uploadStep(step: UploadStep, data: Record<string, string | numbe
  */
 export function reportPickerLost(f: { source: string; ageMs: number }): void {
   if (!enabled) return;
-  Sentry.captureMessage('Photo picker result lost (page reloaded while picking)', {
+  // An Error, not captureMessage: a message's issue is titled after a minified stack frame ("Object.c").
+  Sentry.captureException(new PhotoPickerLostError('Photo picker result lost (app reloaded while picking)'), {
     level: 'warning',
     fingerprint: ['photo-picker-lost', f.source],
     tags: { picker_source: f.source },
