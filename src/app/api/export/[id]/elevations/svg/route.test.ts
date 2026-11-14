@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createProject, loadProject, saveProject } from '@/lib/storage/projects';
 import { elevationsFileName } from '@/lib/export/drawing';
 import { GET } from './route';
+import { SVG_CSP } from '@/lib/export/drawing';
 
 const get = (id: string) => GET(new Request(`http://localhost/api/export/${id}/elevations/svg`), { params: Promise.resolve({ id }) });
 const dw = { id: 'dw', catalogId: 'dishwasher-600', tag: 'dishwasher', sizeMm: { w: 600, d: 580, h: 850 }, position: { x: 1250, y: 290 }, rotationDeg: 0 };
@@ -26,6 +27,7 @@ describe('GET /api/export/[id]/elevations/svg', () => {
     const res = await get(p.id);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8');
+    expect(res.headers.get('content-security-policy')).toBe(SVG_CSP);
     expect(res.headers.get('content-disposition')).toBe('inline; filename="our-kitchen-elevations.svg"');
     expect(await res.text()).toContain('>Dishwasher</text>');
   });

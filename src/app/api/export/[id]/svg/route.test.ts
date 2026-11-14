@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createProject, loadProject, saveProject } from '@/lib/storage/projects';
 import { exportFileName } from '@/lib/plan/svg';
 import { GET } from './route';
+import { SVG_CSP } from '@/lib/export/drawing';
 
 const get = (id: string) => GET(new Request(`http://localhost/api/export/${id}/svg`), { params: Promise.resolve({ id }) });
 
@@ -28,6 +29,8 @@ describe('GET /api/export/[id]/svg', () => {
     const res = await get(p.id);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8');
+    // Opened inline on the app's origin: no scripts, no loads, sandboxed.
+    expect(res.headers.get('content-security-policy')).toBe(SVG_CSP);
     expect(res.headers.get('content-disposition')).toBe('inline; filename="our-kitchen.svg"');
     const body = await res.text();
     expect(body).toMatch(/^<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);

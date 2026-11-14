@@ -12,6 +12,22 @@ const nextConfig: NextConfig = {
   // error reports carry the same release as the server's.
   env: { NEXT_PUBLIC_RELEASE: process.env.RENDER_GIT_COMMIT ?? '' },
   serverExternalPackages:['postgres', '@google-cloud/storage', '@electric-sql/pglite', '@sentry/node'],
+  // Baseline hardening for every response. HSTS only in production: on http://localhost it would
+  // make the browser insist on https for that host. (No page-wide CSP yet: Next's inline scripts
+  // need nonces; the SVG exports, opened inline on this origin, set their own strict one.)
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          ...(process.env.NODE_ENV === 'production' ? [{ key: 'Strict-Transport-Security', value: 'max-age=31536000' }] : []),
+        ],
+      },
+    ];
+  },
   webpack: (config) => {
     // Konva's Node entry requires the optional native `canvas` package. We only
     // render Konva in the browser, so resolve it to an empty module.

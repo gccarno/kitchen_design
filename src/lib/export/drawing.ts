@@ -20,6 +20,12 @@ export const PNG_MM_PER_PX = 5;
 export const PNG_SCALES = [1, 2] as const;
 export type PngScale = (typeof PNG_SCALES)[number];
 
+/**
+ * For SVG drawings served inline on the app's origin: an SVG can carry script, so nothing in it
+ * may run or load anything (our SVGs only need their inline presentation attributes).
+ */
+export const SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
+
 /** A download name for the project's drawing, e.g. "our-kitchen.svg". */
 export function drawingFileName(project: Project, ext: string): string {
   return exportFileName(project.name, ext, projectKind(project) === 'closet' ? 'closet-elevation' : 'kitchen-plan');
