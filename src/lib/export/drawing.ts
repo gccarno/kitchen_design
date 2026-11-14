@@ -4,20 +4,27 @@
  */
 
 import { NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { loadCatalog } from '../catalog/loader';
 import { closetToSvg } from '../closet/svg';
 import { wallElevations } from '../plan/elevation';
 import { elevationsToSvg } from '../plan/elevation-svg';
 import { projectKind, type Project } from '../plan/schemas';
-import { exportFileName, planToSvg, SVG_SCALE } from '../plan/svg';
+import { exportFileName, planToSvg } from '../plan/svg';
 import { UnauthorizedError, unauthorizedResponse } from '../auth/session';
 import { getStorage, isValidProjectId, type Storage } from '../storage';
+import { svgViewBoxSize } from './paper';
+import { rasterizeSvg } from './raster';
 
 /** At 1×, one pixel per this many plan millimetres (a 5 m room is ~1000 px wide). */
 export const PNG_MM_PER_PX = 5;
 export const PNG_SCALES = [1, 2] as const;
 export type PngScale = (typeof PNG_SCALES)[number];
+
+/**
+ * For SVG drawings served inline on the app's origin: an SVG can carry script, so nothing in it
+ * may run or load anything (our SVGs only need their inline presentation attributes).
+ */
+export const SVG_CSP = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
 /** A download name for the project's drawing, e.g. "our-kitchen.svg". */
 export function drawingFileName(project: Project, ext: string): string {
@@ -53,14 +60,9 @@ export async function loadDrawing(id: string): Promise<{ project: Project; svg: 
   return { project, svg: planToSvg(project, { labels }) };
 }
 
-/**
- * Rasterize a drawing from `planToSvg`. The SVG is sized in paper mm at
- * 1:SVG_SCALE, so the density that gives PNG_MM_PER_PX / scale plan mm per
- * pixel is 25.4 × SVG_SCALE / PNG_MM_PER_PX × scale dpi.
- */
+/** Rasterize a drawing at PNG_MM_PER_PX / scale plan mm per pixel (its viewBox is in plan mm). */
 export function svgToPng(svg: string, scale: PngScale): Promise<Buffer> {
-  const density = ((25.4 * SVG_SCALE) / PNG_MM_PER_PX) * scale;
-  return sharp(Buffer.from(svg), { density }).flatten({ background: '#ffffff' }).png().toBuffer();
+  return rasterizeSvg(svg, (svgViewBoxSize(svg).w / PNG_MM_PER_PX) * scale);
 }
 
 /** A download name for the elevations, e.g. "our-kitchen-elevations.svg". */

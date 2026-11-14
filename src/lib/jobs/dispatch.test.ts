@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { dispatchJob, ensureProgress } from './dispatch';
+import { dispatchJob, ensureProgress, STALE_JOB_MS, staleJobMs } from './dispatch';
 // A job store whose clock the tests control (the real one reads Date.now captured at creation).
 const clock = vi.hoisted(() => ({ now: 1_700_000_000_000 }));
 vi.mock('./index', async () => {
@@ -107,6 +107,28 @@ describe('ensureProgress', () => {
     expect(await ensureProgress(running, { env: {}, run, now: () => clock.now })).toBe('requeued');
     expect(run).toHaveBeenCalledWith(job.id);
     expect((await store.get(job.id))!.status).toBe('queued');
+  });
+
+  it('waits longer before requeueing when LLM calls may take longer (LLM_TIMEOUT_MS)', async () => {
+    const slow = { LLM_TIMEOUT_MS: '300000' };
+    // Two calls of up to 5 min each, plus 60 s of rate-limit waiting per call, plus a minute's margin.
+    expect(staleJobMs(slow)).toBe(13 * 60 * 1000);
+    const store = await getJobStore(null);
+    const job = await store.create(PROJECT, 'extract', {});
+    await store.claim(job.id);
+    const run = vi.fn(async () => {});
+    clock.now += 6 * 60 * 1000; // a healthy slow job is still running
+    expect(await ensureProgress((await store.get(job.id))!, { env: slow, run, now: () => clock.now })).toBe('noop');
+    expect(run).not.toHaveBeenCalled();
+    clock.now += 8 * 60 * 1000; // 14 minutes: presumed dead
+    expect(await ensureProgress((await store.get(job.id))!, { env: slow, run, now: () => clock.now })).toBe('requeued');
+    expect(run).toHaveBeenCalledWith(job.id);
+  });
+
+  it('never presumes a job dead in under 5 minutes, whatever the timeout', () => {
+    expect(staleJobMs({})).toBe(STALE_JOB_MS);
+    expect(staleJobMs({ LLM_TIMEOUT_MS: '1000' })).toBe(STALE_JOB_MS);
+    expect(staleJobMs({ LLM_TIMEOUT_MS: 'nonsense' })).toBe(STALE_JOB_MS);
   });
 
   it('does nothing for a fresh running job', async () => {

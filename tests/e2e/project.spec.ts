@@ -58,6 +58,8 @@ test('upload a photo and mark a reference box with the pointer (stored in natura
   expect(served.status()).toBe(200);
   expect(served.headers()['content-type']).toBe('image/jpeg');
 
+  // The marker starts closed (marking is optional); open it.
+  await page.getByRole('button', { name: /mark a known-size object/i }).click();
   const img = page.getByRole('img', { name: /mark the reference object/i });
   await expect(img).toBeVisible();
   await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBe(2000);

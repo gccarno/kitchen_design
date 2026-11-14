@@ -10,10 +10,13 @@ export const runtime = 'nodejs';
 
 type Ctx = { params: Promise<{ id: string }> };
 
+/** Far more than any real edit (a whole room from photos is a few dozen ops); bounds the work per request. */
+const MAX_PATCH_OPS = 1000;
+
 const CommitSchema = z.object({
   baseRevision: z.number().int().nonnegative(),
   // An empty patch would only add a no-op entry to the undo history.
-  patch: z.array(JsonPatchOpSchema).min(1),
+  patch: z.array(JsonPatchOpSchema).min(1).max(MAX_PATCH_OPS),
   summary: z.string().max(SUMMARY_MAX_LENGTH),
   /** Who proposed the edit. The user has confirmed it either way. */
   source: z.enum(['user', 'llm']).default('user'),

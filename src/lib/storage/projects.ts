@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import {
+  closeSync,
   existsSync,
+  fsyncSync,
+  openSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -10,6 +13,7 @@ import {
   statSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { reportInvalidProject } from './invalid';
 import { optionGroupId, sortGroup } from '../plan/options';
 import { newProject } from '../plan/new-project';
 import { ProjectSchema, type Project, type ProjectKind } from '../plan/schemas';
@@ -45,7 +49,14 @@ export function atomicWriteJson(target: string, value: unknown): void {
   const dir = dirname(target);
   mkdirSync(dir, { recursive: true });
   const tmp = `${target}.tmp`;
-  writeFileSync(tmp, JSON.stringify(value, null, 2));
+  const fd = openSync(tmp, 'w');
+  try {
+    writeFileSync(fd, JSON.stringify(value, null, 2));
+    // Flush to disk before the rename, so a crash can't leave the new name pointing at an empty file.
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
   renameSync(tmp, target);
 }
 
@@ -147,9 +158,8 @@ function loadAll(dataDir: string): Project[] {
     if (!existsSync(file)) continue;
     try {
       out.push(ProjectSchema.parse(JSON.parse(readFileSync(file, 'utf-8'))));
-    } catch {
-      // Skip malformed projects — surfaced via logs, not errors.
-      continue;
+    } catch (err) {
+      reportInvalidProject(entry.name, err);
     }
   }
   return out;

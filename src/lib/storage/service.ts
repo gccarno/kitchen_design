@@ -7,7 +7,29 @@ import { randomUUID } from 'node:crypto';
 import { groupName, nextOptionName, optionGroupId, sortGroup } from '../plan/options';
 import { ProjectSchema, type Photo, type Project } from '../plan/schemas';
 import { isValidProjectId, PHOTO_ID, photoKey, projectPrefix } from './ids';
-import type { Storage } from './store';
+import { reportError } from '../monitoring';
+import { ProjectNotFoundError, type Storage } from './store';
+
+import { MAX_PHOTOS } from './limits';
+
+export { MAX_PHOTOS };
+
+export class TooManyPhotosError extends Error {
+  constructor() {
+    super(`a project can have at most ${MAX_PHOTOS} photos; remove one first`);
+    this.name = 'TooManyPhotosError';
+  }
+}
+
+/**
+ * Blobs that should have been deleted but could not be (the record is already gone or changed).
+ * Not fatal for the request; logged with the project so they can be cleaned up by hand.
+ */
+function reportOrphanedBlobs(projectId: string, what: string, err: unknown): void {
+  const errorName = err instanceof Error ? err.name : typeof err;
+  console.error(JSON.stringify({ event: 'orphaned_blobs', projectId, what, errorName }));
+  reportError(err, { event: 'orphaned_blobs', projectId, what });
+}
 
 /** The projects in option group `groupId`: the original first (if it still exists), then its options oldest first. */
 export async function optionGroup(storage: Storage, groupId: string): Promise<Project[]> {
@@ -43,8 +65,14 @@ export async function duplicateAsOption(storage: Storage, sourceId: string, item
     history: [],
   });
   // A listed photo whose file is missing is still listed on the copy, as before.
-  for (const photo of photos) await storage.blobs.copy(photoKey(source.id, photo.id), photoKey(id, photo.id));
-  await storage.projects.insert(copy);
+  try {
+    for (const photo of photos) await storage.blobs.copy(photoKey(source.id, photo.id), photoKey(id, photo.id));
+    await storage.projects.insert(copy);
+  } catch (err) {
+    // No record points at the copied photos: remove them again.
+    await storage.blobs.deletePrefix(projectPrefix(id)).catch((cleanupErr: unknown) => reportOrphanedBlobs(id, 'failed duplicate', cleanupErr));
+    throw err;
+  }
   return copy;
 }
 
@@ -52,7 +80,8 @@ export async function duplicateAsOption(storage: Storage, sourceId: string, item
 export async function deleteProject(storage: Storage, id: string): Promise<boolean> {
   if (!isValidProjectId(id)) return false;
   const removed = await storage.projects.remove(id);
-  if (removed) await storage.blobs.deletePrefix(projectPrefix(id));
+  // The project is gone either way; photos left behind are reported rather than failing the delete.
+  if (removed) await storage.blobs.deletePrefix(projectPrefix(id)).catch((err: unknown) => reportOrphanedBlobs(id, 'deleted project', err));
   return removed;
 }
 
@@ -94,14 +123,38 @@ export async function addPhoto(
   const key = photoKey(projectId, id);
   await storage.blobs.put(key, jpeg, 'image/jpeg');
   try {
-    await storage.projects.update(projectId, (p) => ({
-      ...p,
-      photos: [...p.photos, photo],
-      updatedAt: new Date().toISOString(),
-    }));
+    await storage.projects.update(projectId, (p) => {
+      // Checked under the project lock, so parallel uploads can't overshoot.
+      if (p.photos.length >= MAX_PHOTOS) throw new TooManyPhotosError();
+      return { ...p, photos: [...p.photos, photo], updatedAt: new Date().toISOString() };
+    });
   } catch (err) {
     await storage.blobs.delete(key).catch(() => undefined);
     throw err;
   }
   return photo;
+}
+
+/**
+ * Take a photo off the project, then delete its bytes. Resolves to the project's remaining
+ * photos, or null when the project or the photo (one we generated) isn't there.
+ */
+export async function removePhoto(storage: Storage, projectId: string, photoId: string): Promise<Photo[] | null> {
+  if (!isValidProjectId(projectId) || !PHOTO_ID.test(photoId)) return null;
+  let found = false;
+  let photos: Photo[];
+  try {
+    const next = await storage.projects.update(projectId, (p) => {
+      found = p.photos.some((ph) => ph.id === photoId);
+      if (!found) return p;
+      return { ...p, photos: p.photos.filter((ph) => ph.id !== photoId), updatedAt: new Date().toISOString() };
+    });
+    photos = next.photos;
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) return null;
+    throw err;
+  }
+  if (!found) return null;
+  await storage.blobs.delete(photoKey(projectId, photoId)).catch((err: unknown) => reportOrphanedBlobs(projectId, 'removed photo', err));
+  return photos;
 }

@@ -1,4 +1,4 @@
-import { drawingFileName, loadDrawing } from '@/lib/export/drawing';
+import { drawingFileName, loadDrawing, SVG_CSP } from '@/lib/export/drawing';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,6 +16,7 @@ export async function GET(_req: Request, { params }: Ctx): Promise<Response> {
   return new Response(drawing.svg, {
     headers: {
       'content-type': 'image/svg+xml; charset=utf-8',
+      'content-security-policy': SVG_CSP,
       'content-disposition': `inline; filename="${drawingFileName(drawing.project, 'svg')}"`,
       'cache-control': 'no-store',
     },

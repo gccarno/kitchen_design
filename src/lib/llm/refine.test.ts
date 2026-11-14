@@ -19,7 +19,7 @@ class StubProvider implements LLMProvider {
   async chatWithVision<T>(): Promise<T> {
     throw new Error('unused');
   }
-  async completeJSON<T>(req: { system: string; user: string; schema: z.ZodType<T, z.ZodTypeDef, unknown> }): Promise<T> {
+  async completeJSON<T>(req: { system: string; user: string; schema: z.ZodType<T, unknown> }): Promise<T> {
     this.requests.push({ system: req.system, user: req.user });
     const next = this.outcomes.shift();
     if (next === undefined) throw new Error('stub: no more outcomes');

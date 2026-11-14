@@ -1,6 +1,4 @@
 name: ci
-# Scope: typecheck, lint, unit tests and build only. A Postgres migrations job and the
-# Playwright e2e job are intentionally out of scope here.
 on:
   push:
   pull_request:
@@ -22,3 +20,67 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # The unit tests migrate an in-process PGlite; this applies the same migrations to a
+  # real Postgres, twice (the second run must be a no-op), and fails if schema.ts has
+  # changed without a generated migration.
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Migrations match schema.ts
+        run: |
+          npx drizzle-kit generate
+          if [ -n "$(git status --porcelain -- drizzle)" ]; then
+            git status --porcelain -- drizzle
+            echo "::error::schema.ts has changes with no migration. Run npm run db:generate and commit the result."
+            exit 1
+          fi
+      - run: npm run db:migrate
+      - name: A second run is a no-op
+        run: npm run db:migrate
+
+  # Playwright against `next dev` in disk mode (see playwright.config.ts); the LLM is
+  # mocked in the browser, so no keys or database are needed.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - name: Keep traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

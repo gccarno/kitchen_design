@@ -6,7 +6,6 @@
  * Server-only (sharp is native).
  */
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import sharp from 'sharp';
 import type { Catalog } from '../catalog/loader';
 import { closetToSvg, DOOR_NAME } from '../closet/svg';
 import { buildEstimate, FT2_PER_M2, type Estimate, type EstimateLine } from '../estimate/estimate';
@@ -18,10 +17,11 @@ import { colorName, COUNTERTOP_LABEL, DOOR_STYLE_LABEL } from '../plan/finishes'
 import { polygonAreaMm2, polygonBounds, type Point } from '../plan/geometry';
 import { checkAccessibility, checkLayout, layoutDetail, layoutSummary } from '../plan/layout-check';
 import { projectKind, type Project } from '../plan/schemas';
-import { planToSvg, SVG_SCALE } from '../plan/svg';
+import { planToSvg } from '../plan/svg';
 import { formatLength } from '../plan/viewport';
 import { PAGE, pickScale, PT_MM, svgViewBoxSize } from './paper';
 import { GREY, H1, H2, LINE, SMALL, Sheet, type Column } from './pdf-layout';
+import { rasterizeSvg } from './raster';
 
 /** Drawings are rasterized at this resolution for their printed size. */
 export const PRINT_DPI = 200;
@@ -31,14 +31,12 @@ type Box = { w: number; h: number };
 /**
  * Place an SVG drawing in a box at 1:`scale` (or, with no scale, fitted and
  * marked "not to scale"), rasterized at PRINT_DPI, with a caption under it.
- * Our SVGs declare their size at 1:SVG_SCALE, which sets the density.
  */
 async function placeDrawing(sheet: Sheet, svg: string, caption: string, box: Box, scale = pickScale(svgViewBoxSize(svg), box)): Promise<void> {
   const real = svgViewBoxSize(svg);
   const k = scale ? 1 / scale : Math.min((box.w * PT_MM) / real.w, (box.h * PT_MM) / real.h);
   const printed = { w: real.w * k, h: real.h * k }; // paper mm
-  const density = (PRINT_DPI * printed.w) / (real.w / SVG_SCALE);
-  const png = await sharp(Buffer.from(svg), { density }).flatten({ background: '#ffffff' }).png().toBuffer();
+  const png = await rasterizeSvg(svg, (printed.w / 25.4) * PRINT_DPI);
   sheet.ensureSpace(printed.h / PT_MM + LINE + 4);
   await sheet.image(png, printed.w / PT_MM, printed.h / PT_MM);
   sheet.gap(4);

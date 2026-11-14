@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { resetTestDb, sharedTestDb } from '../db/test-db';
@@ -30,15 +30,24 @@ describe('PgProjectStore', () => {
     expect(await alice.load(p.id)).toEqual(p);
   });
 
-  it('skips a row whose document no longer parses, instead of failing the list', async () => {
+  it('skips (and logs, by id) a row whose document no longer parses, instead of failing the list', async () => {
     const db = await sharedTestDb();
     const store = new PgProjectStore(db);
     const good = newProject({ name: 'Good' });
     await store.insert(good);
+    const broken = randomUUID();
     await db.execute(sql`
       INSERT INTO projects (id, owner_id, name, kind, revision, doc, created_at, updated_at)
-      VALUES (${randomUUID()}, NULL, 'Broken', 'kitchen', 0, '{"name":"Broken"}'::jsonb, now(), now())`);
-    expect((await store.list()).map((s) => s.name)).toEqual(['Good']);
+      VALUES (${broken}, NULL, 'Broken', 'kitchen', 0, '{"name":"Broken"}'::jsonb, now(), now())`);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect((await store.list()).map((s) => s.name)).toEqual(['Good']);
+      const line = JSON.parse(String(errors.mock.calls[0][0]));
+      expect(line).toMatchObject({ event: 'project_invalid', projectId: broken });
+      expect(JSON.stringify(line)).not.toContain('Broken');
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it('locks the row with FOR UPDATE when updating', async () => {

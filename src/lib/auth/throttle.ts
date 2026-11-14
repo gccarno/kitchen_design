@@ -123,3 +123,23 @@ export function setIpThrottle(t: Throttle | undefined): void {
   if (t) g[IP_KEY] = t;
   else delete g[IP_KEY];
 }
+
+export const MAX_REGISTER_ATTEMPTS = 10;
+const REGISTER_KEY = Symbol.for('kitchen-design.register-ip-throttle');
+type R = typeof globalThis & { [REGISTER_KEY]?: Throttle };
+
+/**
+ * Process-wide per-IP cap on registration attempts (10 / 15 min), successful or not: each one
+ * costs a scrypt hash, and an open registration shouldn't let one client create accounts in bulk.
+ */
+export function registerThrottle(): Throttle {
+  const g = globalThis as R;
+  return (g[REGISTER_KEY] ??= new Throttle(Date.now, MAX_REGISTER_ATTEMPTS));
+}
+
+/** Test hook: replace the process-wide registration throttle (or drop it with undefined). */
+export function setRegisterThrottle(t: Throttle | undefined): void {
+  const g = globalThis as R;
+  if (t) g[REGISTER_KEY] = t;
+  else delete g[REGISTER_KEY];
+}

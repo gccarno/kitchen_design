@@ -68,6 +68,7 @@ describe('POST /api/projects/[id]/revisions', () => {
     ['empty patch', { baseRevision: 0, patch: [], summary: 's' }],
     ['summary too long', { baseRevision: 0, patch: rename('x'), summary: 's'.repeat(501) }],
     ['bad op', { baseRevision: 0, patch: [{ op: 'explode', path: '/name' }], summary: 's' }],
+    ['more than 1000 ops', { baseRevision: 0, patch: Array.from({ length: 1001 }, (_, i) => ({ op: 'replace', path: '/name', value: `n${i}` })), summary: 's' }],
     ['not JSON', 'nope'],
   ])('returns 400 for a malformed body (%s)', async (_label, body) => {
     const p = createProject(dataDir, { name: 'P' });

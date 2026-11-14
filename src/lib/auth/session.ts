@@ -4,6 +4,7 @@
  * header such as `x-user-id`, which a client could forge.
  */
 import { headers } from 'next/headers';
+import { cache } from 'react';
 import { getDb } from '../db/client';
 import type { Db } from '../db/types';
 import { authEnabled } from './config';
@@ -24,11 +25,15 @@ export async function userFromHeaders(h: Headers, db?: Db): Promise<AuthUser | n
   return token ? userForToken(db ?? getDb(), token) : null;
 }
 
-/** The signed-in user of the current request, or null (always null when auth is off). */
-export async function currentUser(): Promise<AuthUser | null> {
+/**
+ * The signed-in user of the current request, or null (always null when auth is off).
+ * Memoized per server render with React `cache`, so a page, its metadata and every
+ * getStorage() call in them share one token lookup (outside a render it is not cached).
+ */
+export const currentUser = cache(async (): Promise<AuthUser | null> => {
   if (!authEnabled()) return null;
   return userFromHeaders(await headers());
-}
+});
 
 /** The signed-in user of the current request; throws UnauthorizedError if there is none. */
 export async function requireUser(): Promise<AuthUser> {

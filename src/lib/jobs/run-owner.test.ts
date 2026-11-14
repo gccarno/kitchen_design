@@ -30,7 +30,7 @@ function replyingProvider(): LLMProvider & { prompts: string[] } {
     async chatWithVision() {
       throw new Error('unused');
     },
-    async completeJSON<T>(req: { user: string; schema: z.ZodType<T, z.ZodTypeDef, unknown> }) {
+    async completeJSON<T>(req: { user: string; schema: z.ZodType<T, unknown> }) {
       this.prompts.push(req.user);
       return req.schema.parse({ commands: [], summary: '', reply: 'ok' });
     },

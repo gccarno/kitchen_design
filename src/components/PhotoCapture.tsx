@@ -6,6 +6,9 @@ import { useOnline } from '@/lib/client/online';
 import ReferenceMarker from './ReferenceMarker';
 import type { ReferenceInput } from '@/lib/plan/reference-objects';
 import type { Photo, ReferenceObject } from '@/lib/plan/schemas';
+import { MAX_PHOTOS } from '@/lib/storage/limits';
+
+export { MAX_PHOTOS };
 
 interface PhotoCaptureProps {
   projectId: string;
@@ -59,6 +62,12 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
   // marker fills the screen and its drawing surface can't be swiped to scroll the page.
   const [marking, setMarking] = useState<Set<string>>(new Set());
   const [lostPhoto, setLostPhoto] = useState(false);
+  // The photo whose "remove?" question is showing, the one being removed, and a failed removal.
+  const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<{ id: string; message: string } | null>(null);
+  const full = photos.length >= MAX_PHOTOS;
+  const canAdd = online && !full;
   const nextKey = useRef(0);
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
@@ -171,6 +180,24 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
     void uploadFiles(files);
   }
 
+  async function removePhoto(photoId: string) {
+    if (!online || removing) return;
+    setRemoving(photoId);
+    setRemoveError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/photos/${photoId}`, { method: 'DELETE' });
+      const body = (await res.json().catch(() => ({}))) as { photos?: Photo[]; error?: string };
+      if (!res.ok || !body.photos) throw new Error(body.error ?? `could not remove (${res.status})`);
+      // Filter locally rather than take the server's list, so an upload finishing meanwhile isn't dropped.
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      setConfirmingRemove(null);
+    } catch (err) {
+      setRemoveError({ id: photoId, message: (err as Error).message });
+    } finally {
+      setRemoving(null);
+    }
+  }
+
   function toggleMarking(photoId: string) {
     setMarking((s) => {
       const next = new Set(s);
@@ -208,7 +235,7 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
-        <label className={`rounded bg-black px-4 py-2 text-white ${online ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
+        <label className={`rounded bg-black px-4 py-2 text-white ${canAdd ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
           Take photo
           <input
             ref={cameraRef}
@@ -216,12 +243,12 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
             accept="image/*"
             capture="environment"
             className="sr-only"
-            disabled={!online}
+            disabled={!canAdd}
             onClick={() => openPicker('camera')}
             onChange={handleFiles}
           />
         </label>
-        <label className={`rounded border px-4 py-2 ${online ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
+        <label className={`rounded border px-4 py-2 ${canAdd ? 'cursor-pointer' : 'opacity-40'}`} title={online ? undefined : 'Offline'}>
           Choose photos
           <input
             ref={libraryRef}
@@ -229,12 +256,18 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
             accept="image/*"
             multiple
             className="sr-only"
-            disabled={!online}
+            disabled={!canAdd}
             onClick={() => openPicker('library')}
             onChange={handleFiles}
           />
         </label>
       </div>
+
+      {full && (
+        <p className="text-sm text-gray-600">
+          {MAX_PHOTOS} photos is the most a room can have. Remove one to add another.
+        </p>
+      )}
 
       {lostPhoto && (
         <p role="alert" className="text-sm text-red-600">
@@ -269,14 +302,46 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
               // eslint-disable-next-line @next/next/no-img-element -- served by our API route, not a static asset
               <img src={imageUrl} alt="Room photo" className="block max-h-64 max-w-full self-start rounded" />
             )}
-            <button
-              type="button"
-              className="self-start text-sm text-blue-700 underline"
-              aria-expanded={open}
-              onClick={() => toggleMarking(p.id)}
-            >
-              {open ? 'Done marking' : p.referenceObject ? 'Edit the marked object' : 'Mark a known-size object (optional)'}
-            </button>
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <button type="button" className="text-blue-700 underline" aria-expanded={open} onClick={() => toggleMarking(p.id)}>
+                {open ? 'Done marking' : p.referenceObject ? 'Edit the marked object' : 'Mark a known-size object (optional)'}
+              </button>
+              {confirmingRemove === p.id ? (
+                <span className="flex flex-wrap items-center gap-2">
+                  <span>Remove this photo for good?</span>
+                  <button
+                    type="button"
+                    className="rounded bg-red-700 px-3 py-1 text-white disabled:opacity-40"
+                    disabled={!online || removing !== null}
+                    onClick={() => void removePhoto(p.id)}
+                  >
+                    {removing === p.id ? 'Removing…' : 'Yes, remove'}
+                  </button>
+                  <button type="button" className="rounded border px-3 py-1" onClick={() => setConfirmingRemove(null)}>
+                    Keep it
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="text-red-700 underline disabled:opacity-40"
+                  disabled={!online}
+                  title={online ? undefined : 'Offline'}
+                  aria-label="Remove photo"
+                  onClick={() => {
+                    setConfirmingRemove(p.id);
+                    setRemoveError(null);
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            {removeError?.id === p.id && (
+              <p role="alert" className="text-xs text-red-600">
+                Couldn’t remove: {removeError.message}
+              </p>
+            )}
             {state && (
               <p className={`text-xs ${typeof state === 'object' ? 'text-red-600' : 'text-gray-500'}`}>
                 {state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : `Could not save: ${state.error}`}
