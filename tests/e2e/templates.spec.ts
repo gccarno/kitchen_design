@@ -33,21 +33,14 @@ test('a closet template furnishes the new project, named after the template when
   expect(kinds.filter((k: string) => k === 'rod')).toHaveLength(3);
 });
 
-test('"Scroll page" hands touch back to the page so a phone can scroll past the plan', async ({ page }) => {
+test('the plan leaves one-finger touch to the page (two fingers pan and zoom)', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Try a sample kitchen' }).click();
   await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
-  const plan = page.getByTestId('floor-plan');
-  await expect(plan).toHaveClass(/touch-none/);
-  const toggle = page.getByRole('button', { name: 'Scroll page' });
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-  await expect(plan).toHaveClass(/touch-pan-y/);
-  await toggle.click();
-  await expect(plan).toHaveClass(/touch-none/);
+  await expect(page.getByTestId('floor-plan')).toHaveClass(/touch-pan-y/);
 });
 
-test('with "Scroll page" on, a finger swipe over the plan scrolls the page and leaves the plan alone', async ({ browser }) => {
+test('a one-finger swipe over the plan scrolls the page and leaves the plan alone', async ({ browser }) => {
   const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 412, height: 800 } });
   const page = await context.newPage();
   await page.goto('/');
@@ -55,7 +48,6 @@ test('with "Scroll page" on, a finger swipe over the plan scrolls the page and l
   await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
   const plan = page.getByTestId('floor-plan');
   await expect(plan.locator('canvas').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Scroll page' }).click();
   await plan.scrollIntoViewIfNeeded();
   const before = { x: await plan.getAttribute('data-x'), y: await plan.getAttribute('data-y'), scroll: await page.evaluate(() => window.scrollY) };
   const box = (await plan.boundingBox())!;
