@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import React, { type ComponentProps } from 'react';
 import { markOffline, markOnline } from '@/lib/client/online';
 import ClosetEditor from './ClosetEditor';
 import { closetFootprint, newCloset, newComponent } from '@/lib/closet/catalog';
@@ -40,7 +40,7 @@ describe('ClosetEditor', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let server: Project;
   let patches: JsonPatchOp[][];
-  let onSaved: ReturnType<typeof vi.fn>;
+  let onSaved: Mock<ComponentProps<typeof ClosetEditor>['onSaved']>;
 
   function setup(project = closetProject()) {
     server = project;

@@ -1,5 +1,5 @@
 /**
- * Auth gate (Node.js runtime, so it can query Postgres). Only active when
+ * Auth gate: the Next 16 proxy (formerly middleware), which always runs on Node.js, so it can query Postgres. Only active when
  * DATABASE_URL is set; disk mode passes everything through. Requests without
  * a valid session token: pages → 307 to /login?next=<path>, /api/* → 401.
  * getStorage() re-validates the token itself; this is the first line, not the only one.
@@ -11,10 +11,9 @@ import { unauthorizedResponse, userFromHeaders } from '@/lib/auth/session';
 import type { AuthUser } from '@/lib/auth/users';
 
 export const config = {
-  runtime: 'nodejs',
   // Skip static assets and the public paths (decide() checks those again).
-  // Also skip /api/upload, which checks the session and CSRF itself: when Node middleware awaits
-  // (the session lookup) while a large body is still arriving, Next 15 hands the route a locked
+  // Also skip /api/upload, which checks the session and CSRF itself: when the proxy awaits
+  // (the session lookup) while a large body is still arriving, Next 15 handed the route a locked
   // body ("Response body object should not be disturbed or locked") and the upload 500s.
   matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$|icons/|manifest(?:\\.json|\\.webmanifest)$|sw\\.js$|offline/?$|login(?:/|$)|api/auth/|api/health(?:/|$)|api/upload/?$).*)'],
 };
@@ -56,7 +55,7 @@ export function decide(info: RequestInfo, user: AuthUser | null): Decision {
 
 export { csrfBlocked };
 
-export async function middleware(req: NextRequest): Promise<Response> {
+export async function proxy(req: NextRequest): Promise<Response> {
   const info: RequestInfo = { pathname: req.nextUrl.pathname, search: req.nextUrl.search, authEnabled: authEnabled() };
   if (needsUser(info) && csrfBlocked(req.method, info.pathname, req.headers)) return csrfRefusedResponse();
   const user = needsUser(info) ? await userFromHeaders(req.headers) : null;

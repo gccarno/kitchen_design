@@ -5,7 +5,7 @@ import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { resetTestDb, sharedTestDb } from '@/lib/db/test-db';
 import type { Db } from '@/lib/db/types';
 import { createSession, createUser, revokeToken } from '@/lib/auth/users';
-import { config, csrfBlocked, decide, isPublicPath, middleware } from './middleware';
+import { config, csrfBlocked, decide, isPublicPath, proxy } from './proxy';
 
 const state = vi.hoisted(() => ({ db: undefined as unknown }));
 vi.mock('@/lib/db/client', () => ({ getDb: () => state.db }));
@@ -72,10 +72,6 @@ describe('decide', () => {
 });
 
 describe('config', () => {
-  it('runs on the Node.js runtime', () => {
-    expect(config.runtime).toBe('nodejs');
-  });
-
   const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
 
   it('skips static assets and public paths', () => {
@@ -84,7 +80,7 @@ describe('config', () => {
     }
   });
 
-  it('skips /api/upload, which checks the session and CSRF itself (large bodies break behind Node middleware)', () => {
+  it('skips /api/upload, which checks the session and CSRF itself (large bodies break behind the proxy)', () => {
     for (const p of ['/api/upload', '/api/upload/']) expect(matches(p), p).toBe(false);
   });
 
@@ -95,7 +91,7 @@ describe('config', () => {
   });
 });
 
-describe('middleware', () => {
+describe('proxy', () => {
   let db: Db;
   beforeAll(async () => {
     db = await sharedTestDb();
@@ -107,7 +103,7 @@ describe('middleware', () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  const run = (path: string, headers: Record<string, string> = {}) => middleware(new NextRequest(`http://localhost${path}`, { headers }));
+  const run = (path: string, headers: Record<string, string> = {}) => proxy(new NextRequest(`http://localhost${path}`, { headers }));
 
   it('redirects an anonymous page request to /login (307)', async () => {
     const res = await run('/project/abc?tab=2');
@@ -176,7 +172,7 @@ describe('csrfBlocked', () => {
   });
 });
 
-describe('middleware CSRF', () => {
+describe('proxy CSRF', () => {
   beforeAll(async () => {
     state.db = await sharedTestDb();
   });
@@ -189,12 +185,12 @@ describe('middleware CSRF', () => {
     const u = await createUser(db, 'a@example.com', 'a-good-password');
     const t = await createSession(db, u.id);
     for (const path of ['/api/upload', '/api/projects']) {
-      const res = await middleware(
+      const res = await proxy(
         new NextRequest(`http://localhost${path}`, { method: 'POST', headers: { cookie: `session=${t}`, 'sec-fetch-site': 'cross-site' } })
       );
       expect(res.status, path).toBe(403);
     }
-    const ok = await middleware(new NextRequest('http://localhost/api/projects', { method: 'POST', headers: { cookie: `session=${t}` } }));
+    const ok = await proxy(new NextRequest('http://localhost/api/projects', { method: 'POST', headers: { cookie: `session=${t}` } }));
     expect(ok.status).toBe(200);
   });
 });
