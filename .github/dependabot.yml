@@ -4,3 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Security fixes for npm packages (Next.js, sharp, …) arrive as PRs; version bumps are grouped weekly.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
