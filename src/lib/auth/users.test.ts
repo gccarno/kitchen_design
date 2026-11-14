@@ -14,6 +14,7 @@ import {
   createSession,
   createUser,
   revokeToken,
+  SESSION_IDLE_DAYS,
   userCount,
   userForToken,
 } from './users';
@@ -126,6 +127,33 @@ describe('users', () => {
     await db.execute(sql`UPDATE auth_tokens SET last_used_at = now() - interval '2 hours'`);
     await userForToken(db, token);
     expect(new Date((await last())!).getTime()).toBeGreaterThan(Date.now() - 60_000);
+  });
+
+  it(`expires a session unused for ${SESSION_IDLE_DAYS} days, and keeps one in use`, async () => {
+    const db = await sharedTestDb();
+    const u = await createUser(db, 'a@example.com', PW);
+    const idle = await createSession(db, u.id);
+    const active = await createSession(db, u.id);
+    const age = (token: string, lastUsed: string | null, created: string) =>
+      db.execute(
+        sql`UPDATE auth_tokens SET last_used_at = ${lastUsed === null ? null : sql.raw(`now() - interval '${lastUsed}'`)}, created_at = now() - ${sql.raw(`interval '${created}'`)} WHERE token_hash = ${hashToken(token)}`
+      );
+    // Never used since it was created long ago; created long ago but used last week.
+    await age(idle, null, `${SESSION_IDLE_DAYS + 1} days`);
+    await age(active, '7 days', '400 days');
+    expect(await userForToken(db, idle)).toBeNull();
+    expect(await userForToken(db, active)).toEqual(u);
+  });
+
+  it('prunes expired sessions when a new one is created', async () => {
+    const db = await sharedTestDb();
+    const u = await createUser(db, 'a@example.com', PW);
+    const old = await createSession(db, u.id);
+    await db.execute(sql`UPDATE auth_tokens SET last_used_at = now() - ${sql.raw(`interval '${SESSION_IDLE_DAYS + 1} days'`)} WHERE token_hash = ${hashToken(old)}`);
+    await createSession(db, u.id);
+    const rows = await db.select().from(authTokens);
+    expect(rows.map((r) => r.tokenHash)).not.toContain(hashToken(old));
+    expect(rows).toHaveLength(1);
   });
 
   it('deleting a user cascades to their tokens', async () => {

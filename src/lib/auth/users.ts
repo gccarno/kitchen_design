@@ -84,9 +84,18 @@ export async function findUserByEmail(db: Db, email: string): Promise<AuthUser |
   return row ?? null;
 }
 
+/** A session not used for this long is expired (sliding: every use pushes it back). */
+export const SESSION_IDLE_DAYS = 90;
+
+/** Last use, or creation for a token never used, is within SESSION_IDLE_DAYS. */
+const sessionLive = () =>
+  sql`coalesce(${authTokens.lastUsedAt}, ${authTokens.createdAt}) > now() - (${SESSION_IDLE_DAYS}::int * interval '1 day')`;
+
 export async function createSession(db: Db, userId: string, label?: string): Promise<string> {
   const { token, hash } = newToken();
   await db.insert(authTokens).values({ tokenHash: hash, userId, label: label ?? null });
+  // Housekeeping on sign-in: expired sessions of every user can never be used again.
+  await db.delete(authTokens).where(sql`NOT (${sessionLive()})`);
   return token;
 }
 
@@ -96,7 +105,7 @@ export async function userForToken(db: Db, token: string): Promise<AuthUser | nu
     .select({ id: users.id, email: users.email })
     .from(authTokens)
     .innerJoin(users, eq(users.id, authTokens.userId))
-    .where(eq(authTokens.tokenHash, hash))
+    .where(and(eq(authTokens.tokenHash, hash), sessionLive()))
     .limit(1);
   if (!row) return null;
   await db
