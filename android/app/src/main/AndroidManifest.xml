@@ -35,6 +35,14 @@
         </provider>
     </application>
 
+    <!-- Android 11+ hides other apps unless declared here; without this Capacitor can't find a
+         camera app for <input capture> and silently falls back to the photo picker. -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
