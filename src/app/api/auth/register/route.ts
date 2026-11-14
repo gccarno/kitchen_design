@@ -1,6 +1,7 @@
 import { registrationAllowed } from '@/lib/auth/config';
 import { sessionCookie } from '@/lib/auth/cookies';
-import { credentialsFrom, disabledResponse, json, jsonContentTypeGuard, readJsonBody } from '@/lib/auth/http';
+import { clientIp, credentialsFrom, disabledResponse, json, jsonContentTypeGuard, readJsonBody } from '@/lib/auth/http';
+import { registerThrottle } from '@/lib/auth/throttle';
 import { EmailTakenError, InvalidCredentialsInputError, createSession, createUser, userCount } from '@/lib/auth/users';
 import { getDb } from '@/lib/db/client';
 import type { Db } from '@/lib/db/types';
@@ -17,6 +18,7 @@ export async function POST(req: Request): Promise<Response> {
   if (body instanceof Response) return body;
   const creds = credentialsFrom(body);
   if (creds instanceof Response) return creds;
+  if (!registerThrottle().tryConsume(clientIp(req.headers))) return json({ error: 'Too many attempts. Try again later.' }, 429);
 
   const db = getDb();
   try {

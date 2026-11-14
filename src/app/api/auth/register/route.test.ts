@@ -5,6 +5,7 @@ import { projects, users } from '@/lib/db/schema';
 import { resetTestDb, sharedTestDb } from '@/lib/db/test-db';
 import type { Db } from '@/lib/db/types';
 import { jsonReq, sessionFromSetCookie } from '@/lib/auth/route-test-helpers';
+import { MAX_REGISTER_ATTEMPTS, setRegisterThrottle } from '@/lib/auth/throttle';
 import { userForToken } from '@/lib/auth/users';
 import { newProject } from '@/lib/plan/new-project';
 import { PgProjectStore } from '@/lib/storage/pg-projects';
@@ -25,10 +26,22 @@ beforeEach(async () => {
   await resetTestDb(db);
   vi.stubEnv('DATABASE_URL', 'postgres://test');
   vi.stubEnv('ALLOW_REGISTRATION', '');
+  setRegisterThrottle(undefined);
 });
 afterEach(() => vi.unstubAllEnvs());
 
 describe('POST /api/auth/register', () => {
+  it(`allows ${MAX_REGISTER_ATTEMPTS} attempts per IP, then 429 before any work; other IPs unaffected`, async () => {
+    vi.stubEnv('ALLOW_REGISTRATION', '1');
+    const from = (ip: string, i: number) =>
+      POST(jsonReq(URL, { email: `u${i}@example.com`, password: PW }, { headers: { 'x-forwarded-for': ip } }));
+    for (let i = 0; i < MAX_REGISTER_ATTEMPTS; i++) expect((await from('203.0.113.9', i)).status).toBe(201);
+    const refused = await from('203.0.113.9', 99);
+    expect(refused.status).toBe(429);
+    expect(await db.select().from(users).where(eq(users.email, 'u99@example.com'))).toHaveLength(0);
+    expect((await from('198.51.100.1', 100)).status).toBe(201);
+  });
+
   it('registers the first user and sets a working session cookie', async () => {
     const res = await POST(jsonReq(URL, { email: 'A@Example.com', password: PW }));
     expect(res.status).toBe(201);
