@@ -2,7 +2,7 @@
 /**
  * With auth on, every storage-backed API route answers 401 JSON (never a 500,
  * never data) when the request has no valid session — even if it slipped past
- * the middleware — and another user's project is a plain 404.
+ * the proxy — and another user's project is a plain 404.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
@@ -129,8 +129,8 @@ describe('storage-backed API routes with auth on', () => {
   });
 });
 
-// The middleware skips /api/upload (a Next 15 bug locks large bodies when Node middleware awaits),
-// so the route does the middleware's checks itself, before it reads the body.
+// The proxy skips /api/upload (a Next 15 bug locked large bodies when the proxy awaits),
+// so the route does the proxy's checks itself, before it reads the body.
 describe('POST /api/upload checks the session and CSRF itself', () => {
   const jpeg = async () => {
     const sharp = (await import('sharp')).default;

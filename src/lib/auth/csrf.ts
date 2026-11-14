@@ -8,7 +8,7 @@ const underApi = (pathname: string) => pathname === '/api' || pathname.startsWit
  * Cheap CSRF hardening for cookie-authenticated API calls: a state-changing /api/* request without a
  * Bearer token (so authenticated by its cookie, if at all) is refused when the browser says it is cross-site (Sec-Fetch-Site other than
  * same-origin/none) or its Origin host differs from Host. Requests carrying neither header (curl,
- * native clients) pass. Used by the middleware, and by routes the middleware skips (/api/upload).
+ * native clients) pass. Used by the proxy, and by routes the proxy skips (/api/upload).
  */
 export function csrfBlocked(method: string, pathname: string, headers: Headers): boolean {
   if (SAFE_METHODS.has(method.toUpperCase()) || !underApi(pathname) || bearerToken(headers) !== null) return false;

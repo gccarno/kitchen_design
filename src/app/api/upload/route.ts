@@ -58,7 +58,7 @@ async function readCappedBody(req: Request): Promise<Uint8Array<ArrayBuffer> | n
  * PUT /api/projects/[id]/photos/[photoId]/reference.
  */
 async function handlePost(req: Request): Promise<Response> {
-  // The middleware skips this route (see its matcher), so check here, before reading the body:
+  // The proxy skips this route (see its matcher), so check here, before reading the body:
   // a cross-site POST gets 403, and no valid session gets 401 (UnauthorizedError → withUnauthorized).
   if (authEnabled() && csrfBlocked(req.method, '/api/upload', req.headers)) return csrfRefusedResponse();
   await getRequestUserId();

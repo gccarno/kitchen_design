@@ -26,7 +26,7 @@ export default function LoginForm({ next, canRegister }: { next?: string; canReg
       if (res.ok) {
         // A previous user's cached projects must never be served to this one.
         await clearOfflineCaches();
-        // Full navigation, so the new cookie reaches the middleware and server components.
+        // Full navigation, so the new cookie reaches the proxy and server components.
         window.location.assign(safeNextPath(next));
         return;
       }

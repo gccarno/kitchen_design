@@ -48,7 +48,7 @@ export function unauthorizedResponse(): Response {
 
 /**
  * Wrap a route handler so an UnauthorizedError (from getStorage) becomes 401
- * JSON rather than a 500. The middleware already 401s requests without a
+ * JSON rather than a 500. The proxy already 401s requests without a
  * valid token; this covers a token revoked between the two checks.
  */
 export function withUnauthorized<A extends unknown[], R extends Response>(

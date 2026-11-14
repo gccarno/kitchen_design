@@ -2,6 +2,9 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Dev only: Next 16 refuses dev-server assets requested from any host but localhost, and the
+  // Playwright suite loads the app from 127.0.0.1 (playwright.config.ts).
+  allowedDevOrigins: ['127.0.0.1'],
   // The image optimizer would fetch /api/** photo URLs server-side; the app serves its own
   // already-sized images, so turn it off rather than allow-list.
   images: { unoptimized: true },
@@ -27,12 +30,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
-  },
-  webpack: (config) => {
-    // Konva's Node entry requires the optional native `canvas` package. We only
-    // render Konva in the browser, so resolve it to an empty module.
-    config.resolve.alias = { ...config.resolve.alias, canvas: false };
-    return config;
   },
 };
 

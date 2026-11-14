@@ -31,7 +31,7 @@ See [`docs/plan.md`](docs/plan.md) for the full implementation plan (6 phases), 
 
 ## Stack
 
-- Next.js 15 (App Router) + React 19 + TypeScript + Tailwind
+- Next.js 16 (App Router, Turbopack) + React 19 + TypeScript + Tailwind
 - Next.js route handlers (JSON over fetch), Zod-validated
 - Zustand for client state
 - react-konva for the 2D editor

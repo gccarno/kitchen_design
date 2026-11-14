@@ -1,8 +1,4 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { FlatCompat } from '@eslint/eslintrc';
-
-const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
+import nextVitals from 'eslint-config-next/core-web-vitals';
 
 const config = [
   {
@@ -19,7 +15,15 @@ const config = [
       'next-env.d.ts',
     ],
   },
-  ...compat.extends('next/core-web-vitals'),
+  ...nextVitals,
+  {
+    rules: {
+      // New in react-hooks 7 (eslint-config-next 16). It flags 15 existing effects that set state
+      // (reading window after mount, resetting on a prop change); they work, and rewriting them is
+      // a behaviour change of its own, so warn until each one is refactored.
+      'react-hooks/set-state-in-effect': 'warn',
+    },
+  },
 ];
 
 export default config;
