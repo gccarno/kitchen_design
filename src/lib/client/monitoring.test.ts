@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const sentry = vi.hoisted(() => ({
   init: vi.fn(),
   captureException: vi.fn(),
-  captureMessage: vi.fn(),
   addBreadcrumb: vi.fn(),
 }));
 vi.mock('@sentry/browser', () => sentry);
@@ -91,10 +90,11 @@ describe('client monitoring', () => {
   it('reports a lost picker result as a warning grouped by source', async () => {
     const m = await import('./monitoring');
     m.reportPickerLost({ source: 'camera', ageMs: 5000 });
-    expect(sentry.captureMessage).not.toHaveBeenCalled();
+    expect(sentry.captureException).not.toHaveBeenCalled();
     m.initClientMonitoring({ dsn: 'https://k@o1.ingest.sentry.io/1' });
     m.reportPickerLost({ source: 'camera', ageMs: 42_400 });
-    const [, ctx] = sentry.captureMessage.mock.calls[0];
+    const [err, ctx] = sentry.captureException.mock.calls[0];
+    expect(err.name).toBe('PhotoPickerLostError');
     expect(ctx).toMatchObject({ level: 'warning', fingerprint: ['photo-picker-lost', 'camera'], extra: { secondsSincePickerOpened: 42 } });
   });
 });
