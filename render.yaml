@@ -7,7 +7,8 @@ services:
     name: kitchen-design
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
+    # --include=dev: NODE_ENV=production would otherwise skip the TypeScript and type packages the build checks with.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start
     healthCheckPath: /api/health
     autoDeploy: true
