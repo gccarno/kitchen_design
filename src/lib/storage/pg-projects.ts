@@ -4,6 +4,7 @@ import type { Db } from '../db/types';
 import { optionGroupId } from '../plan/options';
 import { ProjectSchema, projectKind, type Project } from '../plan/schemas';
 import { InvalidProjectIdError, isValidProjectId } from './ids';
+import { reportInvalidProject } from './invalid';
 import { ProjectNotFoundError, toSummary, type ProjectStore, type ProjectSummary } from './store';
 
 /**
@@ -85,26 +86,30 @@ export class PgProjectStore implements ProjectStore {
   async list(): Promise<ProjectSummary[]> {
     // The list never needs history, which is most of a long-lived document.
     const rows = await this.db
-      .select({ doc: sql<Project>`${projects.doc} - 'history'` })
+      .select({ id: projects.id, doc: sql<Project>`${projects.doc} - 'history'` })
       .from(projects)
       .where(this.owned())
       .orderBy(desc(projects.updatedAt));
     return rows.flatMap((row) => {
       const parsed = ProjectSchema.safeParse({ ...row.doc, history: [] });
-      return parsed.success ? [toSummary(parsed.data)] : [];
+      if (parsed.success) return [toSummary(parsed.data)];
+      reportInvalidProject(row.id, parsed.error);
+      return [];
     });
   }
 
   async group(groupId: string): Promise<Project[]> {
     if (!isValidProjectId(groupId)) return [];
     const rows = await this.db
-      .select({ doc: projects.doc })
+      .select({ id: projects.id, doc: projects.doc })
       .from(projects)
       .where(and(this.owned(), or(eq(projects.id, groupId), eq(projects.optionOf, groupId))));
     return rows
       .flatMap((row) => {
         const parsed = ProjectSchema.safeParse(row.doc);
-        return parsed.success ? [parsed.data] : [];
+        if (parsed.success) return [parsed.data];
+        reportInvalidProject(row.id, parsed.error);
+        return [];
       })
       .filter((p) => optionGroupId(p) === groupId);
   }

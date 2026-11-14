@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -256,8 +256,14 @@ describe('project storage', () => {
       const { mkdirSync } = require('node:fs') as typeof import('node:fs');
       mkdirSync(junk, { recursive: true });
       writeFileSync(join(junk, 'project.json'), 'not json');
-      const list = listProjects(dataDir);
-      expect(list.every((p) => p.id !== 'junk')).toBe(true);
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const list = listProjects(dataDir);
+        expect(list.every((p) => p.id !== 'junk')).toBe(true);
+        expect(JSON.parse(String(errors.mock.calls[0][0]))).toEqual({ event: 'project_invalid', projectId: 'junk', issues: ['SyntaxError'] });
+      } finally {
+        errors.mockRestore();
+      }
     });
   });
 });

@@ -13,6 +13,7 @@ import {
   statSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { reportInvalidProject } from './invalid';
 import { optionGroupId, sortGroup } from '../plan/options';
 import { newProject } from '../plan/new-project';
 import { ProjectSchema, type Project, type ProjectKind } from '../plan/schemas';
@@ -157,9 +158,8 @@ function loadAll(dataDir: string): Project[] {
     if (!existsSync(file)) continue;
     try {
       out.push(ProjectSchema.parse(JSON.parse(readFileSync(file, 'utf-8'))));
-    } catch {
-      // Skip malformed projects — surfaced via logs, not errors.
-      continue;
+    } catch (err) {
+      reportInvalidProject(entry.name, err);
     }
   }
   return out;
