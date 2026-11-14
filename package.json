@@ -61,7 +61,7 @@
     "autoprefixer": "^10.6.2",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^15.5.29",
+    "eslint-config-next": "^16.4.6",
     "happy-dom": "^15.10.2",
     "postcss": "^8.5.32",
     "tailwindcss": "^3.4.14",
