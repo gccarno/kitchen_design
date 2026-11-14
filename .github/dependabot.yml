@@ -13,3 +13,8 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # react-konva tracks React's minor version, and the App Router runs the React bundled
+      # with Next.js (19.2 in Next 15), not the one in package.json. Lift this with Next 16.
+      - dependency-name: react-konva
+        versions: [">=19.3.0"]
