@@ -6,7 +6,7 @@ import type { LLMCallSink } from './log';
  * A schema whose parsed OUTPUT is `T`. The input side is left open so
  * schemas with defaults or transforms (input ≠ output) are accepted.
  */
-export type OutputSchema<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
+export type OutputSchema<T> = z.ZodType<T, unknown>;
 
 /** Common configuration for any OpenAI-compatible LLM provider. */
 export interface ProviderConfig {

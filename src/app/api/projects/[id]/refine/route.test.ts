@@ -28,7 +28,7 @@ function stub(outcomes: unknown[]): LLMProvider & { users: string[] } {
     async chatWithVision() {
       throw new Error('unused');
     },
-    async completeJSON<T>(req: { user: string; schema: z.ZodType<T, z.ZodTypeDef, unknown> }) {
+    async completeJSON<T>(req: { user: string; schema: z.ZodType<T, unknown> }) {
       this.users.push(req.user);
       const next = outcomes.shift();
       if (next instanceof Error) throw next;

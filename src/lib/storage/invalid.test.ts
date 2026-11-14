@@ -25,7 +25,7 @@ describe('reportInvalidProject', () => {
     reportInvalidProject('p-2', jsonErr);
     const everything = JSON.stringify([errors.mock.calls, sent.calls.map(([e, c]) => [(e as Error).name, (e as Error).message, (e as Error).stack, c])]);
     expect(everything).not.toContain('SECRET');
-    expect(JSON.parse(String(errors.mock.calls[0][0]))).toEqual({ event: 'project_invalid', projectId: 'p-1', issues: ['name: invalid_enum_value'] });
+    expect(JSON.parse(String(errors.mock.calls[0][0]))).toEqual({ event: 'project_invalid', projectId: 'p-1', issues: ['name: invalid_value'] });
     expect((sent.calls[1][0] as Error).name).toBe('SyntaxError');
   });
 

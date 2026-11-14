@@ -16,7 +16,7 @@ import { runJob } from './run';
 class StubProvider implements LLMProvider {
   calls = 0;
   constructor(private outcomes: Array<unknown | Error>) {}
-  private next<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>): T {
+  private next<T>(schema: z.ZodType<T, unknown>): T {
     this.calls++;
     const n = this.outcomes.shift();
     if (n === undefined) throw new Error('stub: no more outcomes');
@@ -26,11 +26,11 @@ class StubProvider implements LLMProvider {
   async completeText(): Promise<string> {
     throw new Error('unused');
   }
-  async completeJSON<T>(req: { schema: z.ZodType<T, z.ZodTypeDef, unknown> }): Promise<T> {
+  async completeJSON<T>(req: { schema: z.ZodType<T, unknown> }): Promise<T> {
     return this.next(req.schema);
   }
   async chatWithVision<T>(req: VisionRequest<T>): Promise<T> {
-    return this.next(req.schema as z.ZodType<T, z.ZodTypeDef, unknown>);
+    return this.next(req.schema as z.ZodType<T, unknown>);
   }
 }
 

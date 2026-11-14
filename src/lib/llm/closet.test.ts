@@ -34,7 +34,7 @@ function stub(outcomes: unknown[]): LLMProvider & { users: string[]; systems: st
     async chatWithVision() {
       throw new Error('unused');
     },
-    async completeJSON<T>(req: { system: string; user: string; schema: z.ZodType<T, z.ZodTypeDef, unknown> }) {
+    async completeJSON<T>(req: { system: string; user: string; schema: z.ZodType<T, unknown> }) {
       this.users.push(req.user);
       this.systems.push(req.system);
       return req.schema.parse(outcomes.shift());
