@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeOrientation, readImageDimensions } from './exif';
+import { normalizeOrientation, readImageDimensions, STORED_MAX_EDGE_PX } from './exif';
 import sharp from 'sharp';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,6 +40,22 @@ describe('exif utilities', () => {
     const dims = await readImageDimensions(out);
     expect(dims.width).toBe(500);
     expect(dims.height).toBe(500);
+  });
+
+  it('applies the EXIF orientation to the pixels and drops the tag', async () => {
+    // Stored 400×300 with "rotate 90° clockwise to display" (orientation 6), as phones do.
+    const tagged = await sharp(await makeJpegBuffer(400, 300)).withMetadata({ orientation: 6 }).jpeg().toBuffer();
+    const out = await normalizeOrientation(tagged);
+    const meta = await sharp(out).metadata();
+    expect([meta.width, meta.height]).toEqual([300, 400]);
+    expect(meta.orientation ?? 1).toBe(1);
+  });
+
+  it(`shrinks a photo whose long edge is over ${STORED_MAX_EDGE_PX} px, keeping its proportions`, async () => {
+    const out = await normalizeOrientation(await makeJpegBuffer(4000, 3000));
+    expect(await readImageDimensions(out)).toEqual({ width: STORED_MAX_EDGE_PX, height: (STORED_MAX_EDGE_PX * 3) / 4 });
+    const tall = await normalizeOrientation(await makeJpegBuffer(1500, 3000));
+    expect(await readImageDimensions(tall)).toEqual({ width: STORED_MAX_EDGE_PX / 2, height: STORED_MAX_EDGE_PX });
   });
 
   it('handles a tiny 10x10 image', async () => {

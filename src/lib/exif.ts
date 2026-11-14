@@ -3,14 +3,10 @@
  * but the raw pixels are stored un-rotated. Browsers and image viewers
  * rotate on display based on the tag. To make the floor plan extractor
  * work (and our reference-object math), we physically rotate the image
- * once at upload time and strip the orientation tag.
- *
- * `exifr` reads the orientation; `sharp` does the actual rotation/re-encode.
+ * once at upload time and strip the orientation tag (sharp does both).
  */
 
-import exifr from 'exifr';
 import sharp from 'sharp';
-import { readFile } from 'node:fs/promises';
 
 export interface ImageDimensions {
   width: number;
@@ -32,36 +28,22 @@ export async function readImageDimensions(input: Buffer | string): Promise<Image
 }
 
 /**
- * Apply the EXIF orientation to the pixels and re-encode as JPEG,
- * stripping the orientation tag. The returned buffer is what gets
- * saved to disk; downstream code can assume pixels are display-ready.
- *
- * If no EXIF orientation tag is present (e.g. screenshots, desktop
- * uploads), this is essentially a no-op re-encode.
+ * Long-edge cap for stored photos. Phone photos are 4000+ px and several MB; the editor shows them
+ * as thumbnails, the vision model gets 1568 px (llm/images.ts), and the offline cache keeps up to
+ * 300 of them. This leaves room to zoom while marking a reference object.
+ */
+export const STORED_MAX_EDGE_PX = 2560;
+
+/**
+ * Apply the EXIF orientation to the pixels (sharp's `rotate()` with no angle reads the tag and
+ * drops it), shrink to STORED_MAX_EDGE_PX on the long edge, and re-encode as JPEG. The result is
+ * what gets stored; downstream code can assume pixels are display-ready. Rejects bytes sharp
+ * can't decode.
  */
 export async function normalizeOrientation(input: Buffer | string): Promise<Buffer> {
-  // Try to read orientation. exifr returns undefined for images with
-  // no EXIF data; default to 1 (no rotation).
-  let orientation = 1;
-  try {
-    const buf = typeof input === 'string' ? await readFile(input) : input;
-    const tags = await exifr.parse(buf, { pick: ['Orientation'] });
-    if (tags && typeof tags.Orientation === 'number') {
-      orientation = tags.Orientation;
-    }
-  } catch {
-    // No EXIF data — leave orientation as 1.
-  }
-
-  let pipeline = sharp(input).rotate(); // sharp's rotate() with no args applies EXIF orientation
-  // For belt-and-suspenders, also explicitly rotate if the tag was
-  // present (sharp normally handles this, but some buggy JPEGs need it).
-  if (orientation > 1) {
-    // .rotate() with no arg already applies the EXIF tag, so this
-    // is technically redundant for well-formed files. We keep it as
-    // an explicit signal in case the image has no embedded EXIF but
-    // the caller already knows the orientation.
-    pipeline = sharp(input).rotate();
-  }
-  return await pipeline.jpeg({ quality: 90 }).toBuffer();
+  return sharp(input)
+    .rotate()
+    .resize({ width: STORED_MAX_EDGE_PX, height: STORED_MAX_EDGE_PX, fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 90 })
+    .toBuffer();
 }
