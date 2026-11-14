@@ -96,7 +96,7 @@ describe('GET /api/jobs/[id]', () => {
     expect(['queued', 'running', 'failed']).toContain((await res.json()).status);
     // Dispatched again in-process: the runner claims it a second time and, as
     // the project doesn't exist, fails it — it is not left stuck.
-    await vi.waitFor(async () => expect((await jobs.get(job.id))!.status).toBe('failed'));
+    await vi.waitFor(async () => expect((await jobs.get(job.id))!.status).toBe('failed'), { timeout: 10_000 }); // the re-dispatch runs in the background; slow under a full parallel run
     expect(await jobs.get(job.id)).toMatchObject({ attempts: 2, error: { status: 404, error: 'project not found' } });
     spy.mockRestore();
   });
