@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import ProjectEditor from '@/components/ProjectEditor';
@@ -10,9 +11,8 @@ export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ id: string }> };
 
-async function find(id: string) {
-  return (await getPageStorage()).projects.load(id);
-}
+// One load per render: generateMetadata and the page share it.
+const find = cache(async (id: string) => (await getPageStorage()).projects.load(id));
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const project = await find((await params).id);

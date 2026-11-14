@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { cache } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -13,13 +13,16 @@ export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ groupId: string }> };
 
+// One query per render: generateMetadata and the page share it.
+const findGroup = cache(async (groupId: string) => optionGroup(await getPageStorage(), groupId));
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const group = await optionGroup(await getPageStorage(), (await params).groupId);
+  const group = await findGroup((await params).groupId);
   return { title: group.length > 0 ? `Compare options — ${groupName(group)} · Home Design` : 'Options not found' };
 }
 
 export default async function ComparePage({ params }: Props) {
-  const group = await optionGroup(await getPageStorage(), (await params).groupId);
+  const group = await findGroup((await params).groupId);
   if (group.length === 0) notFound();
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-4 p-4 sm:p-8">
