@@ -14,11 +14,15 @@ import { createProject, mockJob, openStep, pagePoint, projectJson, settle } from
  * tests/integration/dev-server.test.ts against a fake OpenAI-compatible server.
  */
 test('photo + measured wall → extracted room → cabinet → SVG export', async ({ page }) => {
+  // A long flow, and the first hit of each route compiles it in dev: more than the default 30 s.
+  test.slow();
   const { id, canvas } = await createProject(page, 'Happy path');
 
   // Upload one photo (a synthetic kitchen with a credit-card-sized marker).
   const photo = readFileSync(join(__dirname, 'fixtures', 'kitchen-photo.jpg'));
   await page.getByLabel('Choose photos').setInputFiles({ name: 'kitchen-photo.jpg', mimeType: 'image/jpeg', buffer: photo });
+  // The marker starts closed (marking is optional); open it.
+  await page.getByRole('button', { name: /mark a known-size object/i }).click();
   await expect(page.getByRole('img', { name: /mark the reference object/i })).toBeVisible();
   await expect.poll(() => projectJson(id).photos.length).toBe(1);
 
