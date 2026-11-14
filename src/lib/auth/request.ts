@@ -1,10 +1,13 @@
+/** The token of an `Authorization: Bearer <t>` header, or null (no header, or another scheme). */
+export function bearerToken(headers: Headers): string | null {
+  const m = /^Bearer\s+(\S+)\s*$/i.exec(headers.get('authorization') ?? '');
+  return m ? m[1] : null;
+}
+
 /** `Authorization: Bearer <t>` first, else the `session` cookie. */
 export function tokenFromRequest(headers: Headers): string | null {
-  const auth = headers.get('authorization');
-  if (auth) {
-    const m = /^Bearer\s+(\S+)\s*$/i.exec(auth);
-    if (m) return m[1];
-  }
+  const bearer = bearerToken(headers);
+  if (bearer) return bearer;
   const cookie = headers.get('cookie');
   if (cookie) {
     for (const part of cookie.split(';')) {

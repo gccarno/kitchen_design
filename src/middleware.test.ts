@@ -161,6 +161,11 @@ describe('csrfBlocked', () => {
     expect(csrfBlocked('POST', '/api/projects', h({ origin: 'https://evil.example', host: 'app.example' }))).toBe(true);
     expect(csrfBlocked('POST', '/api/projects', h({ origin: 'null', host: 'app.example' }))).toBe(true);
   });
+  it('still checks a request whose Authorization is not a Bearer token (its session would come from the cookie)', () => {
+    for (const authorization of ['Basic dTpw', 'Bearer', 'Bearer ', 'Token abc']) {
+      expect(csrfBlocked('POST', '/api/projects', h({ 'sec-fetch-site': 'cross-site', authorization }))).toBe(true);
+    }
+  });
   it('allows same-origin, header-less, Bearer and safe-method requests', () => {
     expect(csrfBlocked('POST', '/api/projects', h({ 'sec-fetch-site': 'same-origin', origin: 'https://app.example', host: 'app.example' }))).toBe(false);
     expect(csrfBlocked('POST', '/api/projects', h({ 'sec-fetch-site': 'none' }))).toBe(false);
