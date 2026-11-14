@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import {
+  closeSync,
   existsSync,
+  fsyncSync,
+  openSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -45,7 +48,14 @@ export function atomicWriteJson(target: string, value: unknown): void {
   const dir = dirname(target);
   mkdirSync(dir, { recursive: true });
   const tmp = `${target}.tmp`;
-  writeFileSync(tmp, JSON.stringify(value, null, 2));
+  const fd = openSync(tmp, 'w');
+  try {
+    writeFileSync(fd, JSON.stringify(value, null, 2));
+    // Flush to disk before the rename, so a crash can't leave the new name pointing at an empty file.
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
   renameSync(tmp, target);
 }
 
