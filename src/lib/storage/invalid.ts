@@ -16,5 +16,9 @@ export function reportInvalidProject(projectId: string, err: unknown): void {
   console.error(JSON.stringify({ event: 'project_invalid', projectId, issues }));
   if (reported.has(projectId)) return;
   reported.add(projectId);
-  reportError(err instanceof Error ? err : new Error('invalid project'), { event: 'project_invalid', projectId, issues });
+  // Not the original error: a ZodError's message can quote the bad values, and a JSON
+  // SyntaxError quotes the file. Only its name travels.
+  const synthetic = new Error('invalid project');
+  synthetic.name = err instanceof Error ? err.name : 'InvalidProject';
+  reportError(synthetic, { event: 'project_invalid', projectId, issues });
 }
