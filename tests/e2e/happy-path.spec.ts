@@ -59,7 +59,7 @@ test('photo + measured wall → extracted room → cabinet → SVG export', asyn
   await expect(review.getByText('Model confidence: 80%')).toBeVisible();
   expect(projectJson(id).revision).toBe(0);
   await review.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   expect(projectJson(id).room.polygon).toEqual(after.room.polygon);
 
   // Place one cabinet against the north wall.
@@ -70,7 +70,7 @@ test('photo + measured wall → extracted room → cabinet → SVG export', asyn
   await settle(canvas);
   const [x, y] = await pagePoint(canvas, [2000, 100]);
   await page.mouse.click(x, y);
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   expect(projectJson(id).items).toHaveLength(1);
 
   // Export the drawing.

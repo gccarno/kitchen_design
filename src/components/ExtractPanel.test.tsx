@@ -47,6 +47,29 @@ describe('ExtractPanel', () => {
     vi.unstubAllGlobals();
   });
 
+  it('keeps what was typed (measurements and hint) when the page is reloaded', () => {
+    const first = setup();
+    fillRow(0, 'sink wall', '3600');
+    fireEvent.change(screen.getByLabelText(/anything else/i), { target: { value: 'galley' } });
+    first.button(); // rendered
+    cleanupRender();
+    setup();
+    expect((screen.getAllByLabelText(/which wall/i)[0] as HTMLInputElement).value).toBe('sink wall');
+    expect((screen.getAllByLabelText(/length \(mm\)/i)[0] as HTMLInputElement).value).toBe('3600');
+    expect((screen.getByLabelText(/anything else/i) as HTMLInputElement).value).toBe('galley');
+  });
+
+  it('forgets the typed form once the room comes back', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(job('done', { result: RESULT }));
+    const { onProposal, button } = setup();
+    fireEvent.change(screen.getByLabelText(/anything else/i), { target: { value: 'galley' } });
+    fireEvent.click(button());
+    await tick(1500);
+    await waitFor(() => expect(onProposal).toHaveBeenCalled());
+    expect(sessionStorage.getItem(`kd-extract-draft:${ID}`)).toBeNull();
+  });
+
   it('is disabled until there is a photo', () => {
     const { button } = setup(false);
     expect(button().disabled).toBe(true);

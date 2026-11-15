@@ -14,6 +14,7 @@ test('a kitchen in feet and inches: sketch it as 12\' 6" × 10\', and the step s
   await expect(page.getByRole('tab', { name: 'Room' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText(`9' 10" × 13' 1 1/2", 129 ft²`)).toBeVisible();
 
+  await page.getByRole('group', { name: 'Get the room' }).getByText('Sketch it').click();
   await page.getByLabel(/^Width/).fill(`12' 6"`);
   await page.getByLabel(/^Depth/).fill(`10'`);
   await expect(page.getByText('= 12\' 6"')).toBeVisible();
@@ -22,17 +23,17 @@ test('a kitchen in feet and inches: sketch it as 12\' 6" × 10\', and the step s
   const review = page.getByRole('region', { name: 'Review proposed change' });
   await expect(review.getByText(/3810 × 3048 mm/)).toBeVisible();
   await review.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   const [, [x1], [, y2]] = projectJson(id).room.polygon;
   expect(x1).toBeCloseTo(3810, 0);
   expect(y2).toBeCloseTo(3048, 0);
 
   // Switching the units is a revision of its own, and undo brings the old units back.
   await page.getByRole('combobox', { name: /Units/ }).selectOption('mm');
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   expect(projectJson(id).units).toBe('mm');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByText('Revision 3')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '3');
   expect(projectJson(id).units).toBe('in');
 
   // The step you were on is still open after a reload.

@@ -14,14 +14,14 @@ test('download the spec sheet, duplicate the sample kitchen as an option, edit i
   await page.getByRole('button', { name: 'Duplicate as option' }).click();
   await page.waitForURL((url) => /\/project\/[0-9a-f-]{36}$/.test(url.pathname) && url.href !== originalUrl);
   await expect(page.getByRole('heading', { level: 1, name: 'Sample kitchen — Option B' })).toBeVisible();
-  await expect(page.getByText('Revision 0')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '0');
 
   await openStep(page, 'Finishes & cost');
   // Make the option cost more: raise the first unit price.
   const price = page.getByRole('table', { name: 'Estimate' }).getByRole('textbox', { name: /^Unit price: / }).first();
   await price.fill(String(Number(await price.inputValue()) + 100));
   await price.press('Enter');
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
 
   await openStep(page, 'Share');
   await page.getByRole('link', { name: 'Compare options' }).click();

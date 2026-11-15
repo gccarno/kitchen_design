@@ -46,7 +46,7 @@ test('ask for a change in the chat, review it, and apply it', async ({ page }) =
   expect(projectJson(id).items).toEqual([]); // not applied yet
 
   await review.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   const saved = projectJson(id);
   expect(saved.items[0]).toMatchObject({ catalogId: 'dishwasher-600', position: { x: 1500, y: 290 } });
   expect(saved.history[0]).toMatchObject({ source: 'llm', summary: 'Add a dishwasher on the north wall' });

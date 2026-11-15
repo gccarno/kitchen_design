@@ -5,7 +5,7 @@ test('change a price in the sample kitchen estimate, then undo it', async ({ pag
   await page.goto('/');
   await page.getByRole('button', { name: 'Try a sample kitchen' }).click();
   await page.waitForURL(/\/project\/[0-9a-f-]{36}$/);
-  await expect(page.getByText('Revision 0')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '0');
   await openStep(page, 'Finishes & cost');
 
   const table = page.getByRole('table', { name: 'Estimate' });
@@ -18,13 +18,13 @@ test('change a price in the sample kitchen estimate, then undo it', async ({ pag
   const old = Number(await price.inputValue());
   await price.fill(String(old + 100));
   await price.press('Enter');
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   await expect(total).not.toHaveText(before!);
   await expect(table.getByRole('button', { name: /^Reset the price of / })).toHaveCount(1);
   await expect(page.getByText(/^Last change: Set the price of /)).toBeVisible();
 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   await expect(total).toHaveText(before!);
   await expect(price).toHaveValue(String(old));
 });

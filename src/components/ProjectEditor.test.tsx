@@ -51,6 +51,11 @@ const project: Project = ProjectSchema.parse({
   history: [],
 });
 
+/** The saved revision, kept on the page (not shown) so tests can tell a save landed. */
+const revision = () => document.querySelector('[data-revision]')?.getAttribute('data-revision');
+/** The Room step offers photos or a sketch; pick the sketch. */
+const chooseSketch = () => fireEvent.click(screen.getByRole('radio', { name: 'Sketch it' }));
+
 /** The kitchen page works in steps; open the one with the panel a test needs. */
 const openStep = (name: 'Room' | 'Layout' | 'Finishes & cost' | 'Share') => fireEvent.click(screen.getByRole('tab', { name }));
 
@@ -176,6 +181,7 @@ describe('ProjectEditor', () => {
     expect(screen.getByRole('img', { name: /current room/i })).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Photos' })).not.toBeNull();
     expect(screen.getByRole('button', { name: /get room from photos/i })).not.toBeNull();
+    chooseSketch();
     expect(screen.getByRole('button', { name: /use rectangle/i })).not.toBeNull();
     openStep('Layout');
     expect(screen.getByRole('heading', { name: 'Catalog' })).not.toBeNull();
@@ -252,6 +258,7 @@ describe('ProjectEditor', () => {
 
   it('sketch → review → apply updates the page from the saved project', async () => {
     render(<ProjectEditor initialProject={project} />);
+    chooseSketch();
     fireEvent.change(screen.getByLabelText(/width/i), { target: { value: '3600' } });
     fireEvent.change(screen.getByLabelText(/depth/i), { target: { value: '2700' } });
     fireEvent.click(screen.getByRole('button', { name: /use rectangle/i }));
@@ -285,17 +292,18 @@ describe('ProjectEditor', () => {
     fireEvent.click(within(review).getByRole('button', { name: /apply/i }));
 
     await waitFor(() => expect(screen.queryByRole('region', { name: /review proposed change/i })).toBeNull());
-    expect(screen.getByText(/revision 1/i)).not.toBeNull();
+    expect(revision()).toBe('1');
     expect(screen.getByText(/3600 × 2700 mm/)).not.toBeNull();
   });
 
   it('discarding a proposal leaves the plan unchanged', () => {
     render(<ProjectEditor initialProject={project} />);
+    chooseSketch();
     fireEvent.click(screen.getByRole('button', { name: /use rectangle/i }));
     fireEvent.click(screen.getByRole('button', { name: /save room/i }));
     fireEvent.click(screen.getByRole('button', { name: /discard/i }));
     expect(screen.queryByRole('region', { name: /review proposed change/i })).toBeNull();
-    expect(screen.getByText(/revision 0/i)).not.toBeNull();
+    expect(revision()).toBe('0');
   });
 
   it('turns an extraction result into an LLM proposal for review', async () => {
@@ -346,7 +354,7 @@ describe('ProjectEditor', () => {
       result = await editRoom(edited, 'Move corner 2');
     });
     expect(result).toBeNull();
-    expect(screen.getByText(/revision 1/i)).not.toBeNull();
+    expect(revision()).toBe('1');
     expect(screen.queryByRole('region', { name: /review proposed change/i })).toBeNull();
   });
 
@@ -367,7 +375,7 @@ describe('ProjectEditor', () => {
     const input = screen.getByLabelText('Unit price: Range (760 mm / 30")');
     fireEvent.change(input, { target: { value: '1200' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    await waitFor(() => expect(screen.getByText(/revision 1/i)).not.toBeNull());
+    await waitFor(() => expect(revision()).toBe('1'));
     expect(screen.getByRole('button', { name: 'Reset the price of Range (760 mm / 30")' })).not.toBeNull();
   });
 
@@ -380,7 +388,7 @@ describe('ProjectEditor', () => {
       result = await editRoom(moved, 'Move corner 1');
     });
     expect(result).toMatch(/invalid/);
-    expect(screen.getByText(/revision 0/i)).not.toBeNull();
+    expect(revision()).toBe('0');
   });
 
   it('does not save a canvas edit that changes nothing', async () => {
@@ -552,6 +560,26 @@ describe('ProjectEditor steps and units', () => {
     sessionStorage.clear();
   });
 
+  it('offers the room from photos or a sketch, one at a time, and remembers the choice for this tab', () => {
+    const first = render(<ProjectEditor initialProject={project} />);
+    expect((screen.getByRole('radio', { name: 'From photos' }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('heading', { name: 'Photos' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /use rectangle/i })).toBeNull();
+    chooseSketch();
+    expect(screen.queryByRole('heading', { name: 'Photos' })).toBeNull();
+    expect(screen.getByRole('button', { name: /use rectangle/i })).not.toBeNull();
+    first.unmount();
+    render(<ProjectEditor initialProject={project} />);
+    expect((screen.getByRole('radio', { name: 'Sketch it' }) as HTMLInputElement).checked).toBe(true);
+    sessionStorage.clear();
+  });
+
+  it('keeps the revision number out of the header', () => {
+    render(<ProjectEditor initialProject={{ ...project, revision: 7 }} />);
+    expect(screen.queryByText(/revision \d/i)).toBeNull();
+    expect(revision()).toBe('7');
+  });
+
   it('remembers the step for this project', () => {
     const first = render(<ProjectEditor initialProject={project} />);
     openStep('Share');
@@ -631,6 +659,7 @@ describe('ProjectEditor steps and units', () => {
 
   it('takes a sketch size in feet and inches in an inch project', () => {
     render(<ProjectEditor initialProject={{ ...project, units: 'in' }} />);
+    chooseSketch();
     fireEvent.change(screen.getByLabelText(/width/i), { target: { value: `12' 6"` } });
     fireEvent.change(screen.getByLabelText(/depth/i), { target: { value: `10'` } });
     fireEvent.click(screen.getByRole('button', { name: /use rectangle/i }));
@@ -705,6 +734,14 @@ describe('ProjectEditor estimated sizes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm a size' }));
     expect(screen.getByRole('tab', { name: 'Room' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByRole('heading', { name: 'Confirm the size' })).not.toBeNull();
+  });
+
+  it('tucks rescaling away in a closed section once the sizes are real', () => {
+    render(<ProjectEditor initialProject={project} />);
+    expect(screen.queryByRole('heading', { name: 'Confirm the size' })).toBeNull();
+    const section = screen.getByText('Rescale from a measurement').closest('details')!;
+    expect(section.open).toBe(false);
+    expect(section.contains(screen.getByRole('button', { name: /rescale the room/i, hidden: true }))).toBe(true);
   });
 
   it('confirming a real size goes through the review step as a rescale', () => {
