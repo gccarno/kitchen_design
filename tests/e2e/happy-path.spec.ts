@@ -49,7 +49,8 @@ test('photo + measured wall → extracted room → cabinet → SVG export', asyn
     (body) => expect(body).toEqual({ measurements: [{ description: 'sink wall', lengthMm: 4000 }] })
   );
 
-  await page.getByText('I measured a wall (more accurate)').click();
+  // The measured-wall fields are shown up front.
+  await expect(page.getByText('Measured a wall? Sizes will be exact (optional)')).toBeVisible();
   await page.getByLabel(/Which wall/).fill('sink wall');
   await page.getByLabel('Length (mm)').fill('4000');
   await page.getByRole('button', { name: 'Get room from photos' }).click();
