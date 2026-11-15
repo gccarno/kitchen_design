@@ -43,6 +43,22 @@ describe('ConfirmScale', () => {
     ]);
   });
 
+  it('picks a wall when it is tapped on the drawing, and marks the picked one', () => {
+    render(<ConfirmScale project={project()} onProposal={() => {}} />);
+    const wall2 = screen.getByRole('button', { name: 'Wall 2' });
+    expect(wall2.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(wall2);
+    expect((screen.getByLabelText(/what did you measure/i) as HTMLSelectElement).value).toBe('wall:b');
+    expect(screen.getByRole('button', { name: 'Wall 2' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Wall 1' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('picks a wall from the keyboard too', () => {
+    render(<ConfirmScale project={project()} onProposal={() => {}} />);
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Wall 4' }), { key: 'Enter' });
+    expect((screen.getByLabelText(/what did you measure/i) as HTMLSelectElement).value).toBe('wall:d');
+  });
+
   it('shows how much the room changes, and proposes a rescale that commits to the right size', () => {
     const onProposal = vi.fn();
     const p = project();

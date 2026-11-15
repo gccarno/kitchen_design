@@ -23,6 +23,8 @@ interface ExtractPanelProps {
   hasPhotos: boolean;
   /** The project's units: what a bare length means, and how lengths are echoed. */
   units?: 'mm' | 'in';
+  /** The photos' labels ("sink wall"): offered as names for a measured wall. */
+  photoLabels?: string[];
   onProposal: (proposal: Proposal) => void;
 }
 
@@ -36,18 +38,18 @@ type Row = { key: number; description: string; length: string };
  * wall in their own words ("sink wall") because the model's walls don't
  * exist yet; the server matches them up and rescales to fit.
  */
-export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onProposal }: ExtractPanelProps) {
+export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photoLabels = [], onProposal }: ExtractPanelProps) {
   const online = useOnline();
   const nextKey = useRef(1);
   const [rows, setRows] = useState<Row[]>([{ key: 0, description: '', length: '' }]);
   const [hint, setHint] = useState('');
-  const [showMeasured, setShowMeasured] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; retryAfterMs?: number } | null>(null);
   const [slow, setSlow] = useState(false);
   const inFlight = useRef(false);
   const current = useRef<AbortController | null>(null);
   const jobKey = `kd-job:extract:${projectId}`;
+  const labelListId = `photo-labels-${projectId}`;
 
   const filled = rows.filter((r) => r.description.trim() !== '' || r.length.trim() !== '');
   const incomplete = filled.some((r) => r.description.trim() === '' || parseLength(r.length, units) === null);
@@ -143,12 +145,17 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onPro
         />
       </label>
 
-      <details open={showMeasured} onToggle={(e) => setShowMeasured(e.currentTarget.open)} className="rounded border p-3 text-sm">
-        <summary className="cursor-pointer font-medium">I measured a wall (more accurate)</summary>
-        <div className="mt-3 flex flex-col gap-3">
+      <fieldset className="rounded border p-3 text-sm">
+        <legend className="px-1 font-medium">Measured a wall? Sizes will be exact (optional)</legend>
+        <div className="flex flex-col gap-3">
           <p className="text-gray-600">
             Measure one or two walls with a tape measure: they set the scale. Describe each so the model can find it.
           </p>
+          <datalist id={labelListId}>
+            {[...new Set(photoLabels)].map((l) => (
+              <option key={l} value={l} />
+            ))}
+          </datalist>
           <ul className="flex flex-col gap-2">
             {rows.map((r, i) => (
               <li key={r.key} className="flex flex-wrap items-end gap-2">
@@ -156,6 +163,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onPro
                   <span>Which wall{i === 0 ? ' (e.g. “sink wall”)' : ''}</span>
                   <input
                     className="w-48 rounded border px-2 py-1"
+                    list={labelListId}
                     value={r.description}
                     maxLength={200}
                     onChange={(e) => update(r.key, { description: e.target.value })}
@@ -192,7 +200,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onPro
           </button>
           {incomplete && <p className="text-amber-700">Each measurement needs a wall and a length.</p>}
         </div>
-      </details>
+      </fieldset>
 
       {!hasPhotos && <p className="text-sm text-gray-600">Upload at least one photo first.</p>}
       <button

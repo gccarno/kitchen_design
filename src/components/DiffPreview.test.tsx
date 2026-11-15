@@ -102,6 +102,27 @@ describe('DiffPreview', () => {
     expect(screen.getByText('Your measurements disagree by 8%.')).not.toBeNull();
   });
 
+  it('shows the photos a room from photos was made from, and a bigger one when tapped', () => {
+    const withPhotos = { ...current, photos: [{ id: 'a', path: 'photos/a.jpg', width: 400, height: 300, label: 'sink wall' }, { id: 'b', path: 'photos/b.jpg', width: 400, height: 300 }] };
+    render(<DiffPreview projectId={ID} current={withPhotos} proposal={llmProposal()} onApplied={vi.fn()} onDiscard={vi.fn()} />);
+    const strip = screen.getByRole('group', { name: /your photos/i });
+    const thumbs = strip.querySelectorAll('img');
+    expect([...thumbs].map((i) => i.getAttribute('src'))).toEqual([`/api/projects/${ID}/photos/a?w=320`, `/api/projects/${ID}/photos/b?w=320`]);
+    expect(screen.queryByAltText(/full size/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /photo 1: sink wall/i }));
+    expect(screen.getByAltText(/photo 1, full size/i).getAttribute('src')).toBe(`/api/projects/${ID}/photos/a`);
+  });
+
+  it('shows no photos for a change that leaves the room alone, or one the user made', () => {
+    const withPhotos = { ...current, photos: [{ id: 'a', path: 'photos/a.jpg', width: 400, height: 300 }] };
+    const rename = llmProposal({ patch: [{ op: 'replace', path: '/name', value: 'New' }] });
+    const { unmount } = render(<DiffPreview projectId={ID} current={withPhotos} proposal={rename} onApplied={vi.fn()} onDiscard={vi.fn()} />);
+    expect(screen.queryByRole('group', { name: /your photos/i })).toBeNull();
+    unmount();
+    render(<DiffPreview projectId={ID} current={withPhotos} proposal={llmProposal({ source: 'user' })} onApplied={vi.fn()} onDiscard={vi.fn()} />);
+    expect(screen.queryByRole('group', { name: /your photos/i })).toBeNull();
+  });
+
   it('flags low confidence', () => {
     setup(llmProposal({ confidence: 0.35 }));
     expect(screen.getByText(/low confidence/i)).not.toBeNull();

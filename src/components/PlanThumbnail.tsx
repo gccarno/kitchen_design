@@ -10,11 +10,15 @@ interface PlanThumbnailProps {
   bounds?: Bounds;
   label: string;
   className?: string;
+  /** Makes each wall a button: tapping (or Enter/Space on) one calls this with its id. */
+  onPickWall?: (wallId: string) => void;
+  /** The wall to draw as picked. */
+  selectedWallId?: string;
 }
 
 
 /** Static top-down drawing of a room: outline, numbered walls, openings, and item footprints. */
-export default function PlanThumbnail({ room, items = [], bounds, label, className }: PlanThumbnailProps) {
+export default function PlanThumbnail({ room, items = [], bounds, label, className, onPickWall, selectedWallId }: PlanThumbnailProps) {
   const poly = room.polygon as Point[];
   const b = bounds ?? polygonBounds(poly);
   const span = Math.max(b.maxX - b.minX, b.maxY - b.minY, 1);
@@ -59,10 +63,44 @@ export default function PlanThumbnail({ room, items = [], bounds, label, classNa
           strokeWidth={stroke / 2}
         />
       ))}
+      {onPickWall &&
+        room.walls.map((w, i) => {
+          if (i >= poly.length) return null;
+          const [p, q] = [poly[i], poly[(i + 1) % poly.length]];
+          const picked = w.id === selectedWallId;
+          return (
+            <line
+              key={w.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Wall ${i + 1}`}
+              aria-pressed={picked}
+              x1={p[0]}
+              y1={p[1]}
+              x2={q[0]}
+              y2={q[1]}
+              // A wide, mostly clear band so a finger can hit it; the picked wall is drawn over the outline.
+              stroke={picked ? '#2563eb' : 'transparent'}
+              strokeOpacity={picked ? 0.7 : 1}
+              strokeWidth={stroke * 8}
+              strokeLinecap="round"
+              className="cursor-pointer focus:outline-none"
+              style={{ pointerEvents: 'stroke' }}
+              onClick={() => onPickWall(w.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onPickWall(w.id);
+                }
+              }}
+            />
+          );
+        })}
       {poly.map((p, i) => {
         const q = poly[(i + 1) % poly.length];
         return (
           <text
+            pointerEvents="none"
             key={i}
             x={(p[0] + q[0]) / 2}
             y={(p[1] + q[1]) / 2}

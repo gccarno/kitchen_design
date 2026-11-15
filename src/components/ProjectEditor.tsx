@@ -431,6 +431,7 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
                   projectId={project.id}
                   hasPhotos={project.photos.length > 0}
                   units={project.units}
+                  photoLabels={project.photos.flatMap((p) => (p.label ? [p.label] : []))}
                   onProposal={propose}
                 />
               </section>
