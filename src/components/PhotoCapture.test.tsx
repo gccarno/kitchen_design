@@ -85,7 +85,8 @@ describe('PhotoCapture', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`/api/projects/${PROJECT}/photos/a`);
     expect(init).toMatchObject({ method: 'DELETE' });
-    expect(onPhotosChange).toHaveBeenLastCalledWith([photo('b')]);
+    // Reported from an effect after the list re-renders, so wait for it too.
+    await waitFor(() => expect(onPhotosChange).toHaveBeenLastCalledWith([photo('b')]));
   });
 
   it('keeps the photo and says why when removing fails', async () => {
