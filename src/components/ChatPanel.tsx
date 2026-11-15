@@ -98,6 +98,9 @@ export default function ChatPanel({
     const saved = recallJob<{ jobId: string; message?: unknown }>(jobKey);
     if (saved && !inFlight.current) {
       const message = typeof saved.message === 'string' ? saved.message : undefined;
+      // Reconnecting to a job that is still running elsewhere (saved in sessionStorage, which the
+      // server render can't read): an effect syncing with an external system, as intended.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (message !== undefined) setMessages([{ role: 'user', content: message }]);
       void execute((signal) => waitForJob<RefinementResponse>(saved.jobId, { signal }), message);
     }
@@ -109,10 +112,14 @@ export default function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per project; execute reads refs only
   }, [jobKey]);
 
+  // The hint shows only while busy; the cleanup resets it for the next request.
   useEffect(() => {
-    if (!busy) return setSlow(false);
+    if (!busy) return;
     const timer = setTimeout(() => setSlow(true), SLOW_HINT_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setSlow(false);
+    };
   }, [busy]);
 
   function send() {

@@ -21,6 +21,32 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Render installs and builds with NODE_ENV=production, so npm ci skips devDependencies unless
+  # told otherwise; the check job above installs everything and would never notice. Runs
+  # render.yaml's own buildCommand, so the two can't drift apart.
+  render-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build as Render does
+        env:
+          NODE_ENV: production
+        run: |
+          cmd=$(sed -n 's/^ *buildCommand: //p' render.yaml | head -n 1)
+          test -n "$cmd" || { echo "::error::no buildCommand in render.yaml"; exit 1; }
+          echo "render.yaml buildCommand: $cmd"
+          bash -euo pipefail -c "$cmd"
+      - name: The build left package.json alone
+        # Next installs missing TypeScript packages into package.json mid-build; on Render that
+        # would mean the build only works by accident.
+        run: git diff --exit-code -- package.json package-lock.json
+
   # The unit tests migrate an in-process PGlite; this applies the same migrations to a
   # real Postgres, twice (the second run must be a no-op), and fails if schema.ts has
   # changed without a generated migration.

@@ -50,10 +50,9 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate, a
   const selectedIndex = closet.components.findIndex((c) => c.id === selectedId);
   const selected = selectedIndex >= 0 ? closet.components[selectedIndex] : undefined;
 
-  // Forget a selection that no longer exists (removed, or undone away).
-  useEffect(() => {
-    if (selectedId && selectedIndex < 0) setSelectedId(null);
-  }, [selectedId, selectedIndex]);
+  // Forget a selection that no longer exists (removed, or undone away). Adjusting state during
+  // render, rather than in an effect, avoids a render with the stale selection.
+  if (selectedId && selectedIndex < 0) setSelectedId(null);
 
   async function save(next: Closet, summary: string): Promise<string | null> {
     if (!online) return 'offline — editing is disabled';
@@ -192,7 +191,12 @@ export default function ClosetEditor({ project, onSaved, onProposal, estimate, a
 /** A millimetre input that commits on Enter or when it loses focus. */
 function MmField({ label, value, onCommit, min = 0, disabled }: { label: string; value: number; onCommit: (v: number) => void; min?: number; disabled?: boolean }) {
   const [text, setText] = useState(String(Math.round(value)));
-  useEffect(() => setText(String(Math.round(value))), [value]);
+  // A new value from outside (a save, an undo) replaces what was typed.
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    setText(String(Math.round(value)));
+  }
   const commit = () => {
     const v = Number(text);
     if (text.trim() === '' || !Number.isFinite(v) || v < min) return setText(String(Math.round(value)));
@@ -264,7 +268,12 @@ function ComponentDetails({
 
 function ClosetSettings({ closet, online, onSave }: { closet: Closet; online: boolean; onSave: (cmds: ClosetCommand[]) => void }) {
   const [form, setForm] = useState(() => toForm(closet));
-  useEffect(() => setForm(toForm(closet)), [closet]);
+  // A new closet from outside (a save, an undo) replaces the form.
+  const [lastCloset, setLastCloset] = useState(closet);
+  if (closet !== lastCloset) {
+    setLastCloset(closet);
+    setForm(toForm(closet));
+  }
   const set = (k: keyof ReturnType<typeof toForm>) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
   const nums = ['widthMm', 'heightMm', 'depthMm', 'leftMm', 'openingMm'] as const;

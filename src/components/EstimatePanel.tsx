@@ -221,7 +221,12 @@ function NumberField({
 }) {
   const shown = String(round2(value));
   const [text, setText] = useState(shown);
-  useEffect(() => setText(shown), [shown]);
+  // A new value from outside (a save, an undo) replaces what was typed.
+  const [lastShown, setLastShown] = useState(shown);
+  if (shown !== lastShown) {
+    setLastShown(shown);
+    setText(shown);
+  }
   const commit = () => {
     const v = Number(text);
     const revert = (message?: string) => {
@@ -260,7 +265,12 @@ function NumberField({
 
 function CurrencyField({ value, onCommit, onInvalid, disabled }: { value: string; onCommit: (c: string) => void; onInvalid: (m: string) => void; disabled?: boolean }) {
   const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
+  // A new code from outside (a save, an undo) replaces what was typed.
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    setText(value);
+  }
   const commit = () => {
     const code = text.trim().toUpperCase();
     if (code === value) return setText(value);

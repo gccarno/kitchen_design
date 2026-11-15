@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useBrowserValue } from '@/lib/client/browser-value';
 import { useOnline } from '@/lib/client/online';
 import type { ProjectKind } from '@/lib/plan/schemas';
 import { templatesForKind } from '@/lib/templates/info';
@@ -24,7 +25,10 @@ export default function NewProjectForm() {
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ProjectKind>('kitchen');
   const [templateId, setTemplateId] = useState('');
-  const [units, setUnits] = useState<'mm' | 'in'>('mm');
+  // What was picked on this page; until then, what was picked last time.
+  const [pickedUnits, setUnits] = useState<'mm' | 'in' | null>(null);
+  const lastUnits = useBrowserValue(rememberedUnits, 'mm');
+  const units = pickedUnits ?? lastUnits;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +36,6 @@ export default function NewProjectForm() {
   useEffect(() => {
     router.refresh();
   }, [router]);
-  useEffect(() => setUnits(rememberedUnits()), []);
 
   const templates = templatesForKind(kind);
   const template = templates.find((t) => t.id === templateId);
