@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useBrowserValue } from '@/lib/client/browser-value';
 import CatalogSidebar from './CatalogSidebar';
 import ChatPanel from './ChatPanel';
 import dynamic from 'next/dynamic';
@@ -104,15 +105,18 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
 
   // The step is remembered for this tab, so a refresh (or a save's reload) stays where you were.
   const stepKey = `kd-step:${initialProject.id}`;
-  const [step, setStep] = useState<StepId>(() => defaultStep(initialProject));
-  useEffect(() => {
+  const [firstStep] = useState<StepId>(() => defaultStep(initialProject));
+  const rememberedStep = useBrowserValue(() => {
     try {
       const remembered = sessionStorage.getItem(stepKey);
-      if (isStepId(remembered)) setStep(remembered);
+      return isStepId(remembered) ? remembered : null;
     } catch {
-      /* storage blocked: keep the default */
+      return null; // storage blocked: use the default
     }
-  }, [stepKey]);
+  }, null);
+  // What was chosen on this page, else what was remembered for this tab, else the default.
+  const [chosenStep, setStep] = useState<StepId | null>(null);
+  const step = chosenStep ?? rememberedStep ?? firstStep;
   // The estimated-size notice leads here: open the Room step and bring the confirm panel into view.
   function goConfirmSize() {
     chooseStep('room');

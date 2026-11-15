@@ -144,11 +144,13 @@ export default function FloorPlanCanvas({
     setViewport(pan(fitToBounds(b, size.w - RULER_PX, size.h - RULER_PX, 0.12), RULER_PX, RULER_PX));
   }
 
-  // Fit on first layout and on resize.
-  useEffect(() => {
+  // Fit on first layout and on resize (adjusted during render, so the first paint is already fitted).
+  const sizeKey = size ? `${size.w}x${size.h}` : null;
+  const [fittedFor, setFittedFor] = useState<string | null>(null);
+  if (sizeKey !== fittedFor) {
+    setFittedFor(sizeKey);
     fit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size?.w, size?.h]);
+  }
 
   // Refit when the room is replaced wholesale (no wall ids in common), but not
   // after an edit to the current outline — the view shouldn't jump while editing.
@@ -166,13 +168,15 @@ export default function FloorPlanCanvas({
   }, [wallKey]);
 
   // Starting to place a catalog item leaves outline editing.
-  useEffect(() => {
+  const [lastPlacingItem, setLastPlacingItem] = useState(placingItem);
+  if (placingItem !== lastPlacingItem) {
+    setLastPlacingItem(placingItem);
     if (placingItem) {
       setEditing(false);
       setPlacing(null);
       setEditError(null);
     }
-  }, [placingItem]);
+  }
 
   // Wheel zoom needs a non-passive listener to stop the page from scrolling.
   useEffect(() => {

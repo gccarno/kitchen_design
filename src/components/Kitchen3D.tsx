@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Edges, OrbitControls } from '@react-three/drei';
+import { useBrowserValue } from '@/lib/client/browser-value';
 import { buildScene, type Prism } from '@/lib/plan/scene3d';
 import type { Project } from '@/lib/plan/schemas';
 
@@ -11,7 +12,16 @@ import type { Project } from '@/lib/plan/schemas';
 const M = 1 / 1000;
 const OUTLINED = new Set<Prism['kind']>(['cabinet', 'appliance', 'furniture', 'slab']);
 
+let webglChecked: boolean | undefined;
+
+/** Whether this browser can draw WebGL (checked once: it doesn't change while the page is open). */
 function webglAvailable(): boolean {
+  if (webglChecked !== undefined) return webglChecked;
+  webglChecked = detectWebgl();
+  return webglChecked;
+}
+
+function detectWebgl(): boolean {
   try {
     const canvas = document.createElement('canvas');
     return Boolean(canvas.getContext('webgl2') || canvas.getContext('webgl'));
@@ -73,9 +83,9 @@ function PrismMesh({ prism }: { prism: Prism }) {
  */
 export default function Kitchen3D({ project }: { project: Project }) {
   const scene = useMemo(() => buildScene(project), [project]);
-  const [webgl, setWebgl] = useState<boolean | null>(null);
+  // null on the server and while hydrating (nothing is drawn until we know).
+  const webgl = useBrowserValue<boolean | null>(webglAvailable, null);
   const [viewKey, setViewKey] = useState(0);
-  useEffect(() => setWebgl(webglAvailable()), []);
 
   const { bounds } = scene;
   const cx = ((bounds.minX + bounds.maxX) / 2) * M;

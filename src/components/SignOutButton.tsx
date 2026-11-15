@@ -15,6 +15,8 @@ export default function SignOutButton({ email }: { email: string }) {
       // Navigate regardless; /login sends a still-valid session back to /.
     }
     await clearOfflineCaches();
+    // A full load on purpose: nothing from the signed-in session may survive in the router's cache.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign('/login');
   }
   return (

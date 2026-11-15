@@ -20,6 +20,7 @@ export default function NativeBridge() {
         // /login is the root for a signed-out user: `/` redirects there, so going "home" would loop.
         if (window.location.pathname === '/' || window.location.pathname === '/login') void App.exitApp();
         else if (canGoBack) window.history.back();
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- outside React (a native back-button listener), no router here
         else window.location.assign('/');
       });
       if (cancelled) {

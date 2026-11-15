@@ -87,6 +87,9 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onPro
   // Resume a job started before this component last unmounted (navigated away and back).
   useEffect(() => {
     const saved = recallJob(jobKey);
+    // Reconnecting to a job that is still running elsewhere (saved in sessionStorage, which the
+    // server render can't read): an effect syncing with an external system, as intended.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved) void execute((signal) => waitForJob<ExtractionResponse>(saved.jobId, { signal, fallbackError }));
     return () => {
       current.current?.abort();
@@ -96,10 +99,14 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', onPro
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per project; execute reads refs only
   }, [jobKey]);
 
+  // The hint shows only while busy; the cleanup resets it for the next request.
   useEffect(() => {
-    if (!busy) return setSlow(false);
+    if (!busy) return;
     const timer = setTimeout(() => setSlow(true), SLOW_HINT_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      setSlow(false);
+    };
   }, [busy]);
 
   function run() {
