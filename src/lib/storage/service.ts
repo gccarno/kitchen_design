@@ -158,3 +158,21 @@ export async function removePhoto(storage: Storage, projectId: string, photoId: 
   await storage.blobs.delete(photoKey(projectId, photoId)).catch((err: unknown) => reportOrphanedBlobs(projectId, 'removed photo', err));
   return photos;
 }
+
+/**
+ * Change one photo's record (its label, its reference object). Resolves to the changed photo,
+ * or undefined if it is no longer on the project. Throws ProjectNotFoundError for a missing project.
+ */
+export async function updatePhoto(
+  storage: Storage,
+  projectId: string,
+  photoId: string,
+  change: (p: Photo) => Photo
+): Promise<Photo | undefined> {
+  const project = await storage.projects.update(projectId, (p) => ({
+    ...p,
+    photos: p.photos.map((ph) => (ph.id === photoId ? change(ph) : ph)),
+    updatedAt: new Date().toISOString(),
+  }));
+  return project.photos.find((ph) => ph.id === photoId);
+}

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useOnline } from '@/lib/client/online';
 import { cacheUrls } from '@/lib/client/offline-cache';
+import { photoUrl } from '@/lib/plan/photo-url';
 
 /**
  * "Keep offline": downloads a project's page, document and photos into the
@@ -26,7 +27,8 @@ export default function KeepOfflineButton({ projectId, projectName }: { projectI
     } catch {
       docFailed = true;
     }
-    const photoUrls = photoIds.map((id) => `/api/projects/${projectId}/photos/${id}`);
+    // Both sizes: the grid shows the small one, an opened photo the stored one.
+    const photoUrls = photoIds.flatMap((id) => [photoUrl(projectId, id, 'thumb'), photoUrl(projectId, id)]);
     const { failed } = await cacheUrls([`/project/${projectId}`, `/api/projects/${projectId}`, ...photoUrls]);
     setState({ ok: failed === 0 && !docFailed, photos: photoIds.length });
   }

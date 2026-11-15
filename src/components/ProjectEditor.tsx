@@ -72,9 +72,12 @@ type StepId = (typeof STEPS)[number]['id'];
 const isStepId = (v: unknown): v is StepId => STEPS.some((s) => s.id === v);
 const STEP_PREFIX = 'kitchen';
 
+/** Nobody has worked on this project yet: there is no room worth looking at. */
+const isUntouched = (project: Project) => project.revision === 0 && project.items.length === 0;
+
 /** A project nobody has worked on starts at the room; one with work in it, at the layout. */
 function defaultStep(project: Project): StepId {
-  return project.revision === 0 && project.items.length === 0 ? 'room' : 'layout';
+  return isUntouched(project) ? 'room' : 'layout';
 }
 
 const M2_TO_FT2 = 10.7639;
@@ -348,39 +351,8 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
     </div>
   );
 
-  return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-8">
-      <header className="flex flex-col gap-1">
-        <Link href="/" className="text-sm text-gray-600 underline">
-          All projects
-        </Link>
-        <h1 className="text-2xl font-semibold">{project.name}</h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-gray-500">Revision {project.revision}</span>
-          <label className="flex items-center gap-2">
-            <span className="text-gray-500">Units</span>
-            <select
-              className="rounded border px-2 py-0.5 disabled:opacity-40"
-              value={project.units}
-              disabled={!online}
-              onChange={(e) => void changeUnits(e.target.value === 'in' ? 'in' : 'mm')}
-            >
-              <option value="mm">Millimetres</option>
-              <option value="in">Feet and inches</option>
-            </select>
-          </label>
-        </div>
-        {unitsError && (
-          <p role="alert" className="text-sm text-red-700">
-            Couldn’t change units: {unitsError}
-          </p>
-        )}
-      </header>
-
-      {reviewPanel}
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
-        <section ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2 lg:sticky lg:top-4">
+  const planColumn = (
+        <section key="plan" ref={canvasRef} className="flex scroll-mt-4 flex-col gap-2 lg:sticky lg:top-4 lg:order-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Current room</h2>
             <div role="group" aria-label="View" className="flex overflow-hidden rounded border text-sm">
@@ -438,8 +410,9 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
             </div>
           )}
         </section>
-
-        <div className="flex min-w-0 flex-col">
+  );
+  const stepsColumn = (
+        <div key="steps" className="flex min-w-0 flex-col lg:order-2">
           <StepTabs steps={STEPS} active={step} onChange={chooseStep} idPrefix={STEP_PREFIX} />
 
           {panel(
@@ -546,6 +519,43 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
             </section>
           )}
         </div>
+  );
+
+  return (
+    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-8">
+      <header className="flex flex-col gap-1">
+        <Link href="/" className="text-sm text-gray-600 underline">
+          All projects
+        </Link>
+        <h1 className="text-2xl font-semibold">{project.name}</h1>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-gray-500">Revision {project.revision}</span>
+          <label className="flex items-center gap-2">
+            <span className="text-gray-500">Units</span>
+            <select
+              className="rounded border px-2 py-0.5 disabled:opacity-40"
+              value={project.units}
+              disabled={!online}
+              onChange={(e) => void changeUnits(e.target.value === 'in' ? 'in' : 'mm')}
+            >
+              <option value="mm">Millimetres</option>
+              <option value="in">Feet and inches</option>
+            </select>
+          </label>
+        </div>
+        {unitsError && (
+          <p role="alert" className="text-sm text-red-700">
+            Couldn’t change units: {unitsError}
+          </p>
+        )}
+      </header>
+
+      {reviewPanel}
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+        {/* On a phone the columns stack. An untouched project has no room to show yet, so the steps
+            (add photos, or sketch) come first; side by side on a wide screen, the plan stays on the left. */}
+        {isUntouched(project) ? [stepsColumn, planColumn] : [planColumn, stepsColumn]}
       </div>
     </main>
   );

@@ -7,6 +7,9 @@
  */
 
 import sharp from 'sharp';
+import { STORED_MAX_EDGE_PX } from './storage/limits';
+
+export { STORED_MAX_EDGE_PX };
 
 export interface ImageDimensions {
   width: number;
@@ -27,12 +30,6 @@ export async function readImageDimensions(input: Buffer | string): Promise<Image
   return { width: w, height: h };
 }
 
-/**
- * Long-edge cap for stored photos. Phone photos are 4000+ px and several MB; the editor shows them
- * as thumbnails, the vision model gets 1568 px (llm/images.ts), and the offline cache keeps up to
- * 300 of them. This leaves room to zoom while marking a reference object.
- */
-export const STORED_MAX_EDGE_PX = 2560;
 
 /**
  * Apply the EXIF orientation to the pixels (sharp's `rotate()` with no angle reads the tag and
