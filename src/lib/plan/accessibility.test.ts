@@ -78,7 +78,9 @@ describe('space to turn a wheelchair', () => {
     const crowded = { ...base, items, room: { ...base.room, polygon: ring, walls: ring.map((_, i) => ({ id: `w${i}`, thicknessMm: 100 })) } };
     const started = Date.now();
     expect(['pass', 'fail']).toContain(rule(crowded, 'access-turning').status);
-    expect(Date.now() - started).toBeLessThan(5000);
+    // About 2 s alone; a full parallel run on CI has taken just over 5 s. The bound only has to
+    // catch a check that runs unbounded again, so it leaves room for a loaded machine.
+    expect(Date.now() - started).toBeLessThan(15_000);
   });
 
   it('ignores wall cabinets, which hang above the circle', () => {
