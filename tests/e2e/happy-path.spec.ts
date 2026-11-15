@@ -21,7 +21,8 @@ test('photo + measured wall → extracted room → cabinet → SVG export', asyn
   // Upload one photo (a synthetic kitchen with a credit-card-sized marker).
   const photo = readFileSync(join(__dirname, 'fixtures', 'kitchen-photo.jpg'));
   await page.getByLabel('Choose photos').setInputFiles({ name: 'kitchen-photo.jpg', mimeType: 'image/jpeg', buffer: photo });
-  // The marker starts closed (marking is optional); open it.
+  // Photos show as a grid: open the photo, then its marker (marking is optional, so it starts closed).
+  await page.getByRole('button', { name: /^Photo 1/ }).click();
   await page.getByRole('button', { name: /mark a known-size object/i }).click();
   await expect(page.getByRole('img', { name: /mark the reference object/i })).toBeVisible();
   await expect.poll(() => projectJson(id).photos.length).toBe(1);
