@@ -40,6 +40,16 @@ describe('aisle wide enough for a wheelchair', () => {
   });
 });
 
+/**
+ * Processor time this test process has used, ms. The speed tests measure this rather than the
+ * clock: on a busy machine (the whole suite in parallel, CI) the clock counts time spent waiting
+ * for a turn, and a 2 s check has taken 17 s by it.
+ */
+const cpuMs = () => {
+  const { user, system } = process.cpuUsage();
+  return (user + system) / 1000;
+};
+
 describe('space to turn a wheelchair', () => {
   const item: Command[] = [{ type: 'addRun', wall: 'w1', items: ['base-600x560x720'] }];
 
@@ -64,9 +74,9 @@ describe('space to turn a wheelchair', () => {
 
   it('stays fast for an enormous room, still finding a circle that fits', () => {
     const huge = room(100_000_000, 100_000_000, [{ type: 'addRun', wall: 'w1', items: ['base-600x560x720'] }]);
-    const started = Date.now();
+    const started = cpuMs();
     const r = rule(huge, 'access-turning');
-    expect(Date.now() - started).toBeLessThan(2000);
+    expect(cpuMs() - started).toBeLessThan(2000);
     expect(r.status).toBe('pass');
   });
 
@@ -76,11 +86,10 @@ describe('space to turn a wheelchair', () => {
     const items = Array.from({ length: 3000 }, (_, i) => ({ ...item, id: `i${i}`, position: { x: 300 + (i % 50) * 100, y: 1000 + Math.floor(i / 50) * 70 } }));
     const ring = Array.from({ length: 500 }, (_, i): [number, number] => [3000 + 2900 * Math.cos((i / 500) * 2 * Math.PI), 3000 + 2900 * Math.sin((i / 500) * 2 * Math.PI)]);
     const crowded = { ...base, items, room: { ...base.room, polygon: ring, walls: ring.map((_, i) => ({ id: `w${i}`, thicknessMm: 100 })) } };
-    const started = Date.now();
+    const started = cpuMs();
     expect(['pass', 'fail']).toContain(rule(crowded, 'access-turning').status);
-    // About 2 s alone; a full parallel run on CI has taken just over 5 s. The bound only has to
-    // catch a check that runs unbounded again, so it leaves room for a loaded machine.
-    expect(Date.now() - started).toBeLessThan(15_000);
+    // About 2 s of work. The bound only has to catch a check that runs unbounded again.
+    expect(cpuMs() - started).toBeLessThan(8000);
   });
 
   it('ignores wall cabinets, which hang above the circle', () => {
