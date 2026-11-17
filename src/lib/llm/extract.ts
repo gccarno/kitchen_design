@@ -90,6 +90,10 @@ export async function extractRoom(input: ExtractRoomInput): Promise<ExtractRoomR
     warnings.push(
       `Your measurements disagree with the outline’s proportions by ${Math.round(residual * 100)}%. Check the measurements or adjust the shape.`
     );
+  } else if (measuredInOneDirectionOnly(extracted)) {
+    warnings.push(
+      'You measured walls running in one direction only, so the room’s size the other way is the model’s estimate. Measure a wall that meets one of them at a corner to pin it down.'
+    );
   }
   const next: Project = { ...project, room };
   const check = validatePlan(next);
@@ -105,6 +109,25 @@ export async function extractRoom(input: ExtractRoomInput): Promise<ExtractRoomR
     baseRevision: project.revision,
     patch: planToJsonPatch(project, next),
   };
+}
+
+/** Walls within this angle of each other count as running the same way. */
+const SAME_DIRECTION_DEG = 20;
+
+/**
+ * True when every measured wall runs the same way (one wall, or walls facing each other).
+ * Rescaling makes those exact, but nothing then checks the room's size across them: models
+ * have answered a "typical" depth there, at high confidence, whatever the photos showed.
+ */
+function measuredInOneDirectionOnly(ex: ExtractedRoom): boolean {
+  const poly = ex.polygonMm;
+  const directions = ex.measuredWalls.map((w) => {
+    const [a, b] = [poly[w], poly[(w + 1) % poly.length]];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[0] - a[0]) / length, (b[1] - a[1]) / length];
+  });
+  const limit = Math.sin((SAME_DIRECTION_DEG * Math.PI) / 180);
+  return directions.length > 0 && directions.every((d) => Math.abs(d[0] * directions[0][1] - d[1] * directions[0][0]) < limit);
 }
 
 async function askWithOneRetry(

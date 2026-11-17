@@ -130,11 +130,17 @@ describe('sample photos of the sample kitchens', () => {
     const thumb = await sharp(await stored(project.id, saved.photos[0].id, `?w=${THUMBNAIL_WIDTH_PX}`)).metadata();
     expect([thumb.width, thumb.height, thumb.format]).toEqual([THUMBNAIL_WIDTH_PX, 240, 'jpeg']);
 
-    // Extract, with the first wall measured.
+    // Extract, with the first two walls measured: they meet at a corner, so both directions are fixed.
     const wallMm = distance(example.room[0] as Point, example.room[1] as Point);
-    const { provider, requests } = recording(trueAnswer(truth, [0]));
+    const nextWallMm = distance(example.room[1] as Point, example.room[2] as Point);
+    const { provider, requests } = recording(trueAnswer(truth, [0, 1]));
     providerFromEnv.mockReturnValue(provider);
-    const result = await runExtraction(project.id, { measurements: [{ description: 'the first wall', lengthMm: wallMm }] });
+    const result = await runExtraction(project.id, {
+      measurements: [
+        { description: 'the first wall', lengthMm: wallMm },
+        { description: 'the wall after it', lengthMm: nextWallMm },
+      ],
+    });
 
     // The model got every photo, in order, at a size it can take, and was told about each.
     expect(requests).toHaveLength(1);

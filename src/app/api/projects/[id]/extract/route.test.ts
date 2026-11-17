@@ -116,7 +116,7 @@ describe('POST /api/projects/[id]/extract', () => {
     const res = await run(p.id, MEASURED);
     expect(res.status).toBe(200);
     const body = res.body;
-    expect(body).toMatchObject({ confidence: 0.8, notes: 'ok', baseRevision: 0, warnings: [] });
+    expect(body).toMatchObject({ confidence: 0.8, notes: 'ok', baseRevision: 0, warnings: [expect.stringMatching(/one direction only/)] });
     expect(body.room.polygon[1][0]).toBeCloseTo(3600);
     expect(loadProject(dataDir, p.id)).toEqual(p);
 
