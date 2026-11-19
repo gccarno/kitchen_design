@@ -158,6 +158,20 @@ describe('PhotoCapture', () => {
     expect(sent.name).toBe('a.jpg');
   });
 
+  it('does not send a photo still too big after shrinking, and says why straight away', async () => {
+    // Shrinking failed (the browser could not decode it), so the 26 MB original is all there is.
+    const huge = new File(['x'], 'huge.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(huge, 'size', { value: 26 * 1024 * 1024 });
+    render(<PhotoCapture projectId={PROJECT} />);
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files: [huge] } });
+    expect(await screen.findByText(/too big to upload \(26 MB, the most is 20 MB\)/i)).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(monitoring.reportUploadFailure).toHaveBeenCalledWith(expect.objectContaining({ status: 413, sizeBytes: 26 * 1024 * 1024 }));
+    // Trying again would only fail the same way.
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /dismiss/i })).toBeTruthy();
+  });
+
   it('offers to try a failed upload again, and sends the same photo', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(jsonResponse({ photo: photo('ok') }, 201));
     render(<PhotoCapture projectId={PROJECT} />);
