@@ -193,7 +193,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
         <legend className="px-1 font-medium">Measured a wall? Sizes will be exact (optional)</legend>
         <div className="flex flex-col gap-3">
           <p className="text-gray-600">
-            Measure one or two walls with a tape measure: they set the scale. Describe each so the model can find it.
+            Measure two walls that meet at a corner if you can: one fixes the room’s width, the other its depth. Describe each so the model can find it.
           </p>
           <datalist id={labelListId}>
             {[...new Set(photoLabels)].map((l) => (

@@ -87,6 +87,8 @@ const PHOTOS: Photo[] = [
   },
 ];
 
+const ONE_DIRECTION = expect.stringMatching(/one direction only.*model’s estimate.*meets one of them at a corner/i);
+
 const run = (provider: LLMProvider, measurements = [{ description: 'sink wall', lengthMm: 3600 }]) =>
   extractRoom({ project: project(PHOTOS), readPhoto: async () => bigJpeg, provider, measurements });
 
@@ -118,7 +120,7 @@ describe('extractRoom', () => {
     ]);
     expect(r.confidence).toBe(0.7);
     expect(r.notes).toBe('fridge wall partly hidden');
-    expect(r.warnings).toEqual([]);
+    expect(r.warnings).toEqual([ONE_DIRECTION]);
   });
 
   it('returns a patch against baseRevision that commits to exactly the candidate room', async () => {
@@ -189,6 +191,25 @@ describe('extractRoom', () => {
     expect(guess.warnings.join(' ')).toMatch(/confirm/i);
     const measured = await run(new StubProvider([answer()]));
     expect(measured.room.sizeEstimated).toBeUndefined();
+  });
+
+  it('warns that the other direction is a guess when one wall, or only facing walls, are measured', async () => {
+    const one = await run(new StubProvider([answer()]));
+    expect(one.warnings).toEqual([ONE_DIRECTION]);
+    // Walls 0 and 2 face each other: still nothing fixes the room's depth.
+    const facing = await run(new StubProvider([answer({ measuredWalls: [0, 2] })]), [
+      { description: 'sink wall', lengthMm: 3600 },
+      { description: 'wall opposite', lengthMm: 3600 },
+    ]);
+    expect(facing.warnings).toEqual([ONE_DIRECTION]);
+  });
+
+  it('does not warn when two walls that meet at a corner are measured and agree', async () => {
+    const r = await run(new StubProvider([answer({ measuredWalls: [0, 1] })]), [
+      { description: 'sink wall', lengthMm: 3600 },
+      { description: 'side wall', lengthMm: 2700 },
+    ]);
+    expect(r.warnings).toEqual([]);
   });
 
   it('warns when two measurements disagree', async () => {
