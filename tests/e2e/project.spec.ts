@@ -58,7 +58,8 @@ test('upload a photo and mark a reference box with the pointer (stored in natura
   expect(served.status()).toBe(200);
   expect(served.headers()['content-type']).toBe('image/jpeg');
 
-  // The marker starts closed (marking is optional); open it.
+  // Photos show as a grid: open the photo, then its marker (marking is optional, so it starts closed).
+  await page.getByRole('button', { name: /^Photo 1/ }).click();
   await page.getByRole('button', { name: /mark a known-size object/i }).click();
   const img = page.getByRole('img', { name: /mark the reference object/i });
   await expect(img).toBeVisible();

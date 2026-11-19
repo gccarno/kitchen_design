@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getStorage, lookupPhoto, ProjectNotFoundError, type Storage } from '@/lib/storage';
+import { getStorage, lookupPhoto, ProjectNotFoundError, updatePhoto } from '@/lib/storage';
 import { ReferenceInputSchema, resolveReference } from '@/lib/plan/reference-objects';
-import type { Photo } from '@/lib/plan/schemas';
 import { withUnauthorized } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +41,7 @@ async function handlePut(req: Request, { params }: Ctx): Promise<NextResponse> {
   }
 
   try {
-    const photo = await setPhoto(storage, id, photoId, (p) => ({ ...p, referenceObject: resolved.value }));
+    const photo = await updatePhoto(storage, id, photoId, (p) => ({ ...p, referenceObject: resolved.value }));
     return NextResponse.json({ photo });
   } catch (err) {
     if (err instanceof ProjectNotFoundError) return NextResponse.json({ error: 'project not found' }, { status: 404 });
@@ -58,26 +57,12 @@ async function handleDelete(_req: Request, { params }: Ctx): Promise<NextRespons
   if (!found.ok) return NextResponse.json({ error: found.error }, { status: found.status });
 
   try {
-    const photo = await setPhoto(storage, id, photoId, ({ referenceObject: _removed, ...rest }) => rest);
+    const photo = await updatePhoto(storage, id, photoId, ({ referenceObject: _removed, ...rest }) => rest);
     return NextResponse.json({ photo });
   } catch (err) {
     if (err instanceof ProjectNotFoundError) return NextResponse.json({ error: 'project not found' }, { status: 404 });
     throw err;
   }
-}
-
-async function setPhoto(
-  storage: Storage,
-  projectId: string,
-  photoId: string,
-  change: (p: Photo) => Photo
-): Promise<Photo | undefined> {
-  const project = await storage.projects.update(projectId, (p) => ({
-    ...p,
-    photos: p.photos.map((ph) => (ph.id === photoId ? change(ph) : ph)),
-    updatedAt: new Date().toISOString(),
-  }));
-  return project.photos.find((ph) => ph.id === photoId);
 }
 
 export const PUT = withUnauthorized(handlePut);

@@ -168,7 +168,7 @@ describe('buildExtractRoomPrompt', () => {
     expect(p.user).toMatch(/door.*2030 mm/i);
     expect(p.user).toMatch(/dishwasher/i);
     expect(p.user).toMatch(/say in "?notes"? which/i);
-    expect(p.system).toMatch(/prompt v1\.3\.0/);
+    expect(p.system).toMatch(/prompt v1\.4\.0/);
   });
 
   it('does not push standard sizes when the user measured something', () => {
@@ -187,6 +187,12 @@ describe('buildExtractRoomPrompt', () => {
     expect(p.user).toMatch(/2 photos/);
     expect(p.user).toMatch(/Photo 1 \(1568×1176 px\).*north wall/);
     expect(p.user).toMatch(/Photo 2 .*credit_card.*\[10, 20, 60, 50\].*long edge.*85\.6 mm/);
+  });
+
+  it('passes on what the user says a photo shows', () => {
+    const p = buildExtractRoomPrompt({ photos: [photo(0, { label: 'sink wall' }), photo(1)], measurements: [] });
+    expect(p.user).toMatch(/Photo 1 .*the user says it shows "sink wall"/);
+    expect(p.user).not.toMatch(/Photo 2 .*the user says/);
   });
 
   it('treats measurements as the scale and references as a secondary hint', () => {

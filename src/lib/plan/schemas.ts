@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_PHOTO_LABEL } from '../storage/limits';
 
 // Primitives
 const Point = z.tuple([z.number(), z.number()]);
@@ -81,6 +82,8 @@ const PhotoSchema = z.object({
   height: z.number().int().positive(),
   referenceObject: ReferenceObjectSchema.optional(),
   wallHint: z.enum(['north', 'east', 'south', 'west', 'unknown']).optional(),
+  /** The user's words for what the photo shows ("sink wall"); passed to the vision model. */
+  label: z.string().min(1).max(MAX_PHOTO_LABEL).optional(),
 });
 
 // A single JSON-Patch op (RFC 6902) — produced by the LLM and applied on user confirm.

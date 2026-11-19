@@ -69,6 +69,7 @@ export async function extractRoom(input: ExtractRoomInput): Promise<ExtractRoomR
       width: vision.width,
       height: vision.height,
       wallHint: photo.wallHint,
+      label: photo.label,
       reference: ref && {
         ...ref,
         pixelBox: ref.pixelBox.map((v) => Math.round(v * vision.scale)) as [number, number, number, number],

@@ -31,7 +31,9 @@ describe('KeepOfflineButton', () => {
     expect(cacheUrls).toHaveBeenCalledWith([
       '/project/p1',
       '/api/projects/p1',
+      '/api/projects/p1/photos/a?w=320',
       '/api/projects/p1/photos/a',
+      '/api/projects/p1/photos/b?w=320',
       '/api/projects/p1/photos/b',
     ]);
   });

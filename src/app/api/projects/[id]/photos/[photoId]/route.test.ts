@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { createProject, loadProject } from '@/lib/storage/projects';
 import { POST as upload } from '@/app/api/upload/route';
-import { GET, DELETE as removePhoto } from './route';
+import { GET, PATCH, DELETE as removePhoto } from './route';
 import { PUT, DELETE } from './reference/route';
 
 type Params = { params: Promise<{ id: string; photoId: string }> };
@@ -52,6 +52,23 @@ describe('photo routes', () => {
       expect(res.headers.get('content-type')).toBe('image/jpeg');
       const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
       expect([meta.width, meta.height]).toEqual([400, 300]);
+    });
+
+    it('serves a small version for the photo grid when asked for w=320', async () => {
+      const p = createProject(dataDir, { name: 'P' });
+      const photoId = await uploadPhoto(p.id, 1600, 1200);
+      const res = await GET(new Request('http://localhost/x?w=320'), ctx(p.id, photoId));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cache-control')).toMatch(/immutable/);
+      const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+      expect([meta.width, meta.height]).toEqual([320, 240]);
+    });
+
+    it('refuses a width it does not offer', async () => {
+      const p = createProject(dataDir, { name: 'P' });
+      const photoId = await uploadPhoto(p.id);
+      expect((await GET(new Request('http://localhost/x?w=5000'), ctx(p.id, photoId))).status).toBe(400);
+      expect((await GET(new Request('http://localhost/x?w=abc'), ctx(p.id, photoId))).status).toBe(400);
     });
 
     it('returns 400 for a non-UUID project id', async () => {
@@ -123,6 +140,40 @@ describe('photo routes', () => {
       const res = await DELETE(new Request('http://localhost/x', { method: 'DELETE' }), ctx(p.id, photoId));
       expect(res.status).toBe(200);
       expect(loadProject(dataDir, p.id).photos[0].referenceObject).toBeUndefined();
+    });
+  });
+
+  describe('PATCH /api/projects/[id]/photos/[photoId]', () => {
+    const patch = (id: string, photoId: string, body: unknown) =>
+      PATCH(
+        new Request('http://localhost/x', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+        ctx(id, photoId)
+      );
+
+    it('stores a trimmed label on the photo and returns the photo', async () => {
+      const p = createProject(dataDir, { name: 'P' });
+      const photoId = await uploadPhoto(p.id);
+      const res = await patch(p.id, photoId, { label: '  sink wall ' });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { photo: { label?: string } }).photo.label).toBe('sink wall');
+      expect(loadProject(dataDir, p.id).photos[0].label).toBe('sink wall');
+    });
+
+    it('clears the label when it is empty', async () => {
+      const p = createProject(dataDir, { name: 'P' });
+      const photoId = await uploadPhoto(p.id);
+      await patch(p.id, photoId, { label: 'sink wall' });
+      expect((await patch(p.id, photoId, { label: '  ' })).status).toBe(200);
+      expect(loadProject(dataDir, p.id).photos[0].label).toBeUndefined();
+    });
+
+    it('rejects a label that is too long or not text, and an unknown photo', async () => {
+      const p = createProject(dataDir, { name: 'P' });
+      const photoId = await uploadPhoto(p.id);
+      expect((await patch(p.id, photoId, { label: 'x'.repeat(61) })).status).toBe(400);
+      expect((await patch(p.id, photoId, { label: 7 })).status).toBe(400);
+      expect((await patch(p.id, randomUUID(), { label: 'a' })).status).toBe(404);
+      expect(loadProject(dataDir, p.id).photos[0].label).toBeUndefined();
     });
   });
 

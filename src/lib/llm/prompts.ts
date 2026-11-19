@@ -6,7 +6,7 @@
 
 import type { ReferenceObject } from '../plan/schemas';
 
-export const PROMPT_VERSION = '1.3.0';
+export const PROMPT_VERSION = '1.4.0';
 
 export interface ExtractPromptPhoto {
   /** 0-based position in the attached images. */
@@ -15,6 +15,8 @@ export interface ExtractPromptPhoto {
   width: number;
   height: number;
   wallHint?: 'north' | 'east' | 'south' | 'west' | 'unknown';
+  /** The user's words for what the photo shows, e.g. "sink wall". */
+  label?: string;
   /** Reference object with `pixelBox` already mapped to the sent image's pixels. */
   reference?: ReferenceObject;
 }
@@ -72,12 +74,14 @@ export function buildExtractRoomPrompt(input: ExtractPromptInput): { system: str
   const n = input.photos.length;
   const lines: string[] = [`Attached: ${n === 1 ? '1 photo' : `${n} photos`}, in this order.`];
   for (const p of input.photos) {
-    let line = `- Photo ${p.index + 1} (${p.width}×${p.height} px)`;
-    if (p.wallHint && p.wallHint !== 'unknown') line += `: faces the ${p.wallHint} wall`;
+    const details: string[] = [];
+    if (p.label) details.push(`the user says it shows ${JSON.stringify(p.label)}`);
+    if (p.wallHint && p.wallHint !== 'unknown') details.push(`faces the ${p.wallHint} wall`);
     if (p.reference) {
       const r = p.reference;
-      line += `${p.wallHint && p.wallHint !== 'unknown' ? ';' : ':'} a ${r.kind} is boxed at [${r.pixelBox.join(', ')}] px; the box spans its ${r.side} edge, which is ${r.knownSizeMm} mm`;
+      details.push(`a ${r.kind} is boxed at [${r.pixelBox.join(', ')}] px; the box spans its ${r.side} edge, which is ${r.knownSizeMm} mm`);
     }
+    const line = `- Photo ${p.index + 1} (${p.width}×${p.height} px)${details.length ? `: ${details.join('; ')}` : ''}`;
     lines.push(line);
   }
 

@@ -541,6 +541,17 @@ describe('ProjectEditor steps and units', () => {
     sessionStorage.clear();
   });
 
+  it('puts the steps ahead of the plan while the project is untouched, and the plan first once it has work in it', () => {
+    const stepsFirst = () => !!(screen.getByRole('tablist').compareDocumentPosition(screen.getByRole('img', { name: 'Current room' })) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const fresh = render(<ProjectEditor initialProject={project} />);
+    expect(stepsFirst()).toBe(true);
+    fresh.unmount();
+    sessionStorage.clear();
+    render(<ProjectEditor initialProject={{ ...project, revision: 3 }} />);
+    expect(stepsFirst()).toBe(false);
+    sessionStorage.clear();
+  });
+
   it('remembers the step for this project', () => {
     const first = render(<ProjectEditor initialProject={project} />);
     openStep('Share');

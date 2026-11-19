@@ -7,6 +7,9 @@ import PhotoCapture, { MAX_PHOTOS, PICKER_PENDING_KEY, UPLOAD_TIMEOUT_MS } from 
 
 const monitoring = vi.hoisted(() => ({ reportUploadFailure: vi.fn(), uploadStep: vi.fn(), reportPickerLost: vi.fn() }));
 vi.mock('@/lib/client/monitoring', () => monitoring);
+// No canvas in the test DOM: photos go up as they are unless a test says otherwise.
+const shrink = vi.hoisted(() => ({ shrinkPhoto: vi.fn(async (file: Blob) => file) }));
+vi.mock('@/lib/client/shrink-photo', () => shrink);
 import type { Photo } from '@/lib/plan/schemas';
 
 const PROJECT = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b';
@@ -22,21 +25,29 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+/** Tap a photo in the grid: its details (label, marking, remove) open below. */
+function openPhoto(index = 0) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^photo ${index + 1}\\b`, 'i') }));
+}
+
 /** Open the reference marker on a photo (it starts closed). */
 function openMarker(index = 0) {
-  fireEvent.click(screen.getAllByRole('button', { name: /mark a known-size object|edit the marked object/i })[index]);
+  openPhoto(index);
+  fireEvent.click(screen.getByRole('button', { name: /mark a known-size object|edit the marked object/i }));
 }
+
+const thumbs = () => screen.queryAllByAltText('Room photo');
 
 /** Make a rendered marker image measurable, then drag a box on it (display 200×150, natural 400×300). */
 function drawBox(index = 0, { alreadyOpen = false } = {}) {
   if (!alreadyOpen) openMarker(index);
-  const img = screen.getAllByRole('img')[index] as HTMLImageElement;
+  const img = screen.getByAltText(/photo to mark/i) as HTMLImageElement;
   Object.defineProperty(img, 'naturalWidth', { value: 400, configurable: true });
   Object.defineProperty(img, 'naturalHeight', { value: 300, configurable: true });
   img.getBoundingClientRect = () =>
     ({ left: 0, top: 0, width: 200, height: 150, right: 200, bottom: 150, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
   fireEvent.load(img);
-  const surface = screen.getAllByTestId('reference-surface')[index];
+  const surface = screen.getByTestId('reference-surface');
   fireEvent.pointerDown(surface, { pointerId: 1, clientX: 10, clientY: 10 });
   fireEvent.pointerMove(surface, { pointerId: 1, clientX: 110, clientY: 60 });
   fireEvent.pointerUp(surface, { pointerId: 1, clientX: 110, clientY: 60 });
@@ -66,23 +77,26 @@ describe('PhotoCapture', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ photos: [photo('b')] }));
     const onPhotosChange = vi.fn();
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a'), photo('b')]} onPhotosChange={onPhotosChange} />);
-    fireEvent.click(screen.getAllByRole('button', { name: /remove photo/i })[0]);
+    openPhoto(0);
+    fireEvent.click(screen.getByRole('button', { name: /remove photo/i }));
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /yes, remove/i }));
-    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1));
+    await waitFor(() => expect(thumbs()).toHaveLength(1));
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`/api/projects/${PROJECT}/photos/a`);
     expect(init).toMatchObject({ method: 'DELETE' });
-    expect(onPhotosChange).toHaveBeenLastCalledWith([photo('b')]);
+    // Reported from an effect after the list re-renders, so wait for it too.
+    await waitFor(() => expect(onPhotosChange).toHaveBeenLastCalledWith([photo('b')]));
   });
 
   it('keeps the photo and says why when removing fails', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'photo not found' }, 404));
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a')]} />);
+    openPhoto(0);
     fireEvent.click(screen.getByRole('button', { name: /remove photo/i }));
     fireEvent.click(screen.getByRole('button', { name: /yes, remove/i }));
     expect(await screen.findByText(/couldn.t remove: photo not found/i)).toBeTruthy();
-    expect(screen.getAllByRole('img')).toHaveLength(1);
+    expect(thumbs()).toHaveLength(1);
   });
 
   it(`stops offering new photos at ${MAX_PHOTOS}, and says how to add another`, () => {
@@ -93,10 +107,88 @@ describe('PhotoCapture', () => {
     expect(screen.getByText(new RegExp(`${MAX_PHOTOS} photos is the most`, 'i'))).toBeTruthy();
   });
 
-  it('renders existing photos served from the photo route', () => {
+  it('shows existing photos as a grid of small versions, and the full photo once tapped', () => {
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a'), photo('b')]} />);
-    const srcs = screen.getAllByRole('img').map((i) => i.getAttribute('src'));
-    expect(srcs).toEqual([`/api/projects/${PROJECT}/photos/a`, `/api/projects/${PROJECT}/photos/b`]);
+    const srcs = thumbs().map((i) => i.getAttribute('src'));
+    expect(srcs).toEqual([`/api/projects/${PROJECT}/photos/a?w=320`, `/api/projects/${PROJECT}/photos/b?w=320`]);
+    expect(screen.queryByRole('button', { name: /remove photo/i })).toBeNull();
+    openPhoto(1);
+    expect(screen.getByAltText(/photo 2, full size/i).getAttribute('src')).toBe(`/api/projects/${PROJECT}/photos/b`);
+    openPhoto(1);
+    expect(screen.queryByAltText(/full size/i)).toBeNull();
+  });
+
+  it('says what to photograph and how many there are', () => {
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a'), photo('b')]} />);
+    expect(screen.getByText(/take 3.6 photos/i)).toBeTruthy();
+    expect(screen.getByText(`2 of ${MAX_PHOTOS} photos`)).toBeTruthy();
+  });
+
+  it('saves what a photo shows as its label, and names the photo by it', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ photo: photo('a', { label: 'sink wall' }) }));
+    const onPhotosChange = vi.fn();
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a')]} onPhotosChange={onPhotosChange} />);
+    openPhoto(0);
+    const input = screen.getByLabelText(/what does this photo show/i);
+    fireEvent.change(input, { target: { value: 'sink wall' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(onPhotosChange).toHaveBeenLastCalledWith([photo('a', { label: 'sink wall' })]));
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`/api/projects/${PROJECT}/photos/a`);
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body)).toEqual({ label: 'sink wall' });
+    expect(screen.getByRole('button', { name: /^photo 1: sink wall/i })).toBeTruthy();
+  });
+
+  it('does not save a label that was not changed', () => {
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a', { label: 'sink wall' })]} />);
+    openPhoto(0);
+    fireEvent.blur(screen.getByLabelText(/what does this photo show/i));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends the shrunk photo, under the original name', async () => {
+    shrink.shrinkPhoto.mockResolvedValueOnce(new Blob(['s'], { type: 'image/jpeg' }));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ photo: photo('one') }, 201));
+    render(<PhotoCapture projectId={PROJECT} />);
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files: [new File(['a much bigger original'], 'a.jpg', { type: 'image/jpeg' })] } });
+    await waitFor(() => expect(thumbs()).toHaveLength(1));
+    const sent = (fetchMock.mock.calls[0][1].body as FormData).get('file') as File;
+    expect(sent.size).toBe(1);
+    expect(sent.name).toBe('a.jpg');
+  });
+
+  it('does not send a photo still too big after shrinking, and says why straight away', async () => {
+    // Shrinking failed (the browser could not decode it), so the 26 MB original is all there is.
+    const huge = new File(['x'], 'huge.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(huge, 'size', { value: 26 * 1024 * 1024 });
+    render(<PhotoCapture projectId={PROJECT} />);
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files: [huge] } });
+    expect(await screen.findByText(/too big to upload \(26 MB, the most is 20 MB\)/i)).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(monitoring.reportUploadFailure).toHaveBeenCalledWith(expect.objectContaining({ status: 413, sizeBytes: 26 * 1024 * 1024 }));
+    // Trying again would only fail the same way.
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /dismiss/i })).toBeTruthy();
+  });
+
+  it('offers to try a failed upload again, and sends the same photo', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(jsonResponse({ photo: photo('ok') }, 201));
+    render(<PhotoCapture projectId={PROJECT} />);
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files: [new File(['x'], 'a.jpg', { type: 'image/jpeg' })] } });
+    fireEvent.click(await screen.findByRole('button', { name: /try again/i }));
+    await waitFor(() => expect(thumbs()).toHaveLength(1));
+    expect(((fetchMock.mock.calls[1][1].body as FormData).get('file') as File).name).toBe('a.jpg');
+    expect(screen.queryByText(/failed to fetch/i)).toBeNull();
+  });
+
+  it('lets a failed upload be dismissed', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'file is not a readable image' }, 400));
+    render(<PhotoCapture projectId={PROJECT} />);
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files: [new File(['x'], 'bad.jpg', { type: 'image/jpeg' })] } });
+    fireEvent.click(await screen.findByRole('button', { name: /dismiss/i }));
+    expect(screen.queryByText(/not a readable image/i)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('uploads each chosen file and shows it once saved', async () => {
@@ -109,7 +201,7 @@ describe('PhotoCapture', () => {
     const files = [new File(['a'], 'a.jpg', { type: 'image/jpeg' }), new File(['b'], 'b.jpg', { type: 'image/jpeg' })];
     fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files } });
 
-    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(2));
+    await waitFor(() => expect(thumbs()).toHaveLength(2));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/upload');
@@ -129,7 +221,7 @@ describe('PhotoCapture', () => {
     fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files } });
 
     expect(await screen.findByText(/bad\.jpg.*not a readable image/i)).not.toBeNull();
-    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1));
+    await waitFor(() => expect(thumbs()).toHaveLength(1));
   });
 
   it('reports a failed upload with its status, and a network failure as status 0', async () => {
@@ -177,6 +269,7 @@ describe('PhotoCapture', () => {
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[photo('a')]} />);
     expect(screen.queryByTestId('reference-surface')).toBeNull();
     expect(screen.queryByLabelText('Reference object')).toBeNull();
+    openPhoto(0);
     fireEvent.click(screen.getByRole('button', { name: /mark a known-size object \(optional\)/i }));
     expect(screen.getByTestId('reference-surface')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /done marking/i }));
@@ -188,6 +281,7 @@ describe('PhotoCapture', () => {
       referenceObject: { kind: 'credit_card', side: 'long', knownSizeMm: 85.6, pixelBox: [20, 20, 220, 120] },
     });
     render(<PhotoCapture projectId={PROJECT} initialPhotos={[withRef]} />);
+    openPhoto(0);
     expect(screen.getByRole('button', { name: /edit the marked object/i })).not.toBeNull();
   });
 
@@ -220,7 +314,7 @@ describe('PhotoCapture upload diagnostics', () => {
     const input = screen.getByLabelText(/take photo/i);
     fireEvent.click(input);
     fireEvent.change(input, { target: { files: [new File(['abc'], 'secret-name.jpg', { type: 'image/jpeg' })] } });
-    await waitFor(() => expect(screen.getAllByRole('img')).toHaveLength(1));
+    await waitFor(() => expect(thumbs()).toHaveLength(1));
     expect(monitoring.uploadStep.mock.calls.map((c) => c[0])).toEqual(['picker-open', 'files-picked', 'upload-start', 'upload-done']);
     expect(JSON.stringify(monitoring.uploadStep.mock.calls)).not.toContain('secret-name');
     expect(localStorage.getItem(PICKER_PENDING_KEY)).toBeNull();
