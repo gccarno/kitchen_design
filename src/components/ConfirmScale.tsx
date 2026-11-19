@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import LengthInput from './LengthInput';
+import PlanThumbnail from './PlanThumbnail';
 import { compass } from '@/lib/plan/compass';
 import { parseLength } from '@/lib/plan/length';
 import { OPENING_LABEL, wallIndexOf } from '@/lib/plan/openings';
@@ -89,8 +90,15 @@ export default function ConfirmScale({ project, onProposal }: ConfirmScaleProps)
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-gray-600">
-        One real measurement makes every size right. Measure something in the room with a tape, pick it here, and type how big it really is.
+        One real measurement makes every size right. Measure something in the room with a tape, tap the wall you measured (or pick it, or a door or window, from the list), and type how big it really is.
       </p>
+      <PlanThumbnail
+        room={room}
+        label="Tap the wall you measured"
+        className="max-h-56 w-full max-w-sm border bg-white"
+        selectedWallId={choice.target.kind === 'wall' ? choice.target.id : undefined}
+        onPickWall={(id) => setSelected(`wall:${id}`)}
+      />
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col gap-1">
           <span>What did you measure?</span>

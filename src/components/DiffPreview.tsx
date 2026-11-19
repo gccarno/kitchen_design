@@ -10,6 +10,7 @@ import { polygonBounds, type Bounds, type Point } from '@/lib/plan/geometry';
 import type { Project } from '@/lib/plan/schemas';
 import type { Proposal } from '@/lib/plan/proposal';
 import { useOnline } from '@/lib/client/online';
+import { photoUrl } from '@/lib/plan/photo-url';
 import { STALE_MESSAGE, submitRevision } from '@/lib/client/revisions';
 
 export type { Proposal };
@@ -122,6 +123,9 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
               )}
             </figure>
           </div>
+          {proposal.source === 'llm' && current.photos.length > 0 && proposal.patch.some((op) => op.path.startsWith('/room')) && (
+            <SourcePhotos projectId={projectId} photos={current.photos} />
+          )}
           {changes.length === 0 ? (
             <p className="text-sm text-gray-600">No changes.</p>
           ) : (
@@ -173,6 +177,37 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
         </button>
       </div>
     </section>
+  );
+}
+
+/** The photos a room from photos was read from, so the outline can be checked against them. */
+function SourcePhotos({ projectId, photos }: { projectId: string; photos: Project['photos'] }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const openIndex = photos.findIndex((p) => p.id === openId);
+  return (
+    <div role="group" aria-label="Your photos" className="flex flex-col gap-2">
+      <p className="text-sm text-gray-600">Check the outline against your photos:</p>
+      <ul className="flex gap-2 overflow-x-auto">
+        {photos.map((p, i) => (
+          <li key={p.id} className="shrink-0">
+            <button
+              type="button"
+              aria-label={`Photo ${i + 1}${p.label ? `: ${p.label}` : ''}`}
+              aria-expanded={p.id === openId}
+              className={`block h-16 w-20 overflow-hidden rounded border-2 ${p.id === openId ? 'border-black' : 'border-transparent'}`}
+              onClick={() => setOpenId((id) => (id === p.id ? null : p.id))}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- served by our API route, not a static asset */}
+              <img src={photoUrl(projectId, p.id, 'thumb')} alt="" loading="lazy" className="h-full w-full object-cover" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {openIndex >= 0 && (
+        // eslint-disable-next-line @next/next/no-img-element -- served by our API route, not a static asset
+        <img src={photoUrl(projectId, photos[openIndex].id)} alt={`Photo ${openIndex + 1}, full size`} className="block max-h-80 max-w-full self-start rounded" />
+      )}
+    </div>
   );
 }
 

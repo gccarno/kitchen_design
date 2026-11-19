@@ -89,17 +89,24 @@ describe('ExtractPanel', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ measurements: [] });
   });
 
-  it('keeps the measured-wall fields in a section that starts closed, and extracts without them', async () => {
+  it('shows the measured-wall fields up front, as optional, and extracts without them', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock.mockResolvedValueOnce(json({ jobId: JOB }, 202)).mockResolvedValueOnce(job('running'));
     const { button } = setup();
-    const section = screen.getByText(/i measured a wall/i).closest('details')!;
-    expect(section.open).toBe(false);
-    expect(section.contains(screen.getAllByLabelText(/which wall/i)[0])).toBe(true);
+    expect(document.querySelector('details')).toBeNull();
+    expect(screen.getByText(/measured a wall\? sizes will be exact/i)).toBeTruthy();
+    expect(screen.getAllByLabelText(/which wall/i)[0]).toBeTruthy();
     expect(button().disabled).toBe(false);
     fireEvent.click(button());
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ measurements: [] });
+  });
+
+  it('suggests the photo labels for which wall was measured', () => {
+    render(<ExtractPanel projectId={ID} hasPhotos photoLabels={['sink wall', 'window wall', 'sink wall']} onProposal={vi.fn()} />);
+    const input = screen.getAllByLabelText(/which wall/i)[0];
+    const list = document.getElementById(input.getAttribute('list')!)!;
+    expect([...list.querySelectorAll('option')].map((o) => o.getAttribute('value'))).toEqual(['sink wall', 'window wall']);
   });
 
   it('takes a measured length in feet and inches in an inch project', async () => {
