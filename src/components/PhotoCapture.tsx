@@ -8,6 +8,7 @@ import { photoUrl } from '@/lib/plan/photo-url';
 import ReferenceMarker from './ReferenceMarker';
 import type { ReferenceInput } from '@/lib/plan/reference-objects';
 import type { Photo, ReferenceObject } from '@/lib/plan/schemas';
+import { MAX_PHOTO_BYTES } from '@/app/api/upload/limits';
 import { MAX_PHOTO_LABEL, MAX_PHOTOS } from '@/lib/storage/limits';
 
 export { MAX_PHOTOS };
@@ -20,7 +21,12 @@ interface PhotoCaptureProps {
 }
 
 // A failed upload keeps its file, so it can be tried again without picking the photo a second time.
-type UploadStatus = { key: number; name: string; state: 'uploading' } | { key: number; name: string; state: 'error'; error: string; file: File };
+type UploadStatus =
+  | { key: number; name: string; state: 'uploading' }
+  /** `retry`: whether sending it again could work (not for a photo that is simply too big). */
+  | { key: number; name: string; state: 'error'; error: string; file: File; retry: boolean };
+
+const mb = (bytes: number) => Math.round(bytes / 1024 / 1024);
 type SaveState = 'saving' | 'saved' | { error: string };
 type PickerSource = 'camera' | 'library';
 
@@ -117,11 +123,11 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
   async function uploadOne(file: File, key: number) {
     const started = performance.now();
     const sizeKB = Math.round(file.size / 1024);
-    const fail = (status: number, error: string, timedOut = false) => {
+    const fail = (status: number, error: string, timedOut = false, retry = true) => {
       const durationMs = performance.now() - started;
       uploadStep('upload-failed', { status, sizeKB, ms: Math.round(durationMs), ...(timedOut ? { timedOut } : {}) });
       reportUploadFailure({ status, error, sizeBytes: file.size, mimeType: file.type, durationMs, ...(timedOut ? { timedOut } : {}) });
-      setUploads((u) => u.map((x) => (x.key === key ? { key, name: file.name, state: 'error', error, file } : x)));
+      setUploads((u) => u.map((x) => (x.key === key ? { key, name: file.name, state: 'error', error, file, retry } : x)));
     };
     if (file.size === 0) {
       fail(-1, 'the photo came through empty, please try again');
@@ -130,6 +136,12 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
     // The server only keeps a reduced copy, so reduce it here and save the user the upload.
     const shrunk = await shrinkPhoto(file);
     const toSend = shrunk === file ? file : new File([shrunk], file.name, { type: shrunk.type });
+    if (toSend.size > MAX_PHOTO_BYTES) {
+      // The server would refuse it after the whole upload (a 26 MB photo took 15 s on a phone to
+      // come back 413). Happens when the browser can't decode the photo to shrink it.
+      fail(413, `too big to upload (${mb(toSend.size)} MB, the most is ${mb(MAX_PHOTO_BYTES)} MB). Try a smaller copy, or a screenshot of it`, false, false);
+      return;
+    }
     uploadStep('upload-start', { sizeKB, sentKB: Math.round(toSend.size / 1024), type: file.type || 'unknown' });
     const abort = new AbortController();
     let timedOut = false;
@@ -308,9 +320,11 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
             ) : (
               <li key={u.key} className="flex flex-wrap items-center gap-2 text-red-600">
                 <span>{`${u.name}: ${u.error}`}</span>
-                <button type="button" className="rounded border border-red-600 px-2 py-0.5 disabled:opacity-40" disabled={!canAdd} onClick={() => retryUpload(u.key, u.file)}>
-                  Try again
-                </button>
+                {u.retry && (
+                  <button type="button" className="rounded border border-red-600 px-2 py-0.5 disabled:opacity-40" disabled={!canAdd} onClick={() => retryUpload(u.key, u.file)}>
+                    Try again
+                  </button>
+                )}
                 <button type="button" className="underline" onClick={() => setUploads((list) => list.filter((x) => x.key !== u.key))}>
                   Dismiss
                 </button>
