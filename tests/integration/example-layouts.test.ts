@@ -28,6 +28,7 @@ import { loadProject } from '@/lib/storage/projects';
 import { POST as createProjectRoute } from '@/app/api/projects/route';
 import { POST as commitRoute } from '@/app/api/projects/[id]/revisions/route';
 import { POST as undoRoute } from '@/app/api/projects/[id]/undo/route';
+import { rect, SHAPED_KITCHENS, type KitchenExample } from '../support/sample-kitchens';
 
 const keep = process.env.EXAMPLES_DATA_DIR;
 let dataDir: string;
@@ -78,33 +79,8 @@ function expectClean(project: Project, warnings: string[] = []) {
   expect(result.warnings, project.name).toEqual(warnings);
 }
 
-const rect = (w: number, d: number): Point[] => [
-  [0, 0],
-  [w, 0],
-  [w, d],
-  [0, d],
-];
-
 // --- Kitchens ---
 // Walls run clockwise from the top-left corner: w1 top, w2 right, w3 bottom, w4 left.
-
-/** A follow-up revision: more commands, or an undo of the last one. */
-type Step = Command[] | 'undo';
-
-interface KitchenExample {
-  name: string;
-  room: Point[];
-  /** The first revision. */
-  commands: Command[];
-  /** Later revisions, each checked to compile and commit. */
-  then?: Step[];
-  /** Catalog ids that must end up in the plan. */
-  has: string[];
-  /** The project name at the end, when a step renames it. */
-  finalName?: string;
-  /** Warnings the layout is known to give (a limitation, recorded rather than hidden). */
-  knownWarnings?: string[];
-}
 
 const KITCHENS: KitchenExample[] = [
   {
@@ -415,7 +391,7 @@ const MORE_KITCHENS: KitchenExample[] = [
 describe('example kitchens', () => {
   const catalog = loadCatalog();
 
-  it.each([...KITCHENS, ...MORE_KITCHENS])('$name', async ({ name, room, commands, then = [], has, finalName, knownWarnings }) => {
+  it.each([...KITCHENS, ...MORE_KITCHENS, ...SHAPED_KITCHENS])('$name', async ({ name, room, commands, then = [], has, finalName, knownWarnings }) => {
     const created = await create(name, 'kitchen');
     // A fresh project has four walls; a room with another outline needs one wall per side.
     const walls = room.length === created.room.walls.length ? created.room.walls : room.map(() => ({ id: randomUUID(), thicknessMm: 100 }));
