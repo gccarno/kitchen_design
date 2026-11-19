@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { proposalFromExtraction, type ExtractionResponse, type Proposal } from '@/lib/plan/proposal';
+import { useBrowserValue } from '@/lib/client/browser-value';
 import { useOnline } from '@/lib/client/online';
 import {
   forgetJob,
@@ -32,6 +33,20 @@ const MAX_MEASUREMENTS = 4;
 const fallbackError = (status: number) => `extraction failed (${status})`;
 
 type Row = { key: number; description: string; length: string };
+type Draft = { rows: Row[]; hint: string };
+const BLANK_ROWS: Row[] = [{ key: 0, description: '', length: '' }];
+
+/** A saved draft, or null when there is none or it isn't one (storage is only a convenience). */
+function parseDraft(raw: string | null): Draft | null {
+  if (!raw) return null;
+  try {
+    const d = JSON.parse(raw) as Draft;
+    const rowsOk = Array.isArray(d.rows) && d.rows.length > 0 && d.rows.every((r) => typeof r.key === 'number' && typeof r.description === 'string' && typeof r.length === 'string');
+    return rowsOk && typeof d.hint === 'string' ? d : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Ask the vision model for a room outline. The user describes each measured
@@ -40,9 +55,33 @@ type Row = { key: number; description: string; length: string };
  */
 export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photoLabels = [], onProposal }: ExtractPanelProps) {
   const online = useOnline();
-  const nextKey = useRef(1);
-  const [rows, setRows] = useState<Row[]>([{ key: 0, description: '', length: '' }]);
-  const [hint, setHint] = useState('');
+  const draftKey = `kd-extract-draft:${projectId}`;
+  // What was typed before a reload (this tab), read once the page is in the browser.
+  const savedRaw = useBrowserValue(() => {
+    try {
+      return sessionStorage.getItem(draftKey);
+    } catch {
+      return null;
+    }
+  }, null);
+  const saved = useMemo(() => parseDraft(savedRaw), [savedRaw]);
+  // Once anything is typed here the form is this page's own; until then, the saved draft or empty.
+  const [edited, setEdited] = useState<Draft | null>(null);
+  const rows = edited?.rows ?? saved?.rows ?? BLANK_ROWS;
+  const hint = edited?.hint ?? saved?.hint ?? '';
+
+  /** Change the form, and keep it for a reload. */
+  function change(next: Partial<Draft>) {
+    const draft = { rows, hint, ...next };
+    setEdited(draft);
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch {
+      /* storage blocked: the form just isn't kept */
+    }
+  }
+  const setRows = (next: Row[]) => change({ rows: next });
+  const setHint = (next: string) => change({ hint: next });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; retryAfterMs?: number } | null>(null);
   const [slow, setSlow] = useState(false);
@@ -56,7 +95,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
   const canRun = online && hasPhotos && !incomplete && !busy;
 
   function update(key: number, change: Partial<Row>) {
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...change } : r)));
+    setRows(rows.map((r) => (r.key === key ? { ...r, ...change } : r)));
   }
 
   /** Run one extraction (a new job, or a resumed one) and hand its result on as a proposal. */
@@ -70,6 +109,11 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
     try {
       const data = await work(ctrl.signal);
       forgetJob(jobKey);
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        /* nothing kept */
+      }
       onProposal(proposalFromExtraction(data));
     } catch (err) {
       // Unmounted mid-poll: keep the remembered job so the next mount resumes it.
@@ -182,7 +226,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
                   <button
                     type="button"
                     className="rounded border px-2 py-1"
-                    onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                    onClick={() => setRows(rows.filter((x) => x.key !== r.key))}
                   >
                     Remove
                   </button>
@@ -194,7 +238,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
             type="button"
             className="self-start underline disabled:opacity-40"
             disabled={rows.length >= MAX_MEASUREMENTS}
-            onClick={() => setRows((rs) => [...rs, { key: nextKey.current++, description: '', length: '' }])}
+            onClick={() => setRows([...rows, { key: Math.max(...rows.map((r) => r.key)) + 1, description: '', length: '' }])}
           >
             Add another wall
           </button>

@@ -36,11 +36,11 @@ test('design a closet: place, drag, warnings, undo, export, list', async ({ page
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await settle(svg);
   await page.mouse.click(...(await closetPoint(svg, 915, 2134)));
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   await page.getByRole('button', { name: 'Hanging rod' }).click();
   await settle(svg);
   await page.mouse.click(...(await closetPoint(svg, 450, 800)));
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   const [shelf, rod] = projectJson(id).closet.components;
   expect(shelf).toMatchObject({ kind: 'shelf', yMm: 2134 }); // snapped to the standard top-shelf height
   expect(rod).toMatchObject({ kind: 'rod', xMm: 0, yMm: 800 });
@@ -56,13 +56,13 @@ test('design a closet: place, drag, warnings, undo, export, list', async ({ page
   await page.mouse.move(from[0], (from[1] + to[1]) / 2, { steps: 4 });
   await page.mouse.move(...to, { steps: 4 });
   await page.mouse.up();
-  await expect(page.getByText('Revision 3')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '3');
   expect(projectJson(id).closet.components[1].yMm).toBe(1727); // the standard long-hang height
   await expect(page.getByRole('list', { name: 'Closet warnings' })).toHaveCount(0);
 
   // Undo puts it back.
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByText('Revision 4')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '4');
   expect(projectJson(id).closet.components[1].yMm).toBe(800);
 
   // Export.
@@ -85,7 +85,7 @@ test('change the size and doors, and ask the chat for a layout', async ({ page }
   await page.getByLabel('Inside width (mm)').fill('2400');
   await page.getByLabel('Doors').selectOption('sliding');
   await page.getByRole('button', { name: 'Save size and doors' }).click();
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   expect(projectJson(id).closet).toMatchObject({ widthMm: 2400, opening: { style: 'sliding', leftMm: 0, widthMm: 2400 } });
 
   // The e2e server has no LLM key, so the refine job (202, then polling) is mocked in the browser.
@@ -109,6 +109,6 @@ test('change the size and doors, and ask the chat for a layout', async ({ page }
   await expect(review.getByText('Drawer unit, 610 × 914 mm, 4 drawers, at 1300 mm from the left, 0 mm up')).toBeVisible();
   await expect(review.getByRole('img', { name: 'Proposed closet' })).toBeVisible();
   await review.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   expect(projectJson(id).closet.components[0]).toMatchObject({ kind: 'drawers', xMm: 1300 });
 });

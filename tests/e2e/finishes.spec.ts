@@ -13,21 +13,21 @@ test('pick finishes: the elevations, the estimate and the saved project follow, 
   expect(projectJson(id).finishes).toBeUndefined();
 
   await page.getByLabel('Cabinet colour').selectOption({ label: 'Navy' });
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   await expect(elevation.locator('rect[fill="#1e3a5f"]').first()).toBeVisible();
 
   await page.getByRole('combobox', { name: /^Countertop/ }).selectOption({ label: 'Granite' });
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   await expect(estimate.getByText('Countertop (granite)')).toBeVisible();
 
   await page.getByLabel('Door style').selectOption({ label: 'Slab (flat)' });
-  await expect(page.getByText('Revision 3')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '3');
   expect(projectJson(id).finishes).toEqual({ cabinetColor: '#1e3a5f', doorStyle: 'slab', countertop: 'granite' });
   await expect(page.getByText('Navy cabinets, slab (flat) doors, granite countertop')).toBeVisible();
 
   // Back to the standard look in one step, and the estimate follows.
   await page.getByRole('button', { name: 'Reset to standard' }).click();
-  await expect(page.getByText('Revision 4')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '4');
   expect(projectJson(id).finishes).toBeUndefined();
   await expect(estimate.getByText('Countertop', { exact: true })).toBeVisible();
   await expect(elevation.locator('rect[fill="#1e3a5f"]')).toHaveCount(0);

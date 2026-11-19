@@ -11,6 +11,7 @@ import ClosetEditor from './ClosetEditor';
 import ConfirmScale from './ConfirmScale';
 import DiffPreview from './DiffPreview';
 import EstimatePanel from './EstimatePanel';
+import ExportLink from './ExportLink';
 import ExtractPanel from './ExtractPanel';
 import PhotoCapture from './PhotoCapture';
 import FloorPlanCanvas, { type PlanChange } from './FloorPlanCanvas';
@@ -30,8 +31,6 @@ import {
   type Proposal,
 } from '@/lib/plan/proposal';
 import { checkAccessibility, checkLayout } from '@/lib/plan/layout-check';
-import { isNative } from '@/lib/client/native';
-import { saveAndShare } from '@/lib/client/download';
 import { wallElevations } from '@/lib/plan/elevation';
 import { validatePlan } from '@/lib/plan/validate';
 import { formatLength } from '@/lib/plan/viewport';
@@ -80,6 +79,13 @@ function defaultStep(project: Project): StepId {
   return isUntouched(project) ? 'room' : 'layout';
 }
 
+const ROOM_SOURCES = [
+  ['photos', 'From photos'],
+  ['sketch', 'Sketch it'],
+] as const;
+type RoomSource = (typeof ROOM_SOURCES)[number][0];
+const isRoomSource = (v: unknown): v is RoomSource => ROOM_SOURCES.some(([s]) => s === v);
+
 const M2_TO_FT2 = 10.7639;
 
 export default function ProjectEditor({ initialProject, optionCount, groupId }: ProjectEditorProps) {
@@ -120,6 +126,26 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   // What was chosen on this page, else what was remembered for this tab, else the default.
   const [chosenStep, setStep] = useState<StepId | null>(null);
   const step = chosenStep ?? rememberedStep ?? firstStep;
+  // How the room is being made (photos or a sketch): one at a time, remembered for this tab.
+  const roomSourceKey = `kd-room-source:${initialProject.id}`;
+  const rememberedRoomSource = useBrowserValue(() => {
+    try {
+      const remembered = sessionStorage.getItem(roomSourceKey);
+      return isRoomSource(remembered) ? remembered : null;
+    } catch {
+      return null;
+    }
+  }, null);
+  const [chosenRoomSource, setRoomSource] = useState<RoomSource | null>(null);
+  const roomSource = chosenRoomSource ?? rememberedRoomSource ?? 'photos';
+  function chooseRoomSource(next: RoomSource) {
+    setRoomSource(next);
+    try {
+      sessionStorage.setItem(roomSourceKey, next);
+    } catch {
+      /* storage blocked: the choice just isn't remembered */
+    }
+  }
   // The estimated-size notice leads here: open the Room step and bring the confirm panel into view.
   function goConfirmSize() {
     chooseStep('room');
@@ -310,15 +336,12 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
 
   if (project.closet) {
     return (
-      <main className="mx-auto flex max-w-3xl flex-col gap-8 p-4 sm:p-8">
+      <main data-revision={project.revision} className="mx-auto flex max-w-3xl flex-col gap-8 p-4 sm:p-8">
         <header className="flex flex-col gap-1">
           <Link href="/" className="text-sm text-gray-600 underline">
             All projects
           </Link>
           <h1 className="text-2xl font-semibold">{project.name}</h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-gray-500">Revision {project.revision}</span>
-          </div>
           {shareControls}
         </header>
         {reviewPanel}
@@ -421,28 +444,59 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
               <p className="text-sm text-gray-600">
                 Get the room in first: add photos, or sketch it. Doors, windows and corners are edited right on the plan.
               </p>
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">Photos</h2>
-                <PhotoCapture projectId={project.id} initialPhotos={project.photos} onPhotosChange={setPhotos} />
-              </section>
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">Room from photos</h2>
-                <ExtractPanel
-                  projectId={project.id}
-                  hasPhotos={project.photos.length > 0}
-                  units={project.units}
-                  photoLabels={project.photos.flatMap((p) => (p.label ? [p.label] : []))}
-                  onProposal={propose}
-                />
-              </section>
-              <section id="confirm-size" className="flex scroll-mt-4 flex-col gap-3">
-                <h2 className="text-lg font-semibold">Confirm the size</h2>
-                <ConfirmScale project={project} onProposal={propose} />
-              </section>
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">Or sketch it by hand</h2>
+              <fieldset className="flex flex-col gap-1 text-sm">
+                <legend className="mb-1 font-medium">Get the room</legend>
+                <div className="flex self-start overflow-hidden rounded border">
+                  {ROOM_SOURCES.map(([value, label]) => (
+                    <label key={value} className={`cursor-pointer px-3 py-1 ${roomSource === value ? 'bg-black text-white' : ''}`}>
+                      <input
+                        type="radio"
+                        name={`room-source-${project.id}`}
+                        value={value}
+                        className="sr-only"
+                        checked={roomSource === value}
+                        onChange={() => chooseRoomSource(value)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {/* Both stay mounted so a half-typed sketch or measurement survives switching. */}
+              <div hidden={roomSource !== 'photos'} className={`${roomSource === 'photos' ? 'flex' : 'hidden'} flex-col gap-6`}>
+                <section className="flex flex-col gap-3">
+                  <h2 className="text-lg font-semibold">Photos</h2>
+                  <PhotoCapture projectId={project.id} initialPhotos={project.photos} onPhotosChange={setPhotos} />
+                </section>
+                <section className="flex flex-col gap-3">
+                  <h2 className="text-lg font-semibold">Room from photos</h2>
+                  <ExtractPanel
+                    projectId={project.id}
+                    hasPhotos={project.photos.length > 0}
+                    units={project.units}
+                    photoLabels={project.photos.flatMap((p) => (p.label ? [p.label] : []))}
+                    onProposal={propose}
+                  />
+                </section>
+              </div>
+              <section hidden={roomSource !== 'sketch'} className={`${roomSource === 'sketch' ? 'flex' : 'hidden'} flex-col gap-3`}>
+                <h2 className="text-lg font-semibold">Sketch the room</h2>
                 <RoomSketch units={project.units} onSave={(room) => propose(proposalForRoom(project, room, 'Sketched room'))} />
               </section>
+              {project.room.sizeEstimated ? (
+                <section id="confirm-size" className="flex scroll-mt-4 flex-col gap-3">
+                  <h2 className="text-lg font-semibold">Confirm the size</h2>
+                  <ConfirmScale project={project} onProposal={propose} />
+                </section>
+              ) : (
+                // The sizes are real already: rescaling is still there for a correction, out of the way.
+                <details className="rounded border p-3 text-sm">
+                  <summary className="cursor-pointer font-medium">Rescale from a measurement</summary>
+                  <div className="mt-3">
+                    <ConfirmScale project={project} onProposal={propose} />
+                  </div>
+                </details>
+              )}
               {nextButton('layout', 'Layout')}
             </>
           )}
@@ -523,14 +577,13 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
   );
 
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-8">
+    <main data-revision={project.revision} className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-8">
       <header className="flex flex-col gap-1">
         <Link href="/" className="text-sm text-gray-600 underline">
           All projects
         </Link>
         <h1 className="text-2xl font-semibold">{project.name}</h1>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="text-gray-500">Revision {project.revision}</span>
           <label className="flex items-center gap-2">
             <span className="text-gray-500">Units</span>
             <select
@@ -559,35 +612,5 @@ export default function ProjectEditor({ initialProject, optionCount, groupId }: 
         {isUntouched(project) ? [stepsColumn, planColumn] : [planColumn, stepsColumn]}
       </div>
     </main>
-  );
-}
-
-/** A server-generated download: a link online, a disabled label offline (it can't be fetched without a network). */
-function ExportLink({ online, href, children, ...rest }: { online: boolean; href: string; children: React.ReactNode; 'aria-label'?: string }) {
-  if (!online) {
-    return (
-      <span className="text-gray-400" title="Offline" aria-disabled="true" {...rest}>
-        {children}
-      </span>
-    );
-  }
-  return (
-    <a
-      className="text-blue-700 underline"
-      href={href}
-      download
-      onClick={async (e) => {
-        if (!isNative()) return;
-        e.preventDefault();
-        try {
-          await saveAndShare(href, href.split('?')[0].split('/').slice(-2).join('-'));
-        } catch (err) {
-          window.alert(err instanceof Error ? err.message : 'Download failed.');
-        }
-      }}
-      {...rest}
-    >
-      {children}
-    </a>
   );
 }

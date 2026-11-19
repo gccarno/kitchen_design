@@ -22,7 +22,7 @@ async function place(page: Page, canvas: Locator, name: RegExp, at: [number, num
   await expect(page.getByText(/Tap the plan to place/)).toBeVisible();
   await settle(canvas);
   await clickWorld(page, canvas, at);
-  await expect(page.getByText(`Revision ${revision}`)).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', String(revision));
 }
 
 test('place a dishwasher against a wall, then move, rotate, and remove it', async ({ page }) => {
@@ -44,15 +44,15 @@ test('place a dishwasher against a wall, then move, rotate, and remove it', asyn
 
   // Drag along the wall: it stays back-to-wall.
   await dragWorld(page, canvas, [1250, 290], [2010, 160]);
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   expect(projectJson(id).items[0].position).toEqual({ x: 2000, y: 290 });
 
   await page.getByRole('button', { name: 'Rotate 90°' }).click();
-  await expect(page.getByText('Revision 3')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '3');
   expect(projectJson(id).items[0].rotationDeg).toBe(90);
 
   await page.getByRole('button', { name: 'Remove item' }).click();
-  await expect(page.getByText('Revision 4')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '4');
   item = projectJson(id);
   expect(item.items).toEqual([]);
   expect(item.history.map((h: { summary: string }) => h.summary)).toEqual([

@@ -17,8 +17,9 @@ function projectJson(id: string) {
 
 test('sketch a room, review it, apply it, and it survives a reload', async ({ page }) => {
   const id = await newProject(page, 'Sketch e2e');
-  await expect(page.getByText('Revision 0')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '0');
 
+  await page.getByRole('group', { name: 'Get the room' }).getByText('Sketch it').click();
   await page.getByLabel('Width (mm)').fill('3600');
   await page.getByLabel('Depth (mm)').fill('2700');
   await page.getByRole('button', { name: 'Use rectangle' }).click();
@@ -30,10 +31,10 @@ test('sketch a room, review it, apply it, and it survives a reload', async ({ pa
 
   await review.getByRole('button', { name: 'Apply' }).click();
   await expect(review).toBeHidden();
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
 
   await page.reload();
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   await expect(page.getByText(/3600 × 2700 mm, 9\.7 m²/)).toBeVisible();
   expect(projectJson(id).room.polygon).toEqual([
     [0, 0],

@@ -38,7 +38,7 @@ test('photos with no tape measure → an estimated room → confirm one real siz
   const review = page.getByRole('region', { name: 'Review proposed change' });
   await expect(review.getByText('Scaled from the 900 mm counter.')).toBeVisible();
   await review.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
 
   // The room is marked as a guess until a real size is confirmed.
   expect(projectJson(id).room.sizeEstimated).toBe(true);
@@ -51,7 +51,7 @@ test('photos with no tape measure → an estimated room → confirm one real siz
   const confirm = page.getByRole('region', { name: 'Review proposed change' });
   await expect(confirm.getByText('Confirm the room size: Wall 1 is 3600 mm')).toBeVisible();
   await confirm.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
 
   // Wall 1 is now exactly what was typed, and the guess flag is gone.
   const room = projectJson(id).room;
@@ -62,7 +62,7 @@ test('photos with no tape measure → an estimated room → confirm one real siz
 
   // It is one undoable revision.
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByText('Revision 3')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '3');
   expect(projectJson(id).room.sizeEstimated).toBe(true);
   expect(projectJson(id).room.polygon[1][0]).toBeCloseTo(4000, 0);
 });

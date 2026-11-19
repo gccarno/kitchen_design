@@ -25,7 +25,7 @@ async function withDoor(page: Page, name: string) {
   await page.getByRole('button', { name: 'Add door' }).click();
   await expect(page.getByText('Tap a wall to place the door.')).toBeVisible();
   await clickWorld(page, canvas, [1500, 40]);
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   return { id, canvas };
 }
 
@@ -46,12 +46,12 @@ test('resize a door by dragging an end square, then slide it along the wall', as
 
   // Drag the end square (1900, 0) to x≈2410 → snapped to 2400: width 1300.
   await dragWorld(page, canvas, [1900, 0], [2410, 30]);
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   expect(projectJson(id).room.openings[0]).toMatchObject({ positionMm: 1100, widthMm: 1300 });
 
   // Grab the body 400 mm in (at x=1500) and drop at x≈1010 → starts at 610 → snapped 600.
   await dragWorld(page, canvas, [1500, 0], [1010, -20]);
-  await expect(page.getByText('Revision 3')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '3');
   const saved = projectJson(id);
   expect(saved.room.openings[0]).toMatchObject({ positionMm: 600, widthMm: 1300 });
   expect(saved.history.map((h: { summary: string }) => h.summary)).toEqual([
@@ -64,7 +64,7 @@ test('resize a door by dragging an end square, then slide it along the wall', as
 test('delete the selected door', async ({ page }) => {
   const { id } = await withDoor(page, 'Openings delete');
   await page.getByRole('button', { name: 'Delete door' }).click();
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   expect(projectJson(id).room.openings).toEqual([]);
 });
 

@@ -25,7 +25,7 @@ test('drag a corner: it snaps to 50 mm, saves as a revision, and the view does n
 
   // Default room corner 3 is (3000, 4000); drop it near (3520, 4480).
   await dragWorld(page, canvas, [3000, 4000], [3520, 4480]);
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
 
   const saved = projectJson(id);
   expect(saved.room.polygon[2]).toEqual([3500, 4500]);
@@ -38,7 +38,7 @@ test('with snapping off, a corner lands where it is dropped', async ({ page }) =
   const { id, canvas } = await startEditing(page, 'Edit no snap');
   await page.getByLabel('Snap to 50 mm').uncheck();
   await dragWorld(page, canvas, [3000, 4000], [3520, 4480]);
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
 
   const [x, y] = projectJson(id).room.polygon[2];
   // Within a screen pixel's worth of world distance of the drop point, and off the 50 mm grid.
@@ -54,7 +54,7 @@ test('add a corner with + and delete it again', async ({ page }) => {
   // "+" handle at the middle of wall 1 (top wall, (0,0)→(3000,0)).
   const [px, py] = await pagePoint(canvas, [1500, 0]);
   await page.mouse.click(px, py);
-  await expect(page.getByText('Revision 1')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '1');
   let saved = projectJson(id);
   expect(saved.room.polygon).toHaveLength(5);
   expect(saved.room.polygon[1]).toEqual([1500, 0]);
@@ -62,7 +62,7 @@ test('add a corner with + and delete it again', async ({ page }) => {
 
   // The new corner is selected; delete it.
   await page.getByRole('button', { name: 'Delete corner' }).click();
-  await expect(page.getByText('Revision 2')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '2');
   saved = projectJson(id);
   expect(saved.room.polygon).toEqual([
     [0, 0],
@@ -78,7 +78,7 @@ test('a drag that would make walls cross is refused and nothing is saved', async
   await dragWorld(page, canvas, [3000, 0], [-1000, 3000]);
   await expect(page.getByText(/can’t do that: room polygon is self-intersecting/i)).toBeVisible();
   expect(projectJson(id).revision).toBe(0);
-  await expect(page.getByText('Revision 0')).toBeVisible();
+  await expect(page.locator('[data-revision]')).toHaveAttribute('data-revision', '0');
 });
 
 test('dragging empty space still pans while editing', async ({ page }) => {
