@@ -28,7 +28,7 @@
     "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
-    "@google-cloud/storage": "^8.4.0",
+    "@google-cloud/storage": "^9.0.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@sentry/browser": "^11.12.0",
