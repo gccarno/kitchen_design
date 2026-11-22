@@ -1,12 +1,17 @@
 import { providerFromEnv, type LLMProvider } from '../llm';
+import type { ProviderConfig } from '../llm/provider';
 import type { LLMCallEvent } from '../llm/log';
 import { reportJobFailure } from '../monitoring';
 import { getStorageFor } from '../storage';
-import { toJobError } from './errors';
+import { providerDetail, toJobError } from './errors';
 import { runExtract, runRefine, type HandlerArgs } from './handlers';
 import { getJobStore, jobOwner, type JobKind } from './index';
 
-export type RunDeps = { provider?: LLMProvider };
+export type RunDeps = {
+  provider?: LLMProvider;
+  /** Builds the provider with the job's call recorder (default: providerFromEnv). */
+  makeProvider?: (extra: Pick<ProviderConfig, 'onCall'>) => LLMProvider;
+};
 
 /**
  * Execute job `jobId` to completion: claim it (a no-op if another runner
@@ -30,11 +35,12 @@ export async function runJob(jobId: string, deps: RunDeps = {}): Promise<void> {
         await store.fail(jobId, { status: 404, error: 'project not found' });
         return;
       }
-      const provider = deps.provider ?? providerFromEnv({ onCall: (e) => calls.push(e) });
+      const provider = deps.provider ?? (deps.makeProvider ?? providerFromEnv)({ onCall: (e) => calls.push(e) });
       const args = { storage, project, input: job.input, provider };
       await store.complete(jobId, await runHandler(job.kind, args));
     } catch (err) {
-      const jobError = toJobError(err, job.kind);
+      const detail = providerDetail(calls);
+      const jobError = { ...toJobError(err, job.kind), ...(detail ? { detail } : {}) };
       reportJobFailure(err, { jobId, kind: job.kind, projectId: job.projectId, status: jobError.status, error: jobError.error, calls });
       try {
         await store.fail(jobId, jobError);

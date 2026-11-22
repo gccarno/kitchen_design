@@ -17,6 +17,7 @@ import {
 } from '@/lib/client/jobs';
 import { parseLength } from '@/lib/plan/length';
 import LengthInput from './LengthInput';
+import ErrorDetail from './ErrorDetail';
 import RetryCountdown from './RetryCountdown';
 
 interface ExtractPanelProps {
@@ -83,7 +84,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
   const setRows = (next: Row[]) => change({ rows: next });
   const setHint = (next: string) => change({ hint: next });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ message: string; retryAfterMs?: number } | null>(null);
+  const [error, setError] = useState<{ message: string; retryAfterMs?: number; detail?: string } | null>(null);
   const [slow, setSlow] = useState(false);
   const inFlight = useRef(false);
   const current = useRef<AbortController | null>(null);
@@ -120,7 +121,8 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
       if (isAbortError(err)) return;
       // Connection lost (or gave up waiting): the job may still finish, so the next mount resumes it.
       if (!keepsJob(err)) forgetJob(jobKey);
-      setError({ message: (err as Error).message, retryAfterMs: err instanceof JobFailedError ? err.retryAfterMs : undefined });
+      const failed = err instanceof JobFailedError ? err : undefined;
+      setError({ message: (err as Error).message, retryAfterMs: failed?.retryAfterMs, detail: failed?.detail });
     } finally {
       if (current.current === ctrl) {
         current.current = null;
@@ -262,6 +264,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
           {error.message}
         </p>
       )}
+      <ErrorDetail detail={error?.detail} />
       {error?.retryAfterMs !== undefined && (
         <RetryCountdown retryAfterMs={error.retryAfterMs} onRetry={run} disabled={!canRun} />
       )}

@@ -113,6 +113,19 @@ describe('runJob', () => {
     expect(failed.error).toEqual({ status: 502, error: 'rate limited' });
   });
 
+  it("keeps each model's own error message on the failed job, for the user to see", async () => {
+    const { store, job } = await setup('extract', {}, { photo: true });
+    const detail = 'Provider returned error (a/m:free is temporarily rate-limited upstream)';
+    await runJob(job.id, {
+      makeProvider: ({ onCall }) => {
+        onCall?.({ event: 'llm_call', op: 'vision', attempt: 0, models: ['a/m:free'], status: 429, ms: 5, outcome: 'rate_limited', rateLimitKind: 'upstream', detail });
+        return new StubProvider([new LLMRequestError('rate limited')]);
+      },
+    });
+    const failed = (await store.get(job.id))!;
+    expect(failed.error).toEqual({ status: 502, error: 'rate limited', detail: `a/m:free (429): ${detail}` });
+  });
+
   it('reports a failed job (a job_failed log line, and Sentry when on)', async () => {
     const { job, project } = await setup('extract', {}, { photo: true });
     await runJob(job.id, { provider: new StubProvider([new LLMRequestError('rate limited')]) });

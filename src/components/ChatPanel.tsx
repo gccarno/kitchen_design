@@ -14,6 +14,7 @@ import {
   startAndWait,
   waitForJob,
 } from '@/lib/client/jobs';
+import ErrorDetail from './ErrorDetail';
 import RetryCountdown from './RetryCountdown';
 
 interface ChatPanelProps {
@@ -31,6 +32,8 @@ type Message = {
   error?: boolean;
   /** Rate-limited: offer to send `message` again after `afterMs`. */
   retry?: { afterMs: number; message: string };
+  /** What the AI providers said, under "Details". */
+  detail?: string;
 };
 
 /** Turns of context sent with each request (errors excluded). */
@@ -79,10 +82,12 @@ export default function ChatPanel({
       // Connection lost (or gave up waiting): the job may still finish, so the next mount resumes it.
       if (!keepsJob(err)) forgetJob(jobKey);
       const afterMs = err instanceof JobFailedError ? err.retryAfterMs : undefined;
+      const detail = err instanceof JobFailedError ? err.detail : undefined;
       reply = {
         role: 'assistant',
         content: `Sorry — ${(err as Error).message}`,
         error: true,
+        ...(detail ? { detail } : {}),
         ...(afterMs !== undefined && message !== undefined ? { retry: { afterMs, message } } : {}),
       };
     }
@@ -177,6 +182,7 @@ export default function ChatPanel({
             >
               {m.content}
               {m.note && <span className="block text-xs text-gray-600">{m.note}</span>}
+              <ErrorDetail detail={m.detail} />
             </li>
           ))}
         </ol>

@@ -184,6 +184,19 @@ describe('ChatPanel', () => {
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
   });
 
+  it("shows the provider's own message under Details", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'The free AI models are busy right now.', retryAfterMs: 5000, detail: 'a/m:free (429): Provider returned error (a/m:free is temporarily rate-limited upstream)' } }));
+    setup().say('add a dishwasher');
+    await tick(1500);
+    await screen.findByText('Sorry — The free AI models are busy right now.');
+    const details = screen.getByText('Details').closest('details')!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain('a/m:free (429): Provider returned error (a/m:free is temporarily rate-limited upstream)');
+  });
+
   it('offers no Try again for errors that are not rate limits', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock

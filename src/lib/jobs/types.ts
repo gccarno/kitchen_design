@@ -13,6 +13,8 @@ export type JobError = {
   issues?: unknown;
   /** Rate-limited: how long until trying again is worth it. */
   retryAfterMs?: number;
+  /** What each model's provider said when it failed, for the user to see under "Details". */
+  detail?: string;
 };
 
 export type Job = {
