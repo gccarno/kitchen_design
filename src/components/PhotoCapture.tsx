@@ -203,7 +203,23 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
       sizeKB: Math.round(files.reduce((n, f) => n + f.size, 0) / 1024),
       types: [...new Set(files.map((f) => f.type || 'unknown'))].join(','),
     });
-    void uploadFiles(files);
+    // Send only what fits: the server would refuse the rest (409) after each one's upload.
+    // The rest stay listed with their file, so they can go once a photo is removed.
+    const inFlight = uploads.filter((u) => u.state === 'uploading').length;
+    const room = Math.max(0, MAX_PHOTOS - photos.length - inFlight);
+    const extra = files.slice(room).map((file): UploadStatus => ({
+      key: nextKey.current++,
+      name: file.name,
+      state: 'error',
+      error: `didn't fit, a room can have at most ${MAX_PHOTOS} photos`,
+      file,
+      retry: true,
+    }));
+    if (extra.length > 0) {
+      uploadStep('files-over-limit', { count: extra.length });
+      setUploads((u) => [...u, ...extra]);
+    }
+    void uploadFiles(files.slice(0, room));
   }
 
   async function removePhoto(photoId: string) {
@@ -325,6 +341,7 @@ export default function PhotoCapture({ projectId, initialPhotos = [], onPhotosCh
                     Try again
                   </button>
                 )}
+                {u.retry && full && <span className="text-gray-600">Remove a photo to try again.</span>}
                 <button type="button" className="underline" onClick={() => setUploads((list) => list.filter((x) => x.key !== u.key))}>
                   Dismiss
                 </button>

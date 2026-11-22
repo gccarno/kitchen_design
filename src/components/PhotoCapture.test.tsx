@@ -182,6 +182,44 @@ describe('PhotoCapture', () => {
     expect(screen.queryByText(/failed to fetch/i)).toBeNull();
   });
 
+  it(`uploads only what fits under ${MAX_PHOTOS}, and says which photos did not fit without sending them`, async () => {
+    const six = Array.from({ length: MAX_PHOTOS - 2 }, (_, i) => photo(`p${i}`));
+    fetchMock.mockResolvedValueOnce(jsonResponse({ photo: photo('n1') }, 201)).mockResolvedValueOnce(jsonResponse({ photo: photo('n2') }, 201));
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={six} />);
+    const files = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'].map((n) => new File(['x'], n, { type: 'image/jpeg' }));
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files } });
+    await waitFor(() => expect(thumbs()).toHaveLength(MAX_PHOTOS));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(new RegExp(`c\\.jpg: didn.t fit`, 'i'))).toBeTruthy();
+    expect(screen.getByText(new RegExp(`d\\.jpg: didn.t fit`, 'i'))).toBeTruthy();
+    expect(monitoring.reportUploadFailure).not.toHaveBeenCalledWith(expect.objectContaining({ status: 409 }));
+  });
+
+  it('says why Try again is off while the room is full, and turns it on once a photo is removed', async () => {
+    const almost = Array.from({ length: MAX_PHOTOS - 1 }, (_, i) => photo(`p${i}`));
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ photo: photo('last') }, 201))
+      .mockResolvedValueOnce(jsonResponse({ photos: [] })) // DELETE
+      .mockResolvedValueOnce(jsonResponse({ photo: photo('late') }, 201));
+    render(<PhotoCapture projectId={PROJECT} initialPhotos={almost} />);
+    const files = ['fits.jpg', 'late.jpg'].map((n) => new File(['x'], n, { type: 'image/jpeg' }));
+    fireEvent.change(screen.getByLabelText(/choose photos/i), { target: { files } });
+    await waitFor(() => expect(thumbs()).toHaveLength(MAX_PHOTOS));
+    const retry = screen.getByRole('button', { name: /try again/i }) as HTMLButtonElement;
+    expect(retry.disabled).toBe(true);
+    expect(screen.getByText(/remove a photo to try again/i)).toBeTruthy();
+
+    openPhoto(0);
+    fireEvent.click(screen.getByRole('button', { name: /remove photo/i }));
+    fireEvent.click(screen.getByRole('button', { name: /yes, remove/i }));
+    await waitFor(() => expect((screen.getByRole('button', { name: /try again/i }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByText(/remove a photo to try again/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await waitFor(() => expect(screen.queryByText(/late\.jpg/)).toBeNull());
+    expect(((fetchMock.mock.calls[2][1].body as FormData).get('file') as File).name).toBe('late.jpg');
+    expect(thumbs()).toHaveLength(MAX_PHOTOS);
+  });
+
   it('lets a failed upload be dismissed', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'file is not a readable image' }, 400));
     render(<PhotoCapture projectId={PROJECT} />);

@@ -77,6 +77,7 @@ export type UploadStep =
   | 'picker-open'
   | 'picker-cancelled'
   | 'files-picked'
+  | 'files-over-limit'
   | 'upload-start'
   | 'upload-done'
   | 'upload-failed';
