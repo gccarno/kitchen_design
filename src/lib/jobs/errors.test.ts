@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ExtractionError, LLMNotConfiguredError, LLMRateLimitError, LLMRequestError, RefinementError } from '../llm';
-import { toJobError } from './errors';
+import { DETAIL_SHOWN_MAX, providerDetail, toJobError } from './errors';
+import type { LLMCallEvent } from '../llm/log';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -53,5 +54,34 @@ describe('toJobError', () => {
     });
     expect(spy.mock.calls[0][0]).toContain('TypeError: boom');
     expect(spy.mock.calls[0]).toHaveLength(1);
+  });
+});
+
+describe('providerDetail', () => {
+  const call = (extra: Partial<LLMCallEvent>): LLMCallEvent => ({ event: 'llm_call', op: 'vision', attempt: 0, models: ['a/m:free', 'b/m:free'], ms: 1, outcome: 'ok', ...extra });
+
+  it('is nothing when no model call failed', () => {
+    expect(providerDetail([])).toBeUndefined();
+    expect(providerDetail([call({ outcome: 'ok' })])).toBeUndefined();
+  });
+
+  it("lists each model's own message once, in order, naming the model", () => {
+    const busy = 'Provider returned error (a/m:free is temporarily rate-limited upstream)';
+    const calls = [
+      call({ attempt: 0, outcome: 'rate_limited', status: 429, detail: busy }),
+      call({ attempt: 1, outcome: 'rate_limited', status: 429, detail: busy }),
+      call({ attempt: 2, models: ['b/m:free', 'a/m:free'], outcome: 'timeout', detail: 'LLM request timed out after 300000 ms' }),
+    ];
+    expect(providerDetail(calls)).toBe(`a/m:free (429): ${busy}\nb/m:free: LLM request timed out after 300000 ms`);
+  });
+
+  it("leaves out the model's own answers (bad_json, bad_envelope), which can quote what the user typed", () => {
+    expect(providerDetail([call({ outcome: 'bad_json', detail: 'LLM returned non-JSON content: "my kitchen…"' })])).toBeUndefined();
+    expect(providerDetail([call({ outcome: 'bad_envelope', detail: 'no choices' })])).toBeUndefined();
+  });
+
+  it('is kept short', () => {
+    const calls = Array.from({ length: 20 }, (_, i) => call({ outcome: 'http_error', status: 500, detail: `error number ${i} `.repeat(20) }));
+    expect(providerDetail(calls)!.length).toBeLessThanOrEqual(DETAIL_SHOWN_MAX);
   });
 });

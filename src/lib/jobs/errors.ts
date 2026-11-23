@@ -1,5 +1,27 @@
 import { ExtractionError, LLMNotConfiguredError, LLMRateLimitError, LLMRequestError, RefinementError } from '../llm';
+import type { LLMCallEvent } from '../llm/log';
 import type { JobError, JobKind } from './types';
+
+/** The most of the providers' messages kept on a failed job. */
+export const DETAIL_SHOWN_MAX = 1000;
+
+/** Failures whose `detail` is the provider's (or the network's) message, not the model's own answer. */
+const PROVIDER_OUTCOMES = new Set<LLMCallEvent['outcome']>(['rate_limited', 'http_error', 'timeout', 'network_error']);
+
+/**
+ * What each model's provider said when a call failed, one line per distinct
+ * message: "model (status): message". The model's own answers (bad_json,
+ * bad_envelope) are left out, as they can quote what the user typed.
+ */
+export function providerDetail(calls: LLMCallEvent[]): string | undefined {
+  const lines: string[] = [];
+  for (const c of calls) {
+    if (!PROVIDER_OUTCOMES.has(c.outcome) || !c.detail) continue;
+    const line = `${c.modelUsed ?? c.models[0]}${c.status ? ` (${c.status})` : ''}: ${c.detail}`;
+    if (!lines.includes(line)) lines.push(line);
+  }
+  return lines.length > 0 ? lines.join('\n').slice(0, DETAIL_SHOWN_MAX) : undefined;
+}
 
 const HAND_HINT: Record<JobKind, string> = {
   extract: 'You can still sketch the room by hand.',

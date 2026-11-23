@@ -228,6 +228,20 @@ describe('ExtractPanel', () => {
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
   });
 
+  it("shows the provider's own message under Details, and none when there is none", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'The free AI models are busy right now.', retryAfterMs: 60_000, detail: 'a/m:free (429): Provider returned error (a/m:free is temporarily rate-limited upstream)' } }));
+    const { button } = setup();
+    fireEvent.click(button());
+    await tick(1500);
+    await screen.findByText('The free AI models are busy right now.');
+    const details = screen.getByText('Details').closest('details')!;
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain('a/m:free (429): Provider returned error (a/m:free is temporarily rate-limited upstream)');
+  });
+
   it('shows the time to come back when the wait is long (daily quota)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock
@@ -249,6 +263,7 @@ describe('ExtractPanel', () => {
     await tick(1500);
     expect(await screen.findByText('bad answer')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+    expect(screen.queryByText('Details')).toBeNull();
   });
 
   it('explains a job the server lost (404 while polling)', async () => {
