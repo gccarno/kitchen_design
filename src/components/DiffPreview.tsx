@@ -2,6 +2,7 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import ClosetElevation from './ClosetElevation';
+import ReasoningDetail from './ReasoningDetail';
 import PlanThumbnail from './PlanThumbnail';
 import { describePlanChanges } from '@/lib/plan/changes';
 import { validatePatchOnProject } from '@/lib/plan/diff';
@@ -86,6 +87,7 @@ export default function DiffPreview({ projectId, current, proposal, onApplied, o
         </p>
       )}
       {proposal.notes && <p className="rounded bg-gray-50 p-2 text-sm text-gray-700">{proposal.notes}</p>}
+      <ReasoningDetail traces={proposal.reasoning} succeeded />
       {proposal.warnings && proposal.warnings.length > 0 && (
         <ul className="list-disc pl-5 text-sm text-amber-700">
           {proposal.warnings.map((w) => (

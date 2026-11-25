@@ -104,4 +104,17 @@ describe('proposalFromExtraction', () => {
       warnings: ['w'],
     });
   });
+
+  it("carries the models' reasoning, dropping anything malformed", () => {
+    const p = proposalFromExtraction({
+      patch: [],
+      baseRevision: 4,
+      confidence: 0.6,
+      notes: 'n',
+      warnings: [],
+      reasoning: [{ model: 'a/m:free', outcome: 'ok', text: 'Photo 1 shows the sink wall.' }, { nope: true }],
+    });
+    expect(p.reasoning).toEqual([{ model: 'a/m:free', outcome: 'ok', text: 'Photo 1 shows the sink wall.' }]);
+    expect(proposalFromExtraction({ patch: [], baseRevision: 4, confidence: 0.6, notes: 'n', warnings: [], reasoning: 'x' })).not.toHaveProperty('reasoning');
+  });
 });

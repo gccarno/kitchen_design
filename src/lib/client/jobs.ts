@@ -4,6 +4,7 @@
  * Short requests only, so a phone connection never holds one open for minutes.
  */
 
+import { parseTraces, type ReasoningTrace } from '../llm/reasoning';
 import { markOffline, markOnline } from './online';
 
 /** Shown when the server no longer knows the job (disk mode lost it on a restart, or it was pruned). */
@@ -40,7 +41,9 @@ export class JobFailedError extends Error {
     /** Rate-limited: how long until trying again is worth it. */
     readonly retryAfterMs?: number,
     /** What the AI providers said, for a "Details" section. */
-    readonly detail?: string
+    readonly detail?: string,
+    /** The models' reasoning behind the answers the job got before it failed. */
+    readonly reasoning?: ReasoningTrace[]
   ) {
     super(message);
     this.name = 'JobFailedError';
@@ -65,7 +68,7 @@ export type WaitOptions = {
 export type StartOptions = WaitOptions & { onJobId?: (id: string) => void };
 
 type JobView = { status?: unknown; result?: unknown; error?: unknown };
-type JobErrorBody = { status?: number; error?: string; issues?: unknown; retryAfterMs?: unknown; detail?: unknown };
+type JobErrorBody = { status?: number; error?: string; issues?: unknown; retryAfterMs?: unknown; detail?: unknown; reasoning?: unknown };
 
 const defaultFallback = (status: number) => `request failed (${status})`;
 
@@ -141,7 +144,8 @@ export async function waitForJob<T>(jobId: string, opts: WaitOptions = {}): Prom
         const status = e.status ?? 500;
         const retryAfterMs = typeof e.retryAfterMs === 'number' ? e.retryAfterMs : undefined;
         const detail = typeof e.detail === 'string' ? e.detail : undefined;
-        throw new JobFailedError(e.error ?? (opts.fallbackError ?? defaultFallback)(status), status, e.issues, false, retryAfterMs, detail);
+        const reasoning = parseTraces(e.reasoning);
+        throw new JobFailedError(e.error ?? (opts.fallbackError ?? defaultFallback)(status), status, e.issues, false, retryAfterMs, detail, reasoning);
       }
       case 'queued':
       case 'running':

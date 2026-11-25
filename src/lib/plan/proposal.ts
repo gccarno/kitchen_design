@@ -1,4 +1,5 @@
 import { withCloset } from '../closet/commands';
+import { parseTraces, type ReasoningTrace } from '../llm/reasoning';
 import { planToJsonPatch } from './diff';
 import type { Closet, Finishes, JsonPatchOp, PlacedItem, Pricing, Project, Room } from './schemas';
 
@@ -13,6 +14,8 @@ export interface Proposal {
   confidence?: number;
   notes?: string;
   warnings?: string[];
+  /** The models' reasoning behind the proposal, oldest first. */
+  reasoning?: ReasoningTrace[];
 }
 
 /** Propose a user edit to the room and/or the placed items. */
@@ -61,6 +64,8 @@ export interface ExtractionResponse {
   confidence: number;
   notes: string;
   warnings: string[];
+  /** The models' reasoning, when they gave any. */
+  reasoning?: unknown;
 }
 
 export function proposalFromExtraction(r: ExtractionResponse): Proposal {
@@ -72,8 +77,14 @@ export function proposalFromExtraction(r: ExtractionResponse): Proposal {
     confidence: r.confidence,
     notes: r.notes,
     warnings: r.warnings,
+    ...withTraces(r.reasoning),
   };
 }
+
+const withTraces = (value: unknown) => {
+  const reasoning = parseTraces(value);
+  return reasoning ? { reasoning } : {};
+};
 
 /** The fields of POST /api/projects/[id]/refine's response a proposal needs. */
 export interface RefinementResponse {
@@ -82,6 +93,8 @@ export interface RefinementResponse {
   summary: string;
   reply: string;
   warnings: string[];
+  /** The models' reasoning, when they gave any (shown in the chat, not on the proposal). */
+  reasoning?: unknown;
 }
 
 export function proposalFromRefinement(r: RefinementResponse): Proposal {

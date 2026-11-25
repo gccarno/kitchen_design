@@ -228,6 +228,18 @@ describe('ExtractPanel', () => {
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
   });
 
+  it('shows the reasoning behind a failed extraction', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'could not produce a valid room', reasoning: [{ outcome: 'bad_json', text: 'Four walls, maybe five.' }] } }));
+    const { button } = setup();
+    fireEvent.click(button());
+    await tick(1500);
+    await screen.findByText('could not produce a valid room');
+    expect(screen.getByText('How the AI worked this out').closest('details')!.textContent).toContain('Four walls, maybe five.');
+  });
+
   it("shows the provider's own message under Details, and none when there is none", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     fetchMock

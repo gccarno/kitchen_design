@@ -126,6 +126,37 @@ describe('runJob', () => {
     expect(failed.error).toEqual({ status: 502, error: 'rate limited', detail: `a/m:free (429): ${detail}` });
   });
 
+  it("keeps the models' reasoning with the result, oldest first", async () => {
+    const { store, job } = await setup('refine', { message: 'hello' });
+    await runJob(job.id, {
+      makeProvider: ({ onReasoning }) => {
+        onReasoning?.({ model: 'a/m:free', outcome: 'ok', text: 'The user greets me.' });
+        return new StubProvider([reply('Hi there')]);
+      },
+    });
+    const done = (await store.get(job.id))!;
+    expect(done.result).toMatchObject({ reply: 'Hi there', reasoning: [{ model: 'a/m:free', outcome: 'ok', text: 'The user greets me.' }] });
+  });
+
+  it("keeps the models' reasoning on a failed job too, but not in the failure report", async () => {
+    const { store, job } = await setup('extract', {}, { photo: true });
+    await runJob(job.id, {
+      makeProvider: ({ onReasoning }) => {
+        onReasoning?.({ outcome: 'bad_json', text: 'SECRET-TRACE' });
+        return new StubProvider([new LLMRequestError('rate limited')]);
+      },
+    });
+    const failed = (await store.get(job.id))!;
+    expect(failed.error).toEqual({ status: 502, error: 'rate limited', reasoning: [{ outcome: 'bad_json', text: 'SECRET-TRACE' }] });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('SECRET-TRACE');
+  });
+
+  it('adds no reasoning field when the models gave none', async () => {
+    const { store, job } = await setup('refine', { message: 'hello' });
+    await runJob(job.id, { makeProvider: () => new StubProvider([reply('Hi')]) });
+    expect((await store.get(job.id))!.result).not.toHaveProperty('reasoning');
+  });
+
   it('reports a failed job (a job_failed log line, and Sentry when on)', async () => {
     const { job, project } = await setup('extract', {}, { photo: true });
     await runJob(job.id, { provider: new StubProvider([new LLMRequestError('rate limited')]) });

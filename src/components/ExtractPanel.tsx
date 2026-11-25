@@ -18,6 +18,8 @@ import {
 import { parseLength } from '@/lib/plan/length';
 import LengthInput from './LengthInput';
 import ErrorDetail from './ErrorDetail';
+import ReasoningDetail from './ReasoningDetail';
+import type { ReasoningTrace } from '@/lib/llm/reasoning';
 import RetryCountdown from './RetryCountdown';
 
 interface ExtractPanelProps {
@@ -84,7 +86,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
   const setRows = (next: Row[]) => change({ rows: next });
   const setHint = (next: string) => change({ hint: next });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ message: string; retryAfterMs?: number; detail?: string } | null>(null);
+  const [error, setError] = useState<{ message: string; retryAfterMs?: number; detail?: string; reasoning?: ReasoningTrace[] } | null>(null);
   const [slow, setSlow] = useState(false);
   const inFlight = useRef(false);
   const current = useRef<AbortController | null>(null);
@@ -122,7 +124,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
       // Connection lost (or gave up waiting): the job may still finish, so the next mount resumes it.
       if (!keepsJob(err)) forgetJob(jobKey);
       const failed = err instanceof JobFailedError ? err : undefined;
-      setError({ message: (err as Error).message, retryAfterMs: failed?.retryAfterMs, detail: failed?.detail });
+      setError({ message: (err as Error).message, retryAfterMs: failed?.retryAfterMs, detail: failed?.detail, reasoning: failed?.reasoning });
     } finally {
       if (current.current === ctrl) {
         current.current = null;
@@ -265,6 +267,7 @@ export default function ExtractPanel({ projectId, hasPhotos, units = 'mm', photo
         </p>
       )}
       <ErrorDetail detail={error?.detail} />
+      <ReasoningDetail traces={error?.reasoning} />
       {error?.retryAfterMs !== undefined && (
         <RetryCountdown retryAfterMs={error.retryAfterMs} onRetry={run} disabled={!canRun} />
       )}

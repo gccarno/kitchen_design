@@ -3,6 +3,7 @@
  * from this module — never from a vendor SDK or specific implementation.
  */
 export type { LLMProvider, ProviderConfig, TextRequest, ImageAttachment, VisionRequest } from './provider';
+export type { ReasoningTrace } from './reasoning';
 export { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, LLMRateLimitError, LLMNotConfiguredError, providerFromEnv } from './openai-compatible';
 export { extractRoom, ExtractionError, type ExtractRoomResult, type MeasurementInput } from './extract';
 export { refinePlan, RefinementError, type RefineResult } from './refine';
