@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, LLMRateLimitError, providerFromEnv } from './openai-compatible';
+import { OpenAICompatibleProvider, LLMResponseError, LLMRequestError, LLMRateLimitError, providerFromEnv, reasoningWanted } from './openai-compatible';
 import { ModelCooldown } from './cooldown';
 import type { LLMProvider, ProviderConfig } from './provider';
 
@@ -481,6 +481,56 @@ describe('call log (one event per attempt)', () => {
     await p.chatWithVision({ system: 'SECRET-SYSTEM', user: 'SECRET-USER', images: [{ mime: 'image/jpeg', dataBase64: 'SECRETPIXELS' }], schema });
     const line = JSON.stringify(log.mock.calls);
     for (const s of ['SECRET-SYSTEM', 'SECRET-USER', 'SECRETPIXELS', 'sk-test']) expect(line).not.toContain(s);
+  });
+});
+
+describe('reasoning', () => {
+  const schema = z.object({ a: z.number() });
+  const sentBody = (i = 0) => JSON.parse((fetchMock.mock.calls[i] as [string, RequestInit])[1].body as string);
+  const answer = (content: string, message: Record<string, unknown> = {}) =>
+    okJson({ model: 'a/m:free', choices: [{ message: { content, ...message } }] });
+
+  it('asks for it only when configured (plain OpenAI rejects unknown fields)', async () => {
+    fetchMock.mockResolvedValue(answer('{"a":1}'));
+    await new OpenAICompatibleProvider(cfg).completeJSON({ system: 's', user: 'u', schema });
+    expect(sentBody(0)).not.toHaveProperty('include_reasoning');
+    await new OpenAICompatibleProvider({ ...cfg, includeReasoning: true }).completeJSON({ system: 's', user: 'u', schema });
+    expect(sentBody(1).include_reasoning).toBe(true);
+  });
+
+  it("hands each answer's reasoning to onReasoning, with the model and whether the answer was usable", async () => {
+    const onReasoning = vi.fn();
+    const p = new OpenAICompatibleProvider({ ...cfg, includeReasoning: true, onReasoning });
+    fetchMock.mockResolvedValueOnce(answer('not json', { reasoning: 'I think a is one' }));
+    await expect(p.completeJSON({ system: 's', user: 'u', schema })).rejects.toBeInstanceOf(LLMResponseError);
+    fetchMock.mockResolvedValueOnce(answer('{"a":1}', { reasoning_details: [{ type: 'reasoning.text', text: 'a is 1' }] }));
+    await p.completeJSON({ system: 's', user: 'u', schema });
+    expect(onReasoning.mock.calls.map((c) => c[0])).toEqual([
+      { model: 'a/m:free', outcome: 'bad_json', text: 'I think a is one' },
+      { model: 'a/m:free', outcome: 'ok', text: 'a is 1' },
+    ]);
+  });
+
+  it('says nothing when the model gave no reasoning', async () => {
+    const onReasoning = vi.fn();
+    fetchMock.mockResolvedValueOnce(answer('{"a":1}'));
+    await new OpenAICompatibleProvider({ ...cfg, onReasoning }).completeJSON({ system: 's', user: 'u', schema });
+    expect(onReasoning).not.toHaveBeenCalled();
+  });
+
+  it('never puts the reasoning in the call log', async () => {
+    const log = vi.fn();
+    fetchMock.mockResolvedValueOnce(answer('{"a":1}', { reasoning: 'SECRET-TRACE' }));
+    await new OpenAICompatibleProvider({ ...cfg, log, onReasoning: () => {} }).completeJSON({ system: 's', user: 'u', schema });
+    expect(log).toHaveBeenCalledOnce();
+    expect(JSON.stringify(log.mock.calls)).not.toContain('SECRET-TRACE');
+  });
+
+  it('is on for OpenRouter unless LLM_REASONING turns it off, and off elsewhere unless turned on', () => {
+    expect(reasoningWanted('https://openrouter.ai/api/v1', undefined)).toBe(true);
+    expect(reasoningWanted('https://openrouter.ai/api/v1', 'off')).toBe(false);
+    expect(reasoningWanted('https://api.openai.com/v1', undefined)).toBe(false);
+    expect(reasoningWanted('http://localhost:8080/v1', 'on')).toBe(true);
   });
 });
 

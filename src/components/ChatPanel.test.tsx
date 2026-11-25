@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, act, cleanup as cleanupRender } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within, cleanup as cleanupRender } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { markOffline, markOnline } from '@/lib/client/online';
@@ -195,6 +195,29 @@ describe('ChatPanel', () => {
     const details = screen.getByText('Details').closest('details')!;
     expect(details.open).toBe(false);
     expect(details.textContent).toContain('a/m:free (429): Provider returned error (a/m:free is temporarily rate-limited upstream)');
+  });
+
+  it("shows the model's reasoning under its reply", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const reasoning = [{ model: 'a/m:free', outcome: 'ok', text: 'They ask for the size; the plan says 3000 × 4000.' }];
+    for (const r of viaJob({ ...EDIT, patch: [], summary: '', reply: 'The room is 3 × 4 m.', reasoning })) fetchMock.mockResolvedValueOnce(r);
+    setup().say('how big is the room?');
+    await tick(1500);
+    const reply = (await screen.findByText('The room is 3 × 4 m.')).closest('li')!;
+    expect(within(reply).getByText('How the AI worked this out').closest('details')!.textContent).toContain(
+      'They ask for the size; the plan says 3000 × 4000.'
+    );
+  });
+
+  it('shows the reasoning behind a failed request too', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fetchMock
+      .mockResolvedValueOnce(json({ jobId: JOB }, 202))
+      .mockResolvedValueOnce(job('failed', { error: { status: 502, error: 'bad answer', reasoning: [{ outcome: 'bad_json', text: 'Hmm, maybe move it.' }] } }));
+    setup().say('add a dishwasher');
+    await tick(1500);
+    const reply = (await screen.findByText('Sorry — bad answer')).closest('li')!;
+    expect(within(reply).getByText('How the AI worked this out').closest('details')!.textContent).toContain('Hmm, maybe move it.');
   });
 
   it('offers no Try again for errors that are not rate limits', async () => {

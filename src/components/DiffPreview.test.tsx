@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { markOffline, markOnline } from '@/lib/client/online';
@@ -100,6 +100,27 @@ describe('DiffPreview', () => {
     expect(screen.getByText(/72%/)).not.toBeNull();
     expect(screen.getByText('Left corner hidden by the fridge.')).not.toBeNull();
     expect(screen.getByText('Your measurements disagree by 8%.')).not.toBeNull();
+  });
+
+  it("folds the models' reasoning away, marking the tries that were rejected", () => {
+    setup(
+      llmProposal({
+        reasoning: [
+          { model: 'nvidia/nemotron-3.5-super-vl:free', outcome: 'bad_json', text: 'First go.' },
+          { model: 'nvidia/nemotron-3.5-super-vl:free', outcome: 'ok', text: 'Photo 1 shows the sink wall.' },
+        ],
+      })
+    );
+    const details = screen.getByText('How the AI worked this out').closest('details')!;
+    expect(details.open).toBe(false);
+    const items = within(details).getAllByRole('listitem');
+    expect(items[0].textContent).toContain('Try 1 · nemotron-3.5-super-vl (its answer was rejected');
+    expect(items[1].textContent).toBe('Try 2 · nemotron-3.5-super-vlPhoto 1 shows the sink wall.');
+  });
+
+  it('shows no reasoning section when there is none', () => {
+    setup();
+    expect(screen.queryByText('How the AI worked this out')).toBeNull();
   });
 
   it('shows the photos a room from photos was made from, and a bigger one when tapped', () => {

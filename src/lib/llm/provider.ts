@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { ModelCooldown } from './cooldown';
 import type { LLMCallSink } from './log';
+import type { ReasoningSink } from './reasoning';
 
 /**
  * A schema whose parsed OUTPUT is `T`. The input side is left open so
@@ -35,6 +36,10 @@ export interface ProviderConfig {
   log?: LLMCallSink;
   /** Also told about each attempt, e.g. to attach the trail to an error report. */
   onCall?: LLMCallSink;
+  /** OpenRouter only: ask for each model's reasoning with its answer. Default off. */
+  includeReasoning?: boolean;
+  /** Told the reasoning behind each answer, when the model gave one. Never logged. */
+  onReasoning?: ReasoningSink;
 }
 
 export interface TextRequest {

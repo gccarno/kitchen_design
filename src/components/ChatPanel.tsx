@@ -15,6 +15,8 @@ import {
   waitForJob,
 } from '@/lib/client/jobs';
 import ErrorDetail from './ErrorDetail';
+import ReasoningDetail from './ReasoningDetail';
+import { parseTraces, type ReasoningTrace } from '@/lib/llm/reasoning';
 import RetryCountdown from './RetryCountdown';
 
 interface ChatPanelProps {
@@ -34,6 +36,10 @@ type Message = {
   retry?: { afterMs: number; message: string };
   /** What the AI providers said, under "Details". */
   detail?: string;
+  /** The models' reasoning behind this reply (or before the failure). */
+  reasoning?: ReasoningTrace[];
+  /** The reply came back: its last trace is the answer used. */
+  succeeded?: boolean;
 };
 
 /** Turns of context sent with each request (errors excluded). */
@@ -70,11 +76,11 @@ export default function ChatPanel({
       const result = await work(ctrl.signal);
       forgetJob(jobKey);
       const text = result.reply || result.summary || (result.patch.length ? '' : 'No changes.');
+      const reasoning = parseTraces(result.reasoning);
+      reply = { role: 'assistant', content: text, ...(reasoning ? { reasoning, succeeded: true } : {}) };
       if (result.patch.length > 0) {
         onProposal(proposalFromRefinement(result));
-        reply = { role: 'assistant', content: text, note: 'Review the change above before it’s applied.' };
-      } else {
-        reply = { role: 'assistant', content: text };
+        reply.note = 'Review the change above before it’s applied.';
       }
     } catch (err) {
       // Unmounted mid-poll: keep the remembered job so the next mount resumes it.
@@ -83,11 +89,13 @@ export default function ChatPanel({
       if (!keepsJob(err)) forgetJob(jobKey);
       const afterMs = err instanceof JobFailedError ? err.retryAfterMs : undefined;
       const detail = err instanceof JobFailedError ? err.detail : undefined;
+      const reasoning = err instanceof JobFailedError ? err.reasoning : undefined;
       reply = {
         role: 'assistant',
         content: `Sorry — ${(err as Error).message}`,
         error: true,
         ...(detail ? { detail } : {}),
+        ...(reasoning ? { reasoning } : {}),
         ...(afterMs !== undefined && message !== undefined ? { retry: { afterMs, message } } : {}),
       };
     }
@@ -183,6 +191,7 @@ export default function ChatPanel({
               {m.content}
               {m.note && <span className="block text-xs text-gray-600">{m.note}</span>}
               <ErrorDetail detail={m.detail} />
+              <ReasoningDetail traces={m.reasoning} succeeded={m.succeeded} />
             </li>
           ))}
         </ol>

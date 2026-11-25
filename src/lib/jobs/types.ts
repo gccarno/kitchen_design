@@ -1,5 +1,7 @@
 /** Long-running LLM work (photo extraction, plan refinement) runs as a job the client polls. */
 
+import type { ReasoningTrace } from '../llm/reasoning';
+
 export const JOB_KINDS = ['extract', 'refine'] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
@@ -15,6 +17,8 @@ export type JobError = {
   retryAfterMs?: number;
   /** What each model's provider said when it failed, for the user to see under "Details". */
   detail?: string;
+  /** The models' reasoning behind each answer the job got, oldest first. */
+  reasoning?: ReasoningTrace[];
 };
 
 export type Job = {
@@ -25,7 +29,7 @@ export type Job = {
   kind: JobKind;
   status: JobStatus;
   input: unknown;
-  /** The route's former 200 body, once `done`. */
+  /** The route's former 200 body, once `done` (plus `reasoning`, when the models gave any). */
   result: unknown | null;
   error: JobError | null;
   /** How many times the job has been claimed (started). */

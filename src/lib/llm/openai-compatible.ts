@@ -7,6 +7,7 @@ import type {
 } from './provider';
 import { ModelCooldown } from './cooldown';
 import { DETAIL_MAX, errorDetail, logLLMCall, type LLMCallEvent, type LLMCallSink } from './log';
+import { readReasoning, type ReasoningSink } from './reasoning';
 
 /** Chat-completions message format used by every OpenAI-compatible API. */
 type ChatMessage =
@@ -28,10 +29,12 @@ interface ChatCompletionsRequest {
   temperature?: number;
   max_tokens?: number;
   response_format?: { type: 'json_object' };
+  /** OpenRouter: return the model's reasoning with its answer (it doesn't change how the model works). */
+  include_reasoning?: boolean;
 }
 
 interface ChatCompletionsResponse {
-  choices: Array<{ message: { content: string | null } }>;
+  choices: Array<{ message: { content: string | null; reasoning?: unknown; reasoning_details?: unknown } }>;
   /** The model that answered (OpenRouter: may be a fallback). */
   model?: unknown;
   /** OpenRouter: the upstream provider it routed to. */
@@ -39,7 +42,7 @@ interface ChatCompletionsResponse {
 }
 
 /** A request body before the model route is added. */
-type ChatBody = Omit<ChatCompletionsRequest, 'model' | 'models'>;
+type ChatBody = Omit<ChatCompletionsRequest, 'model' | 'models' | 'include_reasoning'>;
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_RETRY_DELAY_MS = 5_000;
@@ -154,6 +157,8 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private readonly cooldown: ModelCooldown;
   private readonly log: LLMCallSink;
   private readonly onCall?: LLMCallSink;
+  private readonly includeReasoning: boolean;
+  private readonly onReasoning?: ReasoningSink;
 
   constructor(cfg: ProviderConfig) {
     // Trim trailing slash so concat is predictable.
@@ -170,6 +175,8 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.cooldown = cfg.cooldown ?? sharedCooldown;
     this.log = cfg.log ?? logLLMCall;
     this.onCall = cfg.onCall;
+    this.includeReasoning = cfg.includeReasoning ?? false;
+    this.onReasoning = cfg.onReasoning;
   }
 
   /** The configured models, primary first, with recently rate-limited ones moved to the back. */
@@ -261,7 +268,11 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
       let res: PostResult;
       try {
-        res = await this.post({ ...OpenAICompatibleProvider.route(models), ...body });
+        res = await this.post({
+          ...OpenAICompatibleProvider.route(models),
+          ...body,
+          ...(this.includeReasoning ? { include_reasoning: true } : {}),
+        });
       } catch (err) {
         const timedOut = /timed out/.test((err as Error).message);
         this.emit({ ...base, ms: ms(), outcome: timedOut ? 'timeout' : 'network_error', detail: (err as Error).message.slice(0, DETAIL_MAX) });
@@ -283,12 +294,17 @@ export class OpenAICompatibleProvider implements LLMProvider {
           throw err;
         }
         const used = { ...(answer.model ? { modelUsed: answer.model } : {}), ...(answer.provider ? { provider: answer.provider } : {}) };
+        const reasoned = (outcome: 'ok' | 'bad_json') => {
+          if (answer.reasoning) this.onReasoning?.({ ...(answer.model ? { model: answer.model } : {}), outcome, text: answer.reasoning });
+        };
         try {
           const parsed = parse(answer.content);
           this.emit({ ...base, ...used, status: res.status, ms: ms(), outcome: 'ok' });
+          reasoned('ok');
           return parsed;
         } catch (err) {
           this.emit({ ...base, ...used, status: res.status, ms: ms(), outcome: 'bad_json', detail: (err as Error).message.slice(0, DETAIL_MAX) });
+          reasoned('bad_json');
           throw err;
         }
       }
@@ -353,7 +369,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 }
 
-type Answer = { content: string; model?: string; provider?: string };
+type Answer = { content: string; model?: string; provider?: string; reasoning?: string };
 
 /** The first choice's text (and who answered) from a chat-completions response; LLMRequestError for anything else. */
 function readContent(res: PostResult): Answer {
@@ -370,8 +386,10 @@ function readContent(res: PostResult): Answer {
   if (!choice || choice.message.content == null) {
     throw new LLMRequestError('LLM response had no choices or empty content');
   }
+  const reasoning = readReasoning(choice.message);
   return {
     content: choice.message.content,
+    ...(reasoning ? { reasoning } : {}),
     ...(typeof data.model === 'string' ? { model: data.model } : {}),
     ...(typeof data.provider === 'string' ? { provider: data.provider } : {}),
   };
@@ -404,20 +422,30 @@ function stripCodeFence(s: string): string {
 /** "a, b ,c" → ["a", "b", "c"]. */
 const modelList = (v: string | undefined) => (v ?? '').split(',').map((m) => m.trim()).filter(Boolean);
 
+/** Ask for the models' reasoning: on for OpenRouter unless `LLM_REASONING=off` (plain OpenAI rejects the field). */
+export function reasoningWanted(baseUrl: string, setting = process.env.LLM_REASONING): boolean {
+  const s = (setting ?? '').trim().toLowerCase();
+  if (['off', '0', 'false', 'no'].includes(s)) return false;
+  if (['on', '1', 'true', 'yes'].includes(s)) return true;
+  return /openrouter\.ai/i.test(baseUrl);
+}
+
 /**
  * Build a provider from environment variables. Throws if `LLM_API_KEY` is
  * missing. The other vars fall back to safe defaults aimed at OpenAI.
  * `LLM_MODEL` / `LLM_VISION_MODEL` may be comma-separated lists (OpenRouter):
  * the first is the model, the rest are fallbacks.
  */
-export function providerFromEnv(extra: Pick<ProviderConfig, 'onCall'> = {}): LLMProvider {
+export function providerFromEnv(extra: Pick<ProviderConfig, 'onCall' | 'onReasoning'> = {}): LLMProvider {
   const apiKey = process.env.LLM_API_KEY;
   if (!apiKey) throw new LLMNotConfiguredError();
   const [model = 'gpt-4o-mini', ...fallbackModels] = modelList(process.env.LLM_MODEL);
   const [visionModel = 'gpt-4o-mini', ...visionFallbackModels] = modelList(process.env.LLM_VISION_MODEL);
   const timeoutMs = Number(process.env.LLM_TIMEOUT_MS) || undefined;
+  const baseUrl = process.env.LLM_BASE_URL || 'https://api.openai.com/v1';
   return new OpenAICompatibleProvider({
-    baseUrl: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
+    baseUrl,
+    includeReasoning: reasoningWanted(baseUrl),
     apiKey,
     model,
     visionModel,
